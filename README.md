@@ -19,6 +19,9 @@ and logged in on your Mac. There is **no API key and no API billing**.
 - [Agents](#agents)
 - [Approvals](#approvals)
 - [Routines](#routines)
+- [Avatars](#avatars)
+- [Skills marketplace](#skills-marketplace)
+- [Usage widget](#usage-widget)
 - [Connecting Gmail](#connecting-gmail)
 - [Adding MCP servers](#adding-mcp-servers)
 - [Known limitations](#known-limitations)
@@ -73,6 +76,11 @@ This type-checks, builds, and writes:
 `npm run dist:universal` builds an Intel + Apple Silicon version instead. The production app loads its bundled
 UI files, never a localhost URL, and needs no terminal or dev server.
 
+## Changing the app icon
+
+Run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG. It regenerates `build/icon.icns`
+and the PNGs, and re-brands the dev app. `npm install` also re-brands dev Electron as NateBot automatically.
+
 ## Rebuild after changes
 
 ```bash
@@ -121,6 +129,10 @@ Everything stays on this Mac:
 | `~/NateBot/settings.json` | App settings |
 | `~/NateBot/workspaces/<id>/` | Each agent's private working folder; attachments go in `attachments/` |
 | `~/NateBot/credentials/google/` | Gmail OAuth token (after connecting Gmail) |
+| `~/NateBot/skills/` | Skills installed from the Marketplace (a small Claude Code plugin) |
+| `~/NateBot/skill-sources.json` | GitHub repos the Marketplace browses |
+| `~/NateBot/usage.json` | Last known usage numbers (so the widget works at launch) |
+| `~/Library/Application Support/NateBot/avatars/` | Uploaded profile pictures (256px PNGs) |
 | `~/Library/Logs/NateBot/main.log` | Diagnostic log (no prompts, replies or secrets) |
 
 Deleting an agent moves its workspace to the Trash.
@@ -133,7 +145,7 @@ file:
 ```yaml
 id: email-agent
 name: Email Agent
-icon: "📧"
+shape: hexagon         # blob | circle | square | hexagon | triangle | pill | cloud, or null = from the name
 color: "#F5A524"
 model: sonnet          # sonnet | haiku | opus (haiku uses the least of your limit)
 instructions: |
@@ -185,6 +197,39 @@ an agent's YAML says. The Gmail setup lists `send_gmail_message` there, along wi
 Turn on a routine in an agent's settings. Pick "Weekdays at 8:00 AM" (or write your own cron) and say what it
 should do. The **Routines** view (clock icon, ⇧⌘R) lists every routine with its next run, last result, an on/off
 toggle and **Run now**. You get a macOS notification when a routine finishes or an agent needs your approval.
+
+## Avatars
+
+Each agent gets a mascot (a coloured shape with a small face) generated from its name, so it always looks
+the same. You can pick a different shape and colour in the agent's settings.
+
+To use a photo instead, click any avatar (in the chat header, in agent settings, or your own at the bottom of the
+sidebar) and choose **Choose picture…**. PNG, JPG and GIF work; the image is cropped to a square and resized to
+256px, and a GIF keeps its first frame. **Reset to default** goes back to the mascot (or your initials).
+
+## Skills marketplace
+
+**Marketplace** (above your profile in the sidebar) lets you browse [Agent Skills](https://github.com/anthropics/skills)
+and install or remove them with one click. It starts with Anthropic's official `anthropics/skills` repo. Use
+**+ Source** to add any GitHub repo that contains `SKILL.md` folders (`owner/repo` or its URL).
+
+- Installed skills go into `~/NateBot/skills`, a NateBot-owned Claude Code plugin. Every agent run loads it with
+  `--plugin-dir` and gets the `Skill` tool, so any agent can use them.
+- You can also copy a skill folder (containing `SKILL.md`) into `~/NateBot/skills/skills/` by hand. It shows up as
+  a local skill.
+- Skills marked **scripts** ship helper programs. Agents can read them but can't run them, because agents don't
+  have Bash unless you allow it for that agent under *Advanced tool permissions*.
+- Claude Code *plugins* from plugin marketplaces aren't used. They can include hooks and MCP servers that run
+  code automatically, which would bypass NateBot's approval model.
+- Skills are instructions written by other people, so only add sources you trust. Removing a skill moves it to
+  the Trash.
+
+## Usage widget
+
+Below Marketplace, two small rings show your **5-hour session** and **weekly** usage: the % used and time until
+each resets. They're neutral below 60%, amber from 60% and red from 85% or when a limit is hit. Hover (or focus)
+one for exact numbers and reset times. NateBot learns these numbers from Claude Code as agents run; it never
+polls. **Settings → Usage** shows the same numbers in more detail.
 
 ## Connecting Gmail
 

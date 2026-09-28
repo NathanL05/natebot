@@ -99,12 +99,21 @@ export interface AppSettings {
   userName: string
 }
 
+export interface UsageWindow {
+  /** 0–1, or null before the first report. */
+  utilization: number | null
+  resetsAt: number | null
+}
+
 export interface UsageInfo {
   /** 'allowed' | 'allowed_warning' | 'rejected' as reported by the CLI */
   status: string
+  /** Which window hit its limit (e.g. 'five_hour', 'seven_day') when rejected. */
+  limitedWindow: string | null
+  /** When runs may start again (overall). */
   resetsAt: number | null
-  fiveHourUtilization: number | null
-  sevenDayUtilization: number | null
+  fiveHour: UsageWindow
+  sevenDay: UsageWindow
   updatedAt: number
 }
 

@@ -1,11 +1,16 @@
-// Tracks the subscription usage window from claude's rate_limit_event and
-// decides when runs must wait for the limit to reset.
+// Tracks the subscription usage windows from claude's rate_limit_event and
+// decides when runs must wait for the limit to reset. The last known state is
+// kept in ~/NateBot/usage.json so the widget has numbers right after launch.
 import { EventEmitter } from 'node:events'
-import type { UsageInfo } from '@shared/types'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import type { UsageInfo, UsageWindow } from '@shared/types'
 import type { RateLimitInfo } from './claude/stream'
+import { ROOT } from './paths'
 
 const LIMIT_TEXT = /usage limit|limit reached|rate.?limit|out of (extra )?usage|5-hour limit|weekly limit/i
 const FALLBACK_WAIT = 15 * 60_000
+const FILE = join(ROOT, 'usage.json')
 
 export function looksLikeUsageLimit(text: string): boolean {
   return LIMIT_TEXT.test(text)
@@ -17,28 +22,69 @@ function resetFromText(text: string): number | null {
   return epoch ? Number(epoch) * 1000 : null
 }
 
+const empty = (): UsageWindow => ({ utilization: null, resetsAt: null })
+
+function toWindow(raw: { utilization?: number; resetsAt?: number } | undefined, prev: UsageWindow): UsageWindow {
+  return {
+    utilization: typeof raw?.utilization === 'number' ? raw.utilization : prev.utilization,
+    resetsAt: typeof raw?.resetsAt === 'number' ? raw.resetsAt * 1000 : prev.resetsAt
+  }
+}
+
+/** A window whose reset time has passed starts again from zero. */
+function rollOver(w: UsageWindow): UsageWindow {
+  return w.resetsAt && w.resetsAt <= Date.now() ? { utilization: 0, resetsAt: null } : w
+}
+
 export class UsageTracker extends EventEmitter {
   private info: UsageInfo | null = null
   private blockedUntil = 0
 
+  constructor() {
+    super()
+    try {
+      const saved = JSON.parse(readFileSync(FILE, 'utf8')) as UsageInfo
+      if (saved && saved.fiveHour && saved.sevenDay) {
+        this.info = { ...saved, status: 'allowed', fiveHour: rollOver(saved.fiveHour), sevenDay: rollOver(saved.sevenDay) }
+      }
+    } catch {
+      // No saved usage yet.
+    }
+  }
+
   get(): UsageInfo | null {
+    if (this.info) {
+      const fiveHour = rollOver(this.info.fiveHour)
+      const sevenDay = rollOver(this.info.sevenDay)
+      if (fiveHour !== this.info.fiveHour || sevenDay !== this.info.sevenDay) this.info = { ...this.info, fiveHour, sevenDay }
+    }
     return this.info
   }
 
+  private changed(): void {
+    try {
+      writeFileSync(FILE, JSON.stringify(this.info))
+    } catch {
+      // Not fatal.
+    }
+    this.emit('changed', this.info)
+  }
+
   update(r: RateLimitInfo): void {
-    const five = r.unifiedWindows?.['five_hour']
-    const seven = r.unifiedWindows?.['seven_day']
-    const resetsAt = r.resetsAt ? r.resetsAt * 1000 : (this.info?.resetsAt ?? null)
+    const prev = this.info
+    const fiveHour = toWindow(r.unifiedWindows?.['five_hour'], prev?.fiveHour ?? empty())
+    const sevenDay = toWindow(r.unifiedWindows?.['seven_day'], prev?.sevenDay ?? empty())
+    const resetsAt = r.resetsAt ? r.resetsAt * 1000 : (prev?.resetsAt ?? null)
     this.info = {
       status: r.status ?? 'allowed',
+      limitedWindow: r.status === 'rejected' ? (r.rateLimitType ?? null) : null,
       resetsAt,
-      fiveHourUtilization: typeof five?.utilization === 'number' ? five.utilization : (this.info?.fiveHourUtilization ?? null),
-      sevenDayUtilization: typeof seven?.utilization === 'number' ? seven.utilization : (this.info?.sevenDayUtilization ?? null),
+      fiveHour,
+      sevenDay,
       updatedAt: Date.now()
     }
-    if (r.status === 'rejected') this.blockedUntil = resetsAt ?? Date.now() + FALLBACK_WAIT
-    else this.blockedUntil = 0
-    this.emit('changed', this.info)
+    this.blockedUntil = r.status === 'rejected' ? (resetsAt ?? Date.now() + FALLBACK_WAIT) : 0
+    this.changed()
   }
 
   /** Called when a run fails with a usage-limit error. */
@@ -48,12 +94,13 @@ export class UsageTracker extends EventEmitter {
     this.blockedUntil = until
     this.info = {
       status: 'rejected',
+      limitedWindow: this.info?.limitedWindow ?? null,
       resetsAt: until,
-      fiveHourUtilization: this.info?.fiveHourUtilization ?? null,
-      sevenDayUtilization: this.info?.sevenDayUtilization ?? null,
+      fiveHour: this.info?.fiveHour ?? empty(),
+      sevenDay: this.info?.sevenDay ?? empty(),
       updatedAt: Date.now()
     }
-    this.emit('changed', this.info)
+    this.changed()
   }
 
   /** Dev-only simulation from the Debug menu. */
@@ -62,7 +109,7 @@ export class UsageTracker extends EventEmitter {
     else {
       this.blockedUntil = 0
       if (this.info) this.info = { ...this.info, status: 'allowed', updatedAt: Date.now() }
-      this.emit('changed', this.info)
+      this.changed()
     }
   }
 
@@ -74,7 +121,7 @@ export class UsageTracker extends EventEmitter {
       // Window has passed: optimistically allow; the next run reports fresh status.
       this.blockedUntil = 0
       this.info = { ...this.info, status: 'allowed', updatedAt: Date.now() }
-      this.emit('changed', this.info)
+      this.changed()
     }
     return 0
   }

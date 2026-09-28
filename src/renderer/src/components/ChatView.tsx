@@ -26,10 +26,10 @@ function UsageBanner() {
       </div>
     )
   }
-  if ((usage.fiveHourUtilization ?? 0) >= 0.9) {
+  if ((usage.fiveHour.utilization ?? 0) >= 0.9) {
     return (
       <div className="mx-6 mt-2 rounded-xl bg-warn/10 px-3 py-1.5 text-center text-[12px] text-warn">
-        {Math.round((usage.fiveHourUtilization ?? 0) * 100)}% of your 5-hour usage window used
+        {Math.round((usage.fiveHour.utilization ?? 0) * 100)}% of your 5-hour usage window used
       </div>
     )
   }

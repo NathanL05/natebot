@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { MODELS, type ModelId, type Theme } from '@shared/types'
+import { MODELS, type ModelId, type Theme, type UsageWindow } from '@shared/types'
 import { api, useStore } from '../lib/store'
-import { clockTime } from '../lib/format'
+import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
 import { RefreshIcon } from './icons'
 import { Button, inputBase, inputClass, Segmented, Toggle } from './ui'
 
@@ -26,18 +26,24 @@ function Row({ label, hint, children }: { label: string; hint?: ReactNode; child
   )
 }
 
-function Meter({ value }: { value: number | null }) {
-  if (value === null) return <span className="text-[12px] text-muted">—</span>
-  const pct = Math.round(value * 100)
+function Meter({ window: w, limited }: { window: UsageWindow; limited: boolean }) {
+  const level = usageLevel(w, limited)
+  const color = LEVEL_COLOR[level]
+  const value = limited ? 1 : (w.utilization ?? 0)
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 w-32 overflow-hidden rounded-full bg-elev-2">
-        <div className={`h-full rounded-full ${value > 0.85 ? 'bg-warn' : 'bg-accent'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+        <div className="h-full rounded-full transition-all" style={{ width: `${Math.round(value * 100)}%`, background: color }} />
       </div>
-      <span className="w-9 text-right text-[12px] text-muted">{pct}%</span>
+      <span className="w-12 text-right text-[12px] tabular-nums" style={{ color: level === 'ok' || level === 'none' ? 'var(--muted)' : color }}>
+        {limited ? '100%' : pct(w.utilization, 1)}
+      </span>
     </div>
   )
 }
+
+const resetHint = (w: UsageWindow): string | undefined =>
+  w.resetsAt ? `Resets ${resetTime(w.resetsAt)} (in ${countdown(w.resetsAt)})` : undefined
 
 export function SettingsView() {
   const settings = useStore((s) => s.settings)
@@ -109,11 +115,14 @@ export function SettingsView() {
           </Section>
 
           <Section title="Usage">
-            <Row label="5-hour window" hint={usage?.resetsAt ? `Resets at ${clockTime(usage.resetsAt)}` : undefined}>
-              <Meter value={usage?.fiveHourUtilization ?? null} />
+            <Row label="5-hour session window" hint={resetHint(usage?.fiveHour ?? { utilization: null, resetsAt: null }) ?? 'Shows after your first message'}>
+              <Meter
+                window={usage?.fiveHour ?? { utilization: null, resetsAt: null }}
+                limited={usage?.status === 'rejected' && usage.limitedWindow !== 'seven_day'}
+              />
             </Row>
-            <Row label="This week">
-              <Meter value={usage?.sevenDayUtilization ?? null} />
+            <Row label="Weekly limit" hint={resetHint(usage?.sevenDay ?? { utilization: null, resetsAt: null })}>
+              <Meter window={usage?.sevenDay ?? { utilization: null, resetsAt: null }} limited={usage?.status === 'rejected' && usage.limitedWindow === 'seven_day'} />
             </Row>
           </Section>
 
