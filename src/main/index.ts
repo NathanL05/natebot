@@ -1,33 +1,29 @@
 import { app, BrowserWindow, Menu, nativeImage, shell, type MenuItemConstructorOptions } from 'electron'
-import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { userInfo } from 'node:os'
 import { join } from 'node:path'
+import { Backend } from './backend'
 import { emit, registerApi } from './ipc'
-import { MockBackend } from './mock-backend'
+import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
 
 app.setName('NateBot')
 
 const isDev = !app.isPackaged
 const devServerUrl = isDev ? process.env['ELECTRON_RENDERER_URL'] : undefined
+const resourcesDir = join(__dirname, '../../resources')
 
 // Dev only: lets automated UI checks attach over the Chrome DevTools Protocol.
 const cdpPort = process.env['NATEBOT_CDP_PORT']
 if (isDev && cdpPort) app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
 
+// One NateBot at a time; a second launch just shows the existing window.
+if (!app.requestSingleInstanceLock()) app.quit()
+
 let mainWindow: BrowserWindow | null = null
 let quitting = false
+let backend: Backend
 
-function fullName(): string {
-  try {
-    return execFileSync('/usr/bin/id', ['-F'], { encoding: 'utf8', timeout: 2000 }).trim() || userInfo().username
-  } catch {
-    return userInfo().username
-  }
-}
-
-const backend = new MockBackend(fullName())
+const BACKGROUNDS = { dark: '#1C1C1E', light: '#FFFFFF' } as const
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -37,7 +33,7 @@ function createWindow(): BrowserWindow {
     title: 'NateBot',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 18, y: 20 },
-    backgroundColor: '#1C1C1E',
+    backgroundColor: BACKGROUNDS[backend.settings.get().theme],
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -49,9 +45,11 @@ function createWindow(): BrowserWindow {
   })
   trackBounds(win)
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (!startHidden) win.show()
+  })
 
-  // Closing the window hides it; the app keeps running for routines.
+  // Closing the window hides it; NateBot keeps running in the menu bar.
   win.on('close', (e) => {
     if (!quitting) {
       e.preventDefault()
@@ -74,10 +72,19 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+let startHidden = false
+
 function showWindow(): void {
+  startHidden = false
   if (!mainWindow || mainWindow.isDestroyed()) mainWindow = createWindow()
-  mainWindow.show()
+  if (mainWindow.webContents.isLoading()) mainWindow.once('ready-to-show', () => mainWindow?.show())
+  else mainWindow.show()
   mainWindow.focus()
+}
+
+function openAgent(agentId: string): void {
+  showWindow()
+  emit('focusAgent', agentId)
 }
 
 function buildMenu(): void {
@@ -108,6 +115,8 @@ function buildMenu(): void {
         { label: 'New Agent…', accelerator: 'Cmd+N', click: nav('newAgent') },
         { label: 'Routines', accelerator: 'Cmd+Shift+R', click: nav('routines') },
         { type: 'separator' },
+        { label: 'Show Data Folder', click: () => void shell.openPath(join(app.getPath('home'), 'NateBot')) },
+        { type: 'separator' },
         { role: 'close' }
       ]
     },
@@ -137,29 +146,50 @@ function buildMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
-app.whenReady().then(() => {
+app.on('second-instance', showWindow)
+
+app.whenReady().then(async () => {
   app.setAboutPanelOptions({
     applicationName: 'NateBot',
     applicationVersion: app.getVersion(),
-    copyright: 'Personal multi-agent assistant, powered by Claude Code'
+    copyright: 'Personal multi-agent assistant, powered by your Claude Code subscription'
   })
 
-  // Packaged builds get the icon from the .icns; in dev set it on the Dock.
-  const devIcon = join(__dirname, '../../resources/icon.png')
+  const devIcon = join(resourcesDir, 'icon.png')
   if (isDev && existsSync(devIcon)) app.dock?.setIcon(nativeImage.createFromPath(devIcon))
 
+  // Launched at login: start quietly in the menu bar.
+  startHidden = app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin === true
+
+  backend = new Backend()
   registerApi(backend, devServerUrl)
   buildMenu()
+
+  const tray = createTray({
+    resourcesDir,
+    onOpen: showWindow,
+    onOpenAgent: openAgent,
+    onRoutines: () => {
+      showWindow()
+      emit('navigate', 'routines')
+    }
+  })
+  backend.onAgentsChanged = tray.update
+  backend.onOpenAgent = openAgent
+
   mainWindow = createWindow()
+  await backend.start()
+  tray.update((await backend.bootstrap()).agents)
 
   app.on('activate', showWindow)
 })
 
 app.on('before-quit', () => {
   quitting = true
+  backend?.shutdown()
 })
 
-// On macOS the app stays alive with no windows (routines keep running).
+// NateBot stays alive with no windows so routines keep running.
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

@@ -22,7 +22,7 @@ export function App() {
     document.documentElement.dataset['theme'] = theme
   }, [theme])
 
-  if (!ready) return <div className="drag h-full" />
+  if (!ready || env?.checking) return <div className="drag h-full" />
   if (env && !(env.claudeFound && env.loggedIn)) return <SetupScreen env={env} />
 
   return (

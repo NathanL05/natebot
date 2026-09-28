@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ProposedAction } from '@shared/types'
 import { api } from '../lib/store'
+import { describeTool } from '../lib/format'
 import { CheckIcon, PencilIcon, SpinnerIcon, XIcon } from './icons'
 import { Button, inputClass } from './ui'
 
@@ -71,6 +72,12 @@ export function ActionCard({ messageId, action }: { messageId: string; action: P
 
       <div className="px-4 py-3">
         <div className="text-[14px] font-semibold">{action.summary}</div>
+        {action.tool && (
+          <div className="mt-0.5 text-[11px] text-muted">
+            via {describeTool(action.tool).source}
+            {describeTool(action.tool).action ? ` · ${describeTool(action.tool).action}` : ''}
+          </div>
+        )}
         <dl className="mt-2 space-y-2">
           {entries.map(([k, v]) => {
             const text = toText(v)

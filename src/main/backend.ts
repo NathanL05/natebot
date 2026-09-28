@@ -1,0 +1,372 @@
+// The real NateBot backend: implements the renderer API on top of the agent
+// store (YAML), the database (SQLite), the claude engine and the scheduler.
+import { app, BrowserWindow, dialog, Notification, shell } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile } from 'node:fs'
+import { basename, join } from 'node:path'
+import type { NateBotApi } from '@shared/ipc'
+import type {
+  AgentConfig,
+  AgentDraft,
+  AgentSummary,
+  AppSettings,
+  Bootstrap,
+  ChatMessage,
+  EnvStatus,
+  RoutineInfo
+} from '@shared/types'
+import { describeCron } from '@shared/schedule'
+import { AgentStore } from './agents'
+import { Db } from './db'
+import { Engine, ensureWorkspace, type RunFinished } from './engine'
+import { checkEnv, resolveShellPath } from './env'
+import { emit } from './ipc'
+import { ensureMcpFile, listServers } from './mcp'
+import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
+import { Scheduler } from './scheduler'
+import { SettingsStore } from './settings'
+import { UsageTracker } from './usage'
+
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
+
+function previewOf(msg: ChatMessage | null): string {
+  if (!msg) return ''
+  const line = msg.text.split('\n').find((l) => l.trim()) ?? ''
+  return line.replace(/[*_`#>]/g, '').trim().slice(0, 140)
+}
+
+export class Backend implements NateBotApi {
+  readonly settings = new SettingsStore()
+  readonly usage = new UsageTracker()
+  private store = new AgentStore(AGENTS_DIR)
+  private db: Db
+  private engine: Engine
+  private scheduler: Scheduler
+  private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
+  private envOverride: EnvStatus | null = null
+  private agentsTimer: NodeJS.Timeout | undefined
+  /** Called whenever the agent list changes (tray menu). */
+  onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
+  /** Called when a notification is clicked. */
+  onOpenAgent: (agentId: string) => void = () => undefined
+
+  constructor() {
+    mkdirSync(ROOT, { recursive: true })
+    mkdirSync(WORKSPACES_DIR, { recursive: true })
+    ensureMcpFile()
+    this.db = new Db(DB_FILE)
+    this.db.repairInterrupted()
+
+    this.engine = new Engine({
+      store: this.store,
+      db: this.db,
+      usage: this.usage,
+      claudePath: () => (this.env.claudeFound ? this.env.claudePath : null),
+      emitMessage: (m) => emit('message', m),
+      emitAgents: () => this.emitAgents()
+    })
+    this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
+    this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {
+      if (!r.ok) this.notify(r.agentId, 'Action failed', r.summary)
+    })
+
+    this.scheduler = new Scheduler((id) => this.fireRoutine(id))
+
+    this.usage.on('changed', () => {
+      const info = this.usage.get()
+      if (info) emit('usage', info)
+      if (this.usage.waitMs() === 0) this.engine.pump()
+    })
+
+    const seeded = this.store.init()
+    if (seeded) {
+      for (const a of this.store.list()) {
+        ensureWorkspace(a.id)
+        this.engine.system(a.id, `Created agent: ${a.name}`)
+        if (a.routine?.enabled) this.engine.system(a.id, `Created routine: ${describeCron(a.routine.cron)}`)
+      }
+    }
+    this.store.on('changed', () => {
+      this.scheduler.sync(this.store.list())
+      this.emitAgents()
+    })
+    this.scheduler.sync(this.store.list())
+
+    // Editors often replace the file, so poll its stat rather than fs.watch.
+    watchFile(MCP_FILE, { interval: 1500 }, () => emit('mcpServers', listServers()))
+  }
+
+  /** Resolves the shell PATH and checks claude. Runs once at startup. */
+  async start(): Promise<void> {
+    await resolveShellPath()
+    await this.recheckEnv()
+  }
+
+  shutdown(): void {
+    unwatchFile(MCP_FILE)
+    this.scheduler.stopAll()
+    this.engine.shutdown()
+    this.store.close()
+    this.db.close()
+  }
+
+  // ---- dev helpers (Debug menu) ----
+
+  simulateUsageLimit(on: boolean): void {
+    this.usage.simulate(on)
+  }
+
+  simulateSetupProblem(on: boolean): void {
+    this.envOverride = on
+      ? { ...this.env, loggedIn: false, error: 'Claude Code is installed but not logged in. (simulated)' }
+      : null
+    emit('env', this.envOverride ?? this.env)
+  }
+
+  // ---- internals ----
+
+  private summaries(): AgentSummary[] {
+    return this.store.list().map((a) => {
+      const last = this.db.lastMessage(a.id)
+      const { running, queued } = this.engine.status(a.id)
+      return {
+        ...a,
+        status: running ? 'running' : 'idle',
+        queued,
+        unread: this.db.unread(a.id),
+        lastActivity: last?.createdAt ?? 0,
+        lastPreview: running ? previewOf(this.engine.liveMessage(a.id)) || previewOf(last) : previewOf(last)
+      }
+    })
+  }
+
+  private emitAgents(): void {
+    // Coalesce bursts (streaming, queue changes) into one update.
+    if (this.agentsTimer) return
+    this.agentsTimer = setTimeout(() => {
+      this.agentsTimer = undefined
+      const list = this.summaries()
+      emit('agents', list)
+      this.onAgentsChanged(list)
+    }, 30)
+  }
+
+  private notify(agentId: string, title: string, body: string): void {
+    if (!Notification.isSupported()) return
+    const agent = this.store.get(agentId)
+    const n = new Notification({ title: agent ? `${agent.icon} ${agent.name} · ${title}` : title, body, silent: false })
+    n.on('click', () => this.onOpenAgent(agentId))
+    n.show()
+  }
+
+  private onRunFinished(r: RunFinished): void {
+    const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
+    if (r.needsApproval) this.notify(r.agentId, 'Needs your approval', r.summary)
+    else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
+    else if (!focused && r.ok) this.notify(r.agentId, 'Replied', r.summary)
+  }
+
+  private fireRoutine(agentId: string): void {
+    const agent = this.store.get(agentId)
+    if (!agent?.routine?.enabled) return
+    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    const wait = this.usage.waitMs()
+    if (wait > 0) {
+      const at = new Date(Date.now() + wait).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      this.engine.system(agentId, `Routine skipped at ${time}: usage limit reached (resets at ${at})`)
+      this.emitAgents()
+      return
+    }
+    this.engine.system(agentId, `Routine ran at ${time}`)
+    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [] })
+  }
+
+  private requireAgent(agentId: unknown): AgentConfig {
+    if (typeof agentId !== 'string') throw new Error('Invalid agent id')
+    return this.store.require(agentId)
+  }
+
+  // ---- API ----
+
+  async bootstrap(): Promise<Bootstrap> {
+    return {
+      agents: this.summaries(),
+      settings: this.settings.get(),
+      mcpServers: listServers(),
+      env: this.envOverride ?? this.env,
+      usage: this.usage.get()
+    }
+  }
+
+  async listMessages(agentId: string): Promise<ChatMessage[]> {
+    this.requireAgent(agentId)
+    const list = this.db.listMessages(agentId)
+    const live = this.engine.liveMessage(agentId)
+    return live ? list.map((m) => (m.id === live.id ? { ...live } : m)) : list
+  }
+
+  async sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void> {
+    const agent = this.requireAgent(agentId)
+    const body = typeof text === 'string' ? text.trim() : ''
+    const saved: string[] = []
+    for (const src of attachments ?? []) {
+      if (typeof src !== 'string' || !existsSync(src)) continue
+      const st = statSync(src)
+      if (!st.isFile() || st.size > MAX_ATTACHMENT_BYTES) continue
+      const name = `${Date.now()}-${basename(src).replace(/[^\w.\- ]+/g, '_')}`
+      copyFileSync(src, join(ensureWorkspace(agent.id), 'attachments', name))
+      saved.push(`attachments/${name}`)
+    }
+    if (!body && !saved.length) return
+    const msg: ChatMessage = {
+      id: randomUUID(),
+      agentId,
+      role: 'user',
+      text: body,
+      createdAt: Date.now(),
+      attachments: saved.length ? saved.map((p) => p.replace(/^attachments\/\d+-/, '')) : undefined
+    }
+    this.db.saveMessage(msg)
+    emit('message', msg)
+    this.engine.enqueue(agentId, { source: 'chat', prompt: body, attachments: saved })
+  }
+
+  async stop(agentId: string): Promise<void> {
+    this.requireAgent(agentId)
+    this.engine.stop(agentId)
+  }
+
+  async markRead(agentId: string): Promise<void> {
+    if (!this.store.get(agentId)) return
+    if (this.db.unread(agentId)) {
+      this.db.clearUnread(agentId)
+      this.emitAgents()
+    }
+  }
+
+  async pickAttachment(): Promise<string | null> {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { properties: ['openFile' as const], message: 'Choose a file to send' }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return res.canceled ? null : (res.filePaths[0] ?? null)
+  }
+
+  async createAgent(draft: AgentDraft): Promise<AgentConfig> {
+    const agent = this.store.create(draft)
+    ensureWorkspace(agent.id)
+    this.engine.system(agent.id, `Created agent: ${agent.name}`)
+    if (agent.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(agent.routine.cron)}`)
+    this.scheduler.sync(this.store.list())
+    this.emitAgents()
+    return agent
+  }
+
+  async updateAgent(next: AgentConfig): Promise<AgentConfig> {
+    const before = this.requireAgent(next?.id)
+    const agent = this.store.update(next)
+    const r = agent.routine
+    if (JSON.stringify(before.routine) !== JSON.stringify(r)) {
+      if (r?.enabled && !before.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(r.cron)}`)
+      else if (r?.enabled) this.engine.system(agent.id, `Routine updated: ${describeCron(r.cron)}`)
+      else if (before.routine?.enabled) this.engine.system(agent.id, 'Routine turned off')
+    }
+    if (before.model !== agent.model) this.engine.system(agent.id, `Model changed to ${agent.model}`)
+    this.scheduler.sync(this.store.list())
+    this.emitAgents()
+    return agent
+  }
+
+  async deleteAgent(agentId: string): Promise<void> {
+    this.requireAgent(agentId)
+    this.engine.stop(agentId)
+    this.store.delete(agentId)
+    this.db.deleteAgent(agentId)
+    // The workspace may hold the user's attachments: move it to the Trash (recoverable).
+    const dir = workspaceOf(agentId)
+    if (existsSync(dir)) await shell.trashItem(dir).catch(() => undefined)
+    this.scheduler.sync(this.store.list())
+    this.emitAgents()
+  }
+
+  async resetMemory(agentId: string): Promise<void> {
+    this.requireAgent(agentId)
+    this.store.setSession(agentId, null)
+    this.db.takeNotes(agentId)
+    this.engine.system(agentId, 'Memory reset. Starting a fresh conversation.')
+    this.emitAgents()
+  }
+
+  async resolveAction(messageId: string, actionId: string, decision: 'approve' | 'reject', details?: Record<string, unknown>): Promise<void> {
+    const msg = typeof messageId === 'string' ? this.db.getMessage(messageId) : null
+    const action = msg?.actions?.find((a) => a.id === actionId)
+    if (!msg || !action || action.status !== 'pending') return
+    if (!this.store.get(msg.agentId)) return
+
+    if (decision === 'reject') {
+      action.status = 'rejected'
+      this.db.saveMessage(msg)
+      emit('message', msg)
+      this.db.addNote(msg.agentId, `The user rejected your proposed action "${action.summary}". Don't do it.`)
+      this.engine.system(msg.agentId, `Rejected: ${action.summary}`)
+      return
+    }
+    if (details && typeof details === 'object') action.details = details
+    await this.engine.executeAction(msg.agentId, msg, action)
+  }
+
+  async listRoutines(): Promise<RoutineInfo[]> {
+    return this.store
+      .list()
+      .filter((a) => a.routine)
+      .map((a) => {
+        const last = this.db.lastRun(a.id, 'routine')
+        return {
+          agentId: a.id,
+          agentName: a.name,
+          icon: a.icon,
+          color: a.color,
+          routine: a.routine as NonNullable<AgentConfig['routine']>,
+          nextRun: a.routine?.enabled ? this.scheduler.nextRun(a.id) : null,
+          lastRun: last?.endedAt ? { at: last.endedAt, ok: last.ok === true, summary: last.summary ?? '' } : null
+        }
+      })
+  }
+
+  async setRoutineEnabled(agentId: string, enabled: boolean): Promise<void> {
+    const agent = this.requireAgent(agentId)
+    if (!agent.routine) return
+    await this.updateAgent({ ...agent, routine: { ...agent.routine, enabled: enabled === true } })
+  }
+
+  async runRoutineNow(agentId: string): Promise<void> {
+    const agent = this.requireAgent(agentId)
+    if (!agent.routine) return
+    this.engine.system(agentId, 'Routine started manually')
+    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [] })
+  }
+
+  async updateSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+    const before = this.settings.get()
+    const next = this.settings.update(patch ?? {})
+    if (next.launchAtLogin !== before.launchAtLogin && app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: next.launchAtLogin })
+    }
+    if (next.claudePath !== before.claudePath) void this.recheckEnv()
+    if (next.theme !== before.theme) {
+      for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#1C1C1E' : '#FFFFFF')
+    }
+    return next
+  }
+
+  async recheckEnv(): Promise<EnvStatus> {
+    this.env = await checkEnv(this.settings.get().claudePath)
+    const shown = this.envOverride ?? this.env
+    emit('env', shown)
+    if (this.env.claudeFound && this.env.loggedIn) this.engine.pump()
+    return shown
+  }
+
+  async openExternal(url: string): Promise<void> {
+    if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) await shell.openExternal(url)
+  }
+}

@@ -56,6 +56,8 @@ export interface ProposedAction {
   id: string
   type: string
   summary: string
+  /** Exact tool that performs it, e.g. "mcp__gmail__send_message". */
+  tool?: string
   details: Record<string, unknown>
   status: ActionStatus
   result?: string
@@ -101,6 +103,8 @@ export interface UsageInfo {
 }
 
 export interface EnvStatus {
+  /** True until the first check at startup has finished. */
+  checking?: boolean
   claudeFound: boolean
   claudePath: string | null
   version: string | null

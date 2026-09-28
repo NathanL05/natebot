@@ -89,6 +89,7 @@ export const useStore = create<State>((set, get) => {
       })
       api.on('usage', (usage) => set({ usage }))
       api.on('env', (env) => set({ env }))
+      api.on('mcpServers', (mcpServers) => set({ mcpServers }))
       api.on('focusAgent', (id) => get().select(id))
       api.on('navigate', (target) => {
         if (target === 'newAgent') set({ addOpen: true })

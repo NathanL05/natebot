@@ -8,6 +8,7 @@ import type {
   Bootstrap,
   ChatMessage,
   EnvStatus,
+  McpServerInfo,
   RoutineInfo,
   UsageInfo
 } from './types'
@@ -72,6 +73,8 @@ export interface NateBotEvents {
   message: ChatMessage
   usage: UsageInfo
   env: EnvStatus
+  /** ~/NateBot/mcp.json changed. */
+  mcpServers: McpServerInfo[]
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Routines. */
@@ -83,6 +86,7 @@ export const EVENT_NAMES = [
   'message',
   'usage',
   'env',
+  'mcpServers',
   'focusAgent',
   'navigate'
 ] as const satisfies readonly (keyof NateBotEvents)[]
