@@ -15,7 +15,8 @@ import type {
   EnvStatus,
   GmailStatus,
   MarketplaceData,
-  RoutineInfo
+  RoutineInfo,
+  UsageInfo
 } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { AgentStore } from './agents'
@@ -43,7 +44,7 @@ function previewOf(msg: ChatMessage | null): string {
 
 export class Backend implements NateBotApi {
   readonly settings = new SettingsStore()
-  readonly usage = new UsageTracker()
+  readonly usage = new UsageTracker(() => (this.env.claudeFound && this.env.loggedIn ? this.env.claudePath : null))
   private store = new AgentStore(AGENTS_DIR)
   private db: Db
   private engine: Engine
@@ -112,9 +113,11 @@ export class Backend implements NateBotApi {
     const path = await resolveShellPath()
     log(`startup: version=${app.getVersion()} packaged=${app.isPackaged} pathDirs=${path.split(':').length}`)
     await this.recheckEnv()
+    this.usage.startPolling()
   }
 
   shutdown(): void {
+    this.usage.stopPolling()
     stopGmailConnect()
     unwatchFile(MCP_FILE)
     this.scheduler.stopAll()
@@ -175,6 +178,7 @@ export class Backend implements NateBotApi {
 
   private onRunFinished(r: RunFinished): void {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
+    void this.usage.refresh()
     const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
     if (r.needsApproval) this.notify(r.agentId, 'Needs your approval', r.summary)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
@@ -389,8 +393,16 @@ export class Backend implements NateBotApi {
     log(`env: found=${this.env.claudeFound} path=${this.env.claudePath ?? '-'} version=${this.env.version ?? '-'} loggedIn=${this.env.loggedIn} plan=${this.env.subscriptionType ?? '-'} error=${this.env.error ?? '-'}`)
     const shown = this.envOverride ?? this.env
     emit('env', shown)
-    if (this.env.claudeFound && this.env.loggedIn) this.engine.pump()
+    if (this.env.claudeFound && this.env.loggedIn) {
+      this.engine.pump()
+      void this.usage.refresh()
+    }
     return shown
+  }
+
+  async refreshUsage(): Promise<UsageInfo | null> {
+    await this.usage.refresh()
+    return this.usage.get()
   }
 
   async openExternal(url: string): Promise<void> {

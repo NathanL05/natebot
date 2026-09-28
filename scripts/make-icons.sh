@@ -25,6 +25,12 @@ cp build/icon.png resources/icon.png
 iconutil -c icns "$SET" -o build/icon.icns
 rm -rf "$(dirname "$SET")"
 
+# Menu-bar icon (monochrome template, drawn separately).
+if command -v rsvg-convert >/dev/null; then
+  rsvg-convert -w 18 -h 18 build/trayTemplate.svg -o resources/trayTemplate.png
+  rsvg-convert -w 36 -h 36 build/trayTemplate.svg -o resources/trayTemplate@2x.png
+fi
+
 # Re-brand the dev Electron so `npm run dev` shows the new icon too.
 node scripts/brand-dev-electron.mjs
 echo "Icons updated from $SRC"

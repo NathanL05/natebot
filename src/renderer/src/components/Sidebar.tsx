@@ -4,7 +4,7 @@ import { initials, listTime } from '../lib/format'
 import { agentPicture, userPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { AvatarEditor } from './AvatarEditor'
-import { UsageWidget } from './UsageWidget'
+import { UsageMenu } from './UsageMenu'
 import { ClockIcon, GearIcon, GridIcon, PlusIcon, SearchIcon } from './icons'
 import { IconButton } from './ui'
 
@@ -30,7 +30,8 @@ export function Sidebar() {
   return (
     <aside className="flex w-[300px] shrink-0 flex-col border-r border-line bg-sidebar">
       {/* Title bar area: leaves room for the traffic lights. */}
-      <div className="drag flex h-[52px] shrink-0 items-center justify-end px-3">
+      <div className="drag relative flex h-[52px] shrink-0 items-center justify-end gap-1 px-3">
+        <UsageMenu />
         <IconButton label="New agent (⌘N)" onClick={() => setAddOpen(true)}>
           <PlusIcon size={18} />
         </IconButton>
@@ -101,8 +102,6 @@ export function Sidebar() {
           Marketplace
         </button>
       </div>
-
-      <UsageWidget />
 
       <div className="flex items-center gap-2 border-t border-line px-3 py-2.5">
         <AvatarEditor

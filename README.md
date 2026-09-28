@@ -48,7 +48,7 @@ normally. A copy that was downloaded or AirDropped may be blocked the first time
 - On newer macOS versions where that isn't offered: try to open it once, then go to **System Settings →
   Privacy & Security**, scroll down and click **Open Anyway**.
 
-You only need to do this once. After that, closing the window keeps NateBot in the menu bar (🤖 icon) so
+You only need to do this once. After that, closing the window keeps NateBot in the menu bar (the little blob face) so
 routines keep running. Quit from the menu-bar icon or with ⌘Q. Turn on **Settings → Launch at login** to
 have it start quietly in the menu bar when you log in.
 
@@ -78,8 +78,9 @@ UI files, never a localhost URL, and needs no terminal or dev server.
 
 ## Changing the app icon
 
-Run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG. It regenerates `build/icon.icns`
-and the PNGs, and rebuilds the dev app. `npm install` sets up dev mode automatically: `npm run dev` launches a
+The icon's source is `build/icon.svg` (the menu-bar icon is `build/trayTemplate.svg`); `npm run icons` rebuilds
+every size from them. To use your own art, run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG.
+It regenerates `build/icon.icns` and the PNGs, and rebuilds the dev app. `npm install` sets up dev mode automatically: `npm run dev` launches a
 NateBot-branded copy of Electron (`node_modules/electron/dist/NateBot.app`), so the Dock and menu bar show NateBot.
 To keep NateBot in your Dock, pin the installed `/Applications/NateBot.app` (pinning the dev copy would open a
 blank Electron window when clicked).
@@ -116,8 +117,8 @@ new `.dmg`) into Applications, replace the old one, and open it. Your agents, ch
   - The working directory is `~/NateBot/workspaces/<agent>/`, and file edits are only auto-accepted inside it.
   - Only a small set of built-in tools is enabled (Read/Write/Edit/Glob/Grep/WebSearch/WebFetch/TodoWrite).
   - `--permission-prompts none` means anything that would need permission is refused, never left waiting.
-- Usage limits: NateBot reads Claude Code's `rate_limit_event`. The sidebar shows how much of your 5-hour
-  window you've used. When the limit is hit, a banner shows the reset time, messages wait in the queue and
+- Usage limits: NateBot reads Claude Code's `rate_limit_event` during runs and polls `claude -p /usage`
+  (answered locally, no tokens). The sidebar shows how much of your 5-hour and weekly limits you've used. When the limit is hit, a banner shows the reset time, messages wait in the queue and
   send themselves after the reset, and routines are skipped until then.
 
 ## Where your data lives
@@ -229,10 +230,13 @@ and install or remove them with one click. It starts with Anthropic's official `
 
 ## Usage widget
 
-Below Marketplace, two small rings show your **5-hour session** and **weekly** usage: the % used and time until
-each resets. They're neutral below 60%, amber from 60% and red from 85% or when a limit is hit. Hover (or focus)
-one for exact numbers and reset times. NateBot learns these numbers from Claude Code as agents run; it never
-polls. **Settings → Usage** shows the same numbers in more detail.
+At the top of the sidebar, next to **+**, two nested rings show your usage: the outer ring is the **5-hour
+session**, the inner one the **week**, and the number is the session % used. They turn amber from 60% and red
+from 85% or when a limit is hit. Click them for exact numbers, reset times and a refresh button.
+
+The numbers come from `claude -p /usage`, which Claude Code answers locally without using any tokens. They cover
+all your usage (Claude Code and claude.ai too), not just NateBot's. NateBot checks at launch, every 5 minutes,
+whenever you open the panel, and after each agent run. **Settings → Usage** shows the same numbers.
 
 ## Connecting Gmail
 

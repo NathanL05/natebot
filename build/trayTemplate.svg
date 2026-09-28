@@ -1,16 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+  <!-- Menu-bar template: the NateBot blob from the app icon, eyes cut out. -->
   <defs>
     <mask id="face">
       <rect width="36" height="36" fill="#fff"/>
-      <ellipse cx="13.5" cy="18.5" rx="2.4" ry="2.8" fill="#000"/>
-      <ellipse cx="22.5" cy="18.5" rx="2.4" ry="2.8" fill="#000"/>
-      <path d="M 14 23.5 Q 18 26.5 22 23.5" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+      <ellipse cx="13.4" cy="16.8" rx="2.1" ry="3.2" fill="#000"/>
+      <ellipse cx="22.6" cy="16.8" rx="2.1" ry="3.2" fill="#000"/>
+      <path d="M15.4 23 Q18 25.4 20.6 23" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round"/>
     </mask>
   </defs>
-  <g fill="#000" mask="url(#face)">
-    <rect x="17" y="6" width="2" height="6" rx="1"/>
-    <circle cx="18" cy="5" r="2.6"/>
-    <path d="M 9 26 L 6.5 32 L 14 28.5 Z"/>
-    <rect x="3.5" y="11" width="29" height="19" rx="9.5"/>
+  <g mask="url(#face)">
+    <path fill="#000" transform="translate(3.6 6.4) scale(0.0515)"
+          d="M274 0 C430 -8 554 92 556 242 C558 392 430 480 272 478 C116 476 -6 382 0 236 C6 92 122 8 274 0 Z"/>
   </g>
 </svg>

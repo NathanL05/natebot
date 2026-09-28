@@ -42,6 +42,8 @@ export interface NateBotApi {
 
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   recheckEnv(): Promise<EnvStatus>
+  /** Re-reads subscription usage from the CLI (throttled). */
+  refreshUsage(): Promise<UsageInfo | null>
   openExternal(url: string): Promise<void>
 
   /** target: 'user' or 'agent:<id>'. dataUrl null resets to the default. Returns the new version. */
@@ -74,6 +76,7 @@ export const API_METHODS = [
   'runRoutineNow',
   'updateSettings',
   'recheckEnv',
+  'refreshUsage',
   'openExternal',
   'setAvatar',
   'marketplace',

@@ -115,7 +115,7 @@ export function SettingsView() {
           </Section>
 
           <Section title="Usage">
-            <Row label="5-hour session window" hint={resetHint(usage?.fiveHour ?? { utilization: null, resetsAt: null }) ?? 'Shows after your first message'}>
+            <Row label="5-hour session window" hint={resetHint(usage?.fiveHour ?? { utilization: null, resetsAt: null }) ?? 'Checking…'}>
               <Meter
                 window={usage?.fiveHour ?? { utilization: null, resetsAt: null }}
                 limited={usage?.status === 'rejected' && usage.limitedWindow !== 'seven_day'}
