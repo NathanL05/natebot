@@ -78,48 +78,50 @@ export function Composer({ agent }: { agent: AgentSummary }) {
             ))}
           </div>
         )}
-        <div className="flex items-end gap-2">
+        {/* One pill: + on the left, send on the right, the same 6px inset on every side. */}
+        <div
+          className="flex items-end gap-1.5 rounded-[23px] border border-line-strong bg-field p-1.5 transition focus-within:border-accent/50"
+          style={{ boxShadow: 'var(--field-shadow)' }}
+        >
           <button
             type="button"
             aria-label="Attach a file"
             title="Attach a file"
             onClick={() => void attach()}
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev text-muted transition hover:text-fg"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2/70 text-muted transition hover:bg-elev-2 hover:text-fg"
           >
             <PlusIcon size={17} />
           </button>
-          <div className="flex min-h-[36px] flex-1 items-end rounded-[18px] border border-line bg-bg pr-1 focus-within:border-accent/60">
-            <textarea
-              ref={box}
-              rows={1}
-              value={text}
-              onChange={(e) => update(e.target.value)}
-              onKeyDown={onKeyDown}
-              placeholder={`Message ${agent.name}`}
-              className="max-h-[200px] flex-1 resize-none bg-transparent px-3.5 py-[7px] text-[14px] leading-[20px] text-fg outline-none placeholder:text-muted"
-            />
-            {running && (
-              <button
-                type="button"
-                onClick={() => void api.stop(agent.id)}
-                aria-label="Stop"
-                title="Stop"
-                className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-elev-2 text-fg transition hover:bg-danger hover:text-white"
-              >
-                <StopIcon size={13} />
-              </button>
-            )}
+          <textarea
+            ref={box}
+            rows={1}
+            value={text}
+            onChange={(e) => update(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={`Message ${agent.name}`}
+            className="max-h-[200px] flex-1 resize-none bg-transparent px-1.5 py-[6px] text-[14px] leading-[20px] text-fg outline-none placeholder:text-muted"
+          />
+          {running && (
             <button
               type="button"
-              onClick={send}
-              disabled={!canSend}
-              aria-label="Send"
-              title="Send (Enter)"
-              className="mb-1 ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-white transition disabled:bg-elev-2 disabled:text-muted"
+              onClick={() => void api.stop(agent.id)}
+              aria-label="Stop"
+              title="Stop"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2 text-fg transition hover:bg-danger hover:text-white"
             >
-              <ArrowUpIcon size={15} />
+              <StopIcon size={13} />
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={send}
+            disabled={!canSend}
+            aria-label="Send"
+            title="Send (Enter)"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-me text-me-fg transition hover:opacity-85 disabled:opacity-30"
+          >
+            <ArrowUpIcon size={16} />
+          </button>
         </div>
       </div>
     </div>

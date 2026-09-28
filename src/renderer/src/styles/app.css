@@ -1,46 +1,54 @@
 @import 'tailwindcss';
 
-/* Colour tokens. Dark is the default; light overrides below. */
+/* Colour tokens. Dark is the default; light overrides below.
+   Dark: warm near-black greys. Light: white chat on an off-white sidebar.
+   The send button and your own bubbles use the inverted "me" colours. */
 :root,
 [data-theme='dark'] {
-  --bg: #1c1c1e;
-  --sidebar: #141416;
-  --elev: #2c2c2e;
-  --elev-2: #3a3a3c;
-  --line: rgb(255 255 255 / 0.08);
-  --text: #f5f5f7;
-  --muted: #8e8e93;
-  --bubble-me: #f2f2f7;
-  --bubble-me-text: #1c1c1e;
-  --bubble-agent: #2c2c2e;
+  --bg: #252523;
+  --sidebar: #151514;
+  --elev: #262625;
+  --elev-2: #343433;
+  --field: #262626;
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.12);
+  --text: #ededea;
+  --muted: #92928f;
+  --bubble-me: #ecece8;
+  --bubble-me-text: #1b1b1a;
+  --bubble-agent: #313130;
   --accent: #0a84ff;
   --danger: #ff453a;
   --success: #32d74b;
   --warn: #ffb340;
-  --hover: rgb(255 255 255 / 0.05);
-  --selected: rgb(255 255 255 / 0.09);
+  --hover: rgb(255 255 255 / 0.04);
+  --selected: rgb(255 255 255 / 0.075);
   --overlay: rgb(0 0 0 / 0.55);
+  --field-shadow: none;
   color-scheme: dark;
 }
 
 [data-theme='light'] {
   --bg: #ffffff;
-  --sidebar: #f2f2f5;
-  --elev: #f0f0f3;
-  --elev-2: #e3e3e8;
-  --line: rgb(0 0 0 / 0.08);
-  --text: #1c1c1e;
-  --muted: #6e6e73;
-  --bubble-me: #1c1c1e;
+  --sidebar: #f7f7f7;
+  --elev: #efefef;
+  --elev-2: #e7e7e7;
+  --field: #ffffff;
+  --line: rgb(0 0 0 / 0.06);
+  --line-strong: rgb(0 0 0 / 0.08);
+  --text: #1a1a1a;
+  --muted: #858585;
+  --bubble-me: #1a1a1a;
   --bubble-me-text: #ffffff;
-  --bubble-agent: #ececf0;
+  --bubble-agent: #f0f0f0;
   --accent: #007aff;
   --danger: #e5352b;
   --success: #1fa33a;
   --warn: #c77800;
-  --hover: rgb(0 0 0 / 0.04);
-  --selected: rgb(0 0 0 / 0.07);
+  --hover: rgb(0 0 0 / 0.035);
+  --selected: rgb(0 0 0 / 0.06);
   --overlay: rgb(0 0 0 / 0.3);
+  --field-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
   color-scheme: light;
 }
 
@@ -50,6 +58,8 @@
   --color-elev: var(--elev);
   --color-elev-2: var(--elev-2);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-field: var(--field);
   --color-fg: var(--text);
   --color-muted: var(--muted);
   --color-me: var(--bubble-me);

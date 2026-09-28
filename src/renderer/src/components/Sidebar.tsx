@@ -90,37 +90,41 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="px-2 pb-1">
+      {/* Marketplace and profile share the agent rows' columns: a 44px leading slot
+          (centred on the agent avatars) and the label where agent names start. */}
+      <div className="px-2">
         <button
           type="button"
           onClick={() => useStore.getState().setMarketplaceOpen(true)}
-          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-[14px] font-medium transition hover:bg-hover"
+          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover"
         >
-          <span className="flex h-7 w-7 items-center justify-center text-muted">
-            <GridIcon size={18} />
+          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
+            <GridIcon size={19} />
           </span>
           Marketplace
         </button>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-line px-3 py-2.5">
-        <AvatarEditor
-          target="user"
-          hasPicture={!!userAvatarVersion}
-          onChanged={(v) => useStore.setState({ userAvatarVersion: v })}
-          label="Change your picture"
-          placement="above"
-        >
-          {userPicture(userAvatarVersion) ? (
-            <img src={userPicture(userAvatarVersion) ?? ''} alt="" className="h-8 w-8 rounded-full object-cover" draggable={false} />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold">
-              {initials(userName)}
-            </div>
-          )}
-        </AvatarEditor>
+      <div className="flex items-center gap-3 px-2 pt-1 pb-2.5 pl-4.5">
+        <div className="flex h-8 w-11 shrink-0 justify-center">
+          <AvatarEditor
+            target="user"
+            hasPicture={!!userAvatarVersion}
+            onChanged={(v) => useStore.setState({ userAvatarVersion: v })}
+            label="Change your picture"
+            placement="above"
+          >
+            {userPicture(userAvatarVersion) ? (
+              <img src={userPicture(userAvatarVersion) ?? ''} alt="" className="h-8 w-8 rounded-full object-cover shadow-[0_2px_5px_rgb(0_0_0/0.22)]" draggable={false} />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold shadow-[0_1px_3px_rgb(0_0_0/0.15)]">
+                {initials(userName)}
+              </div>
+            )}
+          </AvatarEditor>
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{userName}</div>
+          <div className="truncate text-[14px] font-medium">{userName}</div>
         </div>
         <IconButton
           label="Routines (⇧⌘R)"

@@ -62,7 +62,7 @@ export function ChatView() {
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <header className="drag flex h-[52px] shrink-0 items-center gap-3 border-b border-line px-5">
+      <header className="drag flex h-[52px] shrink-0 items-center gap-3 px-5">
         <AvatarEditor target={`agent:${agent.id}`} hasPicture={!!agent.avatarVersion} label={`Change ${agent.name}'s picture`}>
           <Avatar seed={agent.name} shape={agent.shape} color={agent.color} picture={agentPicture(agent.id, agent.avatarVersion)} size={30} running={agent.status === 'running'} />
         </AvatarEditor>

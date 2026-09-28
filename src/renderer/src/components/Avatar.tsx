@@ -29,7 +29,7 @@ export function Avatar({
         src={picture ?? mascot}
         alt=""
         draggable={false}
-        className={`h-full w-full ${picture ? 'rounded-full object-cover' : ''}`}
+        className={`h-full w-full ${picture ? 'rounded-full object-cover shadow-[0_2px_5px_rgb(0_0_0/0.22)]' : 'drop-shadow-[0_2px_2.5px_rgb(0_0_0/0.28)]'}`}
       />
     </div>
   )

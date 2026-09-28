@@ -182,12 +182,25 @@ export function mascotSvg(seed: string, opts: { shape?: MascotShape | null; colo
   const b = body(shape, r)
   const light = luminance(color) > 0.6
   const ink = light ? '#1D2250' : '#FFFFFF'
+  // Depth: a soft top-left highlight and darkening towards the rim, drawn
+  // through a mask of the body so overlapping parts (cloud) don't show seams.
+  const layer = (paint: string): string => `<rect width="100" height="100" fill="url(#${paint})" mask="url(#body)"/>`
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">` +
-    `<defs><linearGradient id="g" x1="0" y1="12" x2="0" y2="92" gradientUnits="userSpaceOnUse">` +
-    `<stop offset="0" stop-color="${mix(color, 255, 0.22)}"/><stop offset="1" stop-color="${mix(color, 0, 0.12)}"/>` +
-    `</linearGradient></defs>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs>` +
+    `<linearGradient id="g" x1="0" y1="12" x2="0" y2="92" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="${mix(color, 255, 0.28)}"/><stop offset="1" stop-color="${mix(color, 0, 0.16)}"/>` +
+    `</linearGradient>` +
+    `<radialGradient id="hl" cx="36" cy="28" r="42" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>` +
+    `</radialGradient>` +
+    `<radialGradient id="rim" cx="46" cy="44" r="52" gradientUnits="userSpaceOnUse">` +
+    `<stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.22"/>` +
+    `</radialGradient>` +
+    `<mask id="body">${b.svg.replaceAll('url(#g)', '#fff')}</mask>` +
+    `</defs>` +
     b.svg +
+    layer('rim') +
+    layer('hl') +
     face(eyes, b.fx, b.fy, b.scale, ink, blush, smile) +
     `</svg>`
   )
