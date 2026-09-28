@@ -11,7 +11,7 @@ import { childEnv } from './env'
 import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
 import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
-import { executePrompt, systemPrompt } from './claude/prompt'
+import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
 import { extractActions, hideActionsBlock, StreamState } from './claude/stream'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
@@ -158,9 +158,9 @@ export class Engine extends EventEmitter {
   }
 
   private buildInput(job: Job, notes: string[]): string {
-    const parts: string[] = []
+    const parts: string[] = [currentTimeLine()]
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
-    if (job.source === 'routine') parts.push(`[Scheduled routine run · ${new Date().toLocaleString()}]`)
+    if (job.source === 'routine') parts.push('[Scheduled routine run]')
     parts.push(job.prompt || 'Please look at the attached file(s).')
     if (job.attachments.length) {
       parts.push(`[Attached files, saved in your working folder]\n${job.attachments.map((a) => `- ${a}`).join('\n')}`)
@@ -188,7 +188,12 @@ export class Engine extends EventEmitter {
       // would need permission is refused instead of waiting for a prompt.
       '--permission-mode', 'acceptEdits',
       '--permission-prompts', 'none',
-      '--tools', builtinTools(agent).join(',')
+      '--tools', builtinTools(agent).join(','),
+      // Claude Code's bundled skills (code-review, loop, schedule…) are useless to
+      // agents and cost ~1.5k tokens per message whenever the Skill tool is on.
+      // This removes them without affecting Marketplace skills (--plugin-dir).
+      // design/doctor aren't covered by disableBundledSkills, so they're listed.
+      '--settings', JSON.stringify({ disableBundledSkills: true, skillOverrides: { design: 'off', doctor: 'off' } })
     ]
     // Marketplace skills live in a NateBot-owned plugin; agents invoke them with the Skill tool.
     if (hasInstalledSkills()) {

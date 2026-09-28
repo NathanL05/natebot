@@ -16,7 +16,8 @@ export const STARTER_AGENTS: AgentConfig[] = [
     mcp_servers: ['gmail'],
     allowed_tools: [],
     disallowed_tools: [],
-    routine: { enabled: true, cron: '0 8 * * 1-5', prompt: 'Do my morning inbox sweep.' },
+    // Off until the user opts in: it needs Gmail, which isn't connected on first launch.
+    routine: { enabled: false, cron: '0 8 * * 1-5', prompt: 'Do my morning inbox sweep.' },
     session_id: null
   },
   {

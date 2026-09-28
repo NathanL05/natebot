@@ -1,7 +1,11 @@
 import type { AgentConfig, ProposedAction } from '@shared/types'
 
-function now(): string {
-  return new Date().toLocaleString('en-GB', {
+/**
+ * The current time, sent at the top of each message (never in the system
+ * prompt: a changing system prompt defeats Claude's prompt cache every turn).
+ */
+export function currentTimeLine(): string {
+  return `[Current time: ${new Date().toLocaleString('en-GB', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -9,12 +13,16 @@ function now(): string {
     hour: '2-digit',
     minute: '2-digit',
     timeZoneName: 'short'
-  })
+  })}]`
 }
 
 const FENCE = '```'
 
-/** Shared NateBot house style, prepended to every agent's own instructions. */
+/**
+ * Shared NateBot house style, prepended to every agent's own instructions.
+ * Must stay byte-identical across turns for a given agent so the prompt cache
+ * is reused: nothing time- or message-dependent belongs here.
+ */
 export function systemPrompt(agent: AgentConfig, toolNotes: string[] = []): string {
   return `You are "${agent.name}", one of the user's personal agents inside NateBot, a Mac chat app. Each agent has its own job; yours is described below.
 
@@ -29,7 +37,7 @@ ${FENCE}proposed_actions
 ${FENCE}
   "type" is a short snake_case verb. "summary" is one line the user sees. "tool" is the exact name of the tool that would carry it out. "details" must contain everything needed to do it exactly as approved. The user gets Approve / Edit / Reject buttons, and approved actions are carried out separately. Only include the block when something needs approval, and don't describe the block in your text.
 - Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
-- Current date and time: ${now()}.
+- Each message starts with a [Current time: …] line; use it for dates and scheduling.
 ${toolNotes.length ? `\nNotes about your connected tools:\n${toolNotes.map((n) => `- ${n}`).join('\n')}\n` : ''}
 Your instructions from the user:
 ${agent.instructions || '(none yet: be a helpful general assistant)'}`
@@ -37,7 +45,9 @@ ${agent.instructions || '(none yet: be a helpful general assistant)'}`
 
 /** One-off prompt used after the user approves a proposed action. */
 export function executePrompt(action: ProposedAction): string {
-  return `The user has reviewed and APPROVED the following action. Carry it out exactly once, exactly as specified, using the tool ${action.tool}. Do not do anything else and do not propose further actions.
+  return `${currentTimeLine()}
+
+The user has reviewed and APPROVED the following action. Carry it out exactly once, exactly as specified, using the tool ${action.tool}. Do not do anything else and do not propose further actions.
 
 Action:
 ${JSON.stringify({ type: action.type, summary: action.summary, details: action.details }, null, 2)}

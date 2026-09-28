@@ -27,7 +27,7 @@ import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
 import { connectGmail, gmailStatus } from './gmail'
-import { ensureMcpFile, listServers } from './mcp'
+import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { Scheduler } from './scheduler'
 import { SettingsStore } from './settings'
@@ -179,6 +179,13 @@ export class Backend implements NateBotApi {
     const agent = this.store.get(agentId)
     if (!agent?.routine?.enabled) return
     const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
+    const missing = agent.mcp_servers.filter((n) => !configuredServersFor(agent).includes(n))
+    if (missing.length) {
+      this.engine.system(agentId, `Routine skipped at ${time}: ${missing.join(', ')} isn't set up yet`)
+      this.emitAgents()
+      return
+    }
     const wait = this.usage.waitMs()
     if (wait > 0) {
       const at = new Date(Date.now() + wait).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
