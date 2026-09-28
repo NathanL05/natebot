@@ -15,7 +15,9 @@
     "build": "npm run typecheck && electron-vite build",
     "start": "electron-vite preview",
     "dist": "npm run build && electron-builder --mac --arm64",
-    "dist:universal": "npm run build && electron-builder --mac --universal"
+    "dist:universal": "npm run build && electron-builder --mac --universal",
+    "postinstall": "node scripts/brand-dev-electron.mjs",
+    "icons": "sh scripts/make-icons.sh"
   },
   "dependencies": {
     "node-cron": "^4.6.0",
