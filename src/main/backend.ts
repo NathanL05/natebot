@@ -14,6 +14,7 @@ import type {
   ChatMessage,
   EnvStatus,
   GmailStatus,
+  MarketplaceData,
   RoutineInfo
 } from '@shared/types'
 import { describeCron } from '@shared/schedule'
@@ -24,6 +25,7 @@ import { Engine, ensureWorkspace, type RunFinished } from './engine'
 import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
+import * as skills from './skills'
 import { connectGmail, gmailStatus } from './gmail'
 import { ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
@@ -388,6 +390,40 @@ export class Backend implements NateBotApi {
     else if (typeof dataUrl === 'string') version = saveAvatar(target, dataUrl)
     if (target !== 'user') this.emitAgents()
     return version
+  }
+
+  async marketplace(refresh?: boolean): Promise<MarketplaceData> {
+    return skills.marketplace(refresh === true)
+  }
+
+  async installSkill(id: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await skills.installSkill(String(id))
+      log(`skill installed: ${id}`)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  }
+
+  async uninstallSkill(name: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await skills.uninstallSkill(String(name))
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: (e as Error).message }
+    }
+  }
+
+  async addSkillSource(input: string): Promise<{ ok: boolean; error?: string }> {
+    const repo = skills.parseRepo(String(input))
+    if (!repo) return { ok: false, error: 'Enter a GitHub repo like owner/repo or its github.com URL.' }
+    skills.addSource(repo)
+    return { ok: true }
+  }
+
+  async removeSkillSource(repo: string): Promise<void> {
+    skills.removeSource(String(repo))
   }
 
   async gmailStatus(): Promise<GmailStatus> {

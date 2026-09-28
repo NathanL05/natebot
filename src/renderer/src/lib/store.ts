@@ -26,6 +26,7 @@ interface State {
   drawerOpen: boolean
   addOpen: boolean
   gmailOpen: boolean
+  marketplaceOpen: boolean
 
   init(): Promise<void>
   select(agentId: string): void
@@ -34,6 +35,7 @@ interface State {
   setDrawerOpen(open: boolean): void
   setAddOpen(open: boolean): void
   setGmailOpen(open: boolean): void
+  setMarketplaceOpen(open: boolean): void
   patchSettings(patch: Partial<AppSettings>): Promise<void>
 }
 
@@ -74,6 +76,7 @@ export const useStore = create<State>((set, get) => {
     drawerOpen: false,
     addOpen: false,
     gmailOpen: false,
+    marketplaceOpen: false,
 
     async init() {
       api.on('agents', (agents) => {
@@ -135,6 +138,7 @@ export const useStore = create<State>((set, get) => {
     setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
     setAddOpen: (addOpen) => set({ addOpen }),
     setGmailOpen: (gmailOpen) => set({ gmailOpen }),
+    setMarketplaceOpen: (marketplaceOpen) => set({ marketplaceOpen }),
 
     async patchSettings(patch) {
       const current = get().settings

@@ -151,3 +151,28 @@ export interface GmailStatus {
   email: string | null
   uvInstalled: boolean
 }
+
+export interface MarketplaceSkill {
+  /** "<owner/repo>#<folder>" for GitHub skills, "local#<name>" for hand-added ones. */
+  id: string
+  name: string
+  description: string
+  source: string
+  installed: boolean
+  installedName: string | null
+  /** Ships helper scripts (these need Bash, which agents don't have by default). */
+  hasScripts: boolean
+  fileCount: number
+}
+
+export interface MarketplaceSource {
+  repo: string
+  count: number
+  error: string | null
+}
+
+export interface MarketplaceData {
+  skills: MarketplaceSkill[]
+  sources: MarketplaceSource[]
+  installedCount: number
+}

@@ -10,6 +10,7 @@ import type { Db } from './db'
 import { childEnv } from './env'
 import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
 import { workspaceOf } from './paths'
+import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
 import { extractActions, hideActionsBlock, StreamState } from './claude/stream'
@@ -189,6 +190,12 @@ export class Engine extends EventEmitter {
       '--permission-prompts', 'none',
       '--tools', builtinTools(agent).join(',')
     ]
+    // Marketplace skills live in a NateBot-owned plugin; agents invoke them with the Skill tool.
+    if (hasInstalledSkills()) {
+      const i = args.indexOf('--tools')
+      args[i + 1] = `${args[i + 1]},Skill`
+      args.push('--plugin-dir', SKILLS_PLUGIN)
+    }
     if (allowed.length) args.push('--allowedTools', allowed.join(','))
     if (disallowed.length) args.push('--disallowedTools', disallowed.join(','))
     return [...args, ...sessionArgs]

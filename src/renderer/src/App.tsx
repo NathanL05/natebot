@@ -3,6 +3,7 @@ import { useStore } from './lib/store'
 import { AddAgentModal } from './components/AddAgentModal'
 import { ChatView } from './components/ChatView'
 import { ConnectGmailModal } from './components/ConnectGmailModal'
+import { MarketplaceModal } from './components/MarketplaceModal'
 import { RoutinesView } from './components/RoutinesView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -14,6 +15,7 @@ export function App() {
   const view = useStore((s) => s.view)
   const addOpen = useStore((s) => s.addOpen)
   const gmailOpen = useStore((s) => s.gmailOpen)
+  const marketplaceOpen = useStore((s) => s.marketplaceOpen)
   const theme = useStore((s) => s.settings?.theme ?? 'dark')
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export function App() {
       </main>
       {addOpen && <AddAgentModal />}
       {gmailOpen && <ConnectGmailModal />}
+      {marketplaceOpen && <MarketplaceModal />}
     </div>
   )
 }

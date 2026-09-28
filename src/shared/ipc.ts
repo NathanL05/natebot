@@ -10,6 +10,7 @@ import type {
   EnvStatus,
   GmailProgress,
   GmailStatus,
+  MarketplaceData,
   McpServerInfo,
   RoutineInfo,
   UsageInfo
@@ -46,6 +47,12 @@ export interface NateBotApi {
   /** target: 'user' or 'agent:<id>'. dataUrl null resets to the default. Returns the new version. */
   setAvatar(target: string, dataUrl: string | null): Promise<number | null>
 
+  marketplace(refresh?: boolean): Promise<MarketplaceData>
+  installSkill(id: string): Promise<{ ok: boolean; error?: string }>
+  uninstallSkill(name: string): Promise<{ ok: boolean; error?: string }>
+  addSkillSource(repo: string): Promise<{ ok: boolean; error?: string }>
+  removeSkillSource(repo: string): Promise<void>
+
   gmailStatus(): Promise<GmailStatus>
   connectGmail(email: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; error?: string }>
 }
@@ -69,6 +76,11 @@ export const API_METHODS = [
   'recheckEnv',
   'openExternal',
   'setAvatar',
+  'marketplace',
+  'installSkill',
+  'uninstallSkill',
+  'addSkillSource',
+  'removeSkillSource',
   'gmailStatus',
   'connectGmail'
 ] as const satisfies readonly (keyof NateBotApi)[]

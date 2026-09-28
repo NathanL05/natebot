@@ -4,7 +4,7 @@ import { initials, listTime } from '../lib/format'
 import { agentPicture, userPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { AvatarEditor } from './AvatarEditor'
-import { ClockIcon, GearIcon, PlusIcon, SearchIcon } from './icons'
+import { ClockIcon, GearIcon, GridIcon, PlusIcon, SearchIcon } from './icons'
 import { IconButton } from './ui'
 
 export function Sidebar() {
@@ -89,6 +89,19 @@ export function Sidebar() {
           </div>
         )}
       </nav>
+
+      <div className="px-2 pb-1">
+        <button
+          type="button"
+          onClick={() => useStore.getState().setMarketplaceOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-[14px] font-medium transition hover:bg-hover"
+        >
+          <span className="flex h-7 w-7 items-center justify-center text-muted">
+            <GridIcon size={18} />
+          </span>
+          Marketplace
+        </button>
+      </div>
 
       <div className="flex items-center gap-2 border-t border-line px-3 py-2.5">
         <AvatarEditor
