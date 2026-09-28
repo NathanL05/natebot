@@ -59,7 +59,7 @@ export function Sidebar() {
               }`}
             >
               <div className="relative">
-                <Avatar icon={a.icon} color={a.color} size={44} running={a.status === 'running'} />
+                <Avatar seed={a.name} shape={a.shape} color={a.color} size={44} running={a.status === 'running'} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">

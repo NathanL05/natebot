@@ -5,7 +5,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
   {
     id: 'email-agent',
     name: 'Email Agent',
-    icon: '📧',
+    shape: 'hexagon',
     color: '#F5A524',
     model: 'sonnet',
     instructions: [
@@ -22,7 +22,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
   {
     id: 'planner',
     name: 'Planner',
-    icon: '🗓️',
+    shape: 'pill',
     color: '#5E8BFF',
     model: 'sonnet',
     instructions: [
@@ -39,7 +39,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
   {
     id: 'research-helper',
     name: 'Research Helper',
-    icon: '🔎',
+    shape: 'cloud',
     color: '#30D158',
     model: 'sonnet',
     instructions: [

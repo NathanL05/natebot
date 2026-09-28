@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AgentDraft } from '@shared/types'
+import { seededColor } from '@shared/mascot'
 import { api, useStore } from '../lib/store'
 import { AgentForm, blankDraft, validateDraft } from './AgentForm'
 import { XIcon } from './icons'
@@ -11,6 +12,14 @@ export function AddAgentModal() {
   const [draft, setDraft] = useState<AgentDraft>(() => blankDraft(defaultModel))
   const [saving, setSaving] = useState(false)
   const [touched, setTouched] = useState(false)
+  const [colorPicked, setColorPicked] = useState(false)
+
+  // Until a colour is picked by hand, it follows the name (same seed as the mascot).
+  const change = (next: AgentDraft): void => {
+    const picked = colorPicked || next.color !== draft.color
+    setColorPicked(picked)
+    setDraft(picked ? next : { ...next, color: seededColor(next.name) })
+  }
   const close = (): void => useStore.getState().setAddOpen(false)
 
   const problems = validateDraft(draft)
@@ -37,7 +46,7 @@ export function AddAgentModal() {
         </IconButton>
       </div>
       <div className="overflow-y-auto px-5 py-5">
-        <AgentForm draft={draft} onChange={setDraft} mcpServers={mcpServers} />
+        <AgentForm draft={draft} onChange={change} mcpServers={mcpServers} />
       </div>
       <div className="flex items-center gap-2 border-t border-line px-5 py-3">
         <div className="flex-1 truncate text-[12px] text-danger">{touched ? problems[0] : ''}</div>

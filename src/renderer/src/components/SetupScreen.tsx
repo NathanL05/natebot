@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { EnvStatus } from '@shared/types'
 import { api, useStore } from '../lib/store'
+import { Avatar } from './Avatar'
 import { RefreshIcon } from './icons'
 import { Button, inputClass } from './ui'
 
@@ -38,7 +39,9 @@ export function SetupScreen({ env }: { env: EnvStatus }) {
       <div className="flex flex-1 items-center justify-center overflow-y-auto px-6 pb-10">
         <div className="w-full max-w-[520px]">
           <div className="mb-6 text-center">
-            <div className="mb-3 text-[44px] leading-none">🤖</div>
+            <div className="mb-3 flex justify-center">
+              <Avatar seed="NateBot" shape="blob" color="#6A5CFF" size={64} />
+            </div>
             <h1 className="text-[22px] font-bold">Let's get NateBot running</h1>
             <p className="mt-2 text-[13px] text-muted">
               NateBot uses the Claude Code app on this Mac and your Claude subscription. No API key needed.

@@ -29,7 +29,7 @@ export function createTray(opts: {
         ...(busy ? [{ label: `${busy} agent${busy > 1 ? 's' : ''} working…`, enabled: false }] : []),
         ...(unread ? [{ label: `${unread} unread`, enabled: false }] : []),
         ...recent.map((a) => ({
-          label: `${a.icon}  ${a.name}${a.status === 'running' ? '  ·  working' : a.unread ? '  ·  new' : ''}`,
+          label: `${a.name}${a.status === 'running' ? '  ·  working' : a.unread ? '  ·  new' : ''}`,
           click: () => opts.onOpenAgent(a.id)
         })),
         { type: 'separator' },

@@ -158,7 +158,7 @@ export class Backend implements NateBotApi {
   private notify(agentId: string, title: string, body: string): void {
     if (!Notification.isSupported()) return
     const agent = this.store.get(agentId)
-    const n = new Notification({ title: agent ? `${agent.icon} ${agent.name} · ${title}` : title, body, silent: false })
+    const n = new Notification({ title: agent ? `${agent.name} · ${title}` : title, body, silent: false })
     n.on('click', () => this.onOpenAgent(agentId))
     n.show()
   }
@@ -328,7 +328,7 @@ export class Backend implements NateBotApi {
         return {
           agentId: a.id,
           agentName: a.name,
-          icon: a.icon,
+          shape: a.shape,
           color: a.color,
           routine: a.routine as NonNullable<AgentConfig['routine']>,
           nextRun: a.routine?.enabled ? this.scheduler.nextRun(a.id) : null,

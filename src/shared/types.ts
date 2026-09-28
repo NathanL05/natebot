@@ -1,4 +1,7 @@
 // Types shared by the main process, preload and renderer.
+import type { MascotShape } from './mascot'
+
+export type { MascotShape }
 
 export type ModelId = 'sonnet' | 'haiku' | 'opus'
 export const MODELS: { id: ModelId; label: string; hint: string }[] = [
@@ -17,7 +20,8 @@ export interface Routine {
 export interface AgentConfig {
   id: string
   name: string
-  icon: string
+  /** Mascot shape; null = derived from the name. */
+  shape: MascotShape | null
   color: string
   model: ModelId
   instructions: string
@@ -116,7 +120,7 @@ export interface EnvStatus {
 export interface RoutineInfo {
   agentId: string
   agentName: string
-  icon: string
+  shape: MascotShape | null
   color: string
   routine: Routine
   nextRun: number | null

@@ -8,7 +8,7 @@ import { Button, ConfirmDialog, IconButton } from './ui'
 function toDraft(a: AgentSummary): AgentDraft {
   return {
     name: a.name,
-    icon: a.icon,
+    shape: a.shape,
     color: a.color,
     model: a.model,
     instructions: a.instructions,

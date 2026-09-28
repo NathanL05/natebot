@@ -61,7 +61,7 @@ export function ChatView() {
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <header className="drag flex h-[52px] shrink-0 items-center gap-3 border-b border-line px-5">
-        <Avatar icon={agent.icon} color={agent.color} size={30} running={agent.status === 'running'} />
+        <Avatar seed={agent.name} shape={agent.shape} color={agent.color} size={30} running={agent.status === 'running'} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] leading-tight font-semibold">{agent.name}</div>
           <div className={`truncate text-[12px] leading-tight ${agent.status === 'running' ? 'text-accent' : 'text-muted'}`}>
@@ -89,7 +89,7 @@ export function ChatView() {
         <div className="flex-1" />
       ) : messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-          <Avatar icon={agent.icon} color={agent.color} size={72} />
+          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} size={72} />
           <div className="text-[17px] font-semibold">{agent.name}</div>
           <div className="max-w-[360px] text-[13px] text-muted">
             {agent.instructions.split('\n')[0] || 'Say hi to get started.'}

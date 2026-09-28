@@ -1,29 +1,36 @@
-import type { CSSProperties } from 'react'
+import { useMemo, type CSSProperties } from 'react'
+import { mascotDataUrl, seededColor, type MascotShape } from '@shared/mascot'
 
+/**
+ * An agent's avatar: their uploaded picture if they have one, otherwise the
+ * mascot generated from their name.
+ */
 export function Avatar({
-  icon,
+  seed,
   color,
+  shape,
+  picture,
   size = 44,
   running = false
 }: {
-  icon: string
-  color: string
+  seed: string
+  color?: string | null
+  shape?: MascotShape | null
+  picture?: string | null
   size?: number
   running?: boolean
 }) {
-  const style = {
-    width: size,
-    height: size,
-    fontSize: size * 0.48,
-    background: `linear-gradient(145deg, ${color}, color-mix(in srgb, ${color} 70%, black))`,
-    '--ring': color
-  } as CSSProperties
+  const mascot = useMemo(() => mascotDataUrl(seed || 'agent', { shape, color }), [seed, shape, color])
+  const ring = color ?? seededColor(seed)
+  const style = { width: size, height: size, '--ring': ring } as CSSProperties
   return (
-    <div
-      className={`flex shrink-0 items-center justify-center rounded-full leading-none ${running ? 'pulse' : ''}`}
-      style={style}
-    >
-      <span aria-hidden="true">{icon || '🤖'}</span>
+    <div className={`relative shrink-0 rounded-full ${running ? 'pulse' : ''}`} style={style}>
+      <img
+        src={picture ?? mascot}
+        alt=""
+        draggable={false}
+        className={`h-full w-full ${picture ? 'rounded-full object-cover' : ''}`}
+      />
     </div>
   )
 }

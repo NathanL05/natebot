@@ -39,7 +39,7 @@ export function RoutinesView() {
           <div className="space-y-2">
             {routines?.map((r) => (
               <div key={r.agentId} className="flex items-center gap-4 rounded-2xl bg-elev/60 px-4 py-3.5">
-                <Avatar icon={r.icon} color={r.color} size={40} />
+                <Avatar seed={r.agentName} shape={r.shape} color={r.color} size={40} />
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"

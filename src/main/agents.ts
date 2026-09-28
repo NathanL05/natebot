@@ -4,7 +4,8 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import type { AgentConfig, AgentDraft, ModelId, Routine } from '@shared/types'
+import type { AgentConfig, AgentDraft, MascotShape, ModelId, Routine } from '@shared/types'
+import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
 
 const MODELS: ModelId[] = ['sonnet', 'haiku', 'opus']
@@ -12,7 +13,8 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 
 const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
-  '# model: sonnet | haiku | opus   routine.cron: minute hour day month weekday\n'
+  '# model: sonnet | haiku | opus   routine.cron: minute hour day month weekday\n' +
+  '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 
 export function slugify(name: string): string {
   return (
@@ -37,6 +39,12 @@ function normalizeRoutine(v: unknown): Routine | null {
   return { enabled: r['enabled'] === true, cron, prompt: str(r['prompt']) }
 }
 
+function normalizeShape(v: unknown, id: string): MascotShape | null {
+  if (MASCOT_SHAPES.includes(v as MascotShape)) return v as MascotShape
+  // Starter agents created before shapes existed keep their designed look.
+  return STARTER_AGENTS.find((s) => s.id === id)?.shape ?? null
+}
+
 /** Accepts whatever is in a YAML file and returns a valid config. */
 function normalize(raw: unknown, id: string): AgentConfig {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
@@ -44,7 +52,7 @@ function normalize(raw: unknown, id: string): AgentConfig {
   return {
     id,
     name: str(r['name']).trim() || id,
-    icon: str(r['icon']).trim() || '🤖',
+    shape: normalizeShape(r['shape'], id),
     color: /^#[0-9a-f]{6}$/i.test(str(r['color'])) ? str(r['color']) : '#5E8BFF',
     model: MODELS.includes(model) ? model : 'sonnet',
     instructions: str(r['instructions']).trim(),
@@ -61,7 +69,7 @@ function serialize(a: AgentConfig): string {
   const doc = {
     id: a.id,
     name: a.name,
-    icon: a.icon,
+    shape: a.shape,
     color: a.color,
     model: a.model,
     instructions: a.instructions.endsWith('\n') ? a.instructions : `${a.instructions}\n`,

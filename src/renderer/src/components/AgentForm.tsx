@@ -1,18 +1,16 @@
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { MODELS, type AgentDraft, type McpServerInfo, type ModelId } from '@shared/types'
+import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
 import { ChevronIcon } from './icons'
 import { isValidCron, SchedulePicker } from './SchedulePicker'
 import { Field, inputBase, inputClass, Segmented, Toggle } from './ui'
 
-export const EMOJIS = ['🤖', '📧', '🗓️', '🔎', '✍️', '💡', '📈', '🧾', '🛒', '🏋️', '🎵', '🌍', '🧠', '📚', '💬', '🛠️']
-export const COLORS = ['#F5A524', '#FF6B6B', '#FF5FA2', '#A06CFF', '#5E8BFF', '#2EC5FF', '#30D158', '#8E8E93']
-
 export function blankDraft(model: ModelId): AgentDraft {
   return {
     name: '',
-    icon: '🤖',
-    color: COLORS[Math.floor(Math.random() * (COLORS.length - 1))] ?? '#5E8BFF',
+    shape: null,
+    color: seededColor(''),
     model,
     instructions: '',
     mcp_servers: [],
@@ -42,11 +40,14 @@ const splitList = (s: string): string[] =>
 export function AgentForm({
   draft,
   onChange,
-  mcpServers
+  mcpServers,
+  avatar
 }: {
   draft: AgentDraft
   onChange: (d: AgentDraft) => void
   mcpServers: McpServerInfo[]
+  /** Replaces the plain avatar preview (e.g. with an uploadable one). */
+  avatar?: ReactNode
 }) {
   const [advanced, setAdvanced] = useState(draft.allowed_tools.length > 0 || draft.disallowed_tools.length > 0)
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]): void => onChange({ ...draft, [key]: value })
@@ -63,7 +64,7 @@ export function AgentForm({
     <div className="space-y-5">
       {/* Identity */}
       <div className="flex items-start gap-4">
-        <Avatar icon={draft.icon} color={draft.color} size={64} />
+        {avatar ?? <Avatar seed={draft.name} shape={draft.shape} color={draft.color} size={64} />}
         <div className="flex-1 space-y-3">
           <Field label="Name">
             <input
@@ -74,36 +75,14 @@ export function AgentForm({
               autoFocus
             />
           </Field>
-          <div className="flex flex-wrap items-center gap-1">
-            {EMOJIS.map((e) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => set('icon', e)}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg text-[17px] transition ${
-                  draft.icon === e ? 'bg-selected ring-1 ring-accent' : 'hover:bg-hover'
-                }`}
-                aria-label={`Use ${e}`}
-              >
-                {e}
-              </button>
-            ))}
-            <input
-              className={`${inputBase} h-8 w-14 px-2 py-0 text-center`}
-              value={draft.icon}
-              maxLength={4}
-              onChange={(e) => set('icon', e.target.value)}
-              aria-label="Custom emoji"
-              title="Type any emoji"
-            />
-          </div>
+          <ShapePicker draft={draft} onPick={(shape) => set('shape', shape)} />
           <div className="flex items-center gap-1.5">
-            {COLORS.map((c) => (
+            {MASCOT_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => set('color', c)}
-                className={`h-6 w-6 rounded-full transition ${draft.color === c ? 'ring-2 ring-fg ring-offset-2 ring-offset-bg' : ''}`}
+                className={`h-6 w-6 rounded-full transition ${draft.color.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-fg ring-offset-2 ring-offset-bg' : ''}`}
                 style={{ background: c }}
                 aria-label={`Colour ${c}`}
               />
@@ -219,6 +198,44 @@ export function AgentForm({
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/** "Auto" (derived from the name) plus one preview per mascot shape. */
+function ShapePicker({ draft, onPick }: { draft: AgentDraft; onPick: (shape: AgentDraft['shape']) => void }) {
+  const previews = useMemo(
+    () => MASCOT_SHAPES.map((shape) => ({ shape, src: mascotDataUrl(draft.name, { shape, color: draft.color }) })),
+    [draft.name, draft.color]
+  )
+  const auto = seededShape(draft.name)
+  const tile = (active: boolean): string =>
+    `flex h-9 w-9 items-center justify-center rounded-lg transition ${active ? 'bg-selected ring-1 ring-accent' : 'hover:bg-hover'}`
+  return (
+    <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Avatar shape">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={draft.shape === null}
+        onClick={() => onPick(null)}
+        className={`${tile(draft.shape === null)} w-auto px-2 text-[11px] font-medium text-muted`}
+        title={`Auto: picked from the name (currently ${auto})`}
+      >
+        Auto
+      </button>
+      {previews.map(({ shape, src }) => (
+        <button
+          key={shape}
+          type="button"
+          role="radio"
+          aria-checked={draft.shape === shape}
+          onClick={() => onPick(shape)}
+          className={tile(draft.shape === shape)}
+          title={shape}
+        >
+          <img src={src} alt={shape} className="h-7 w-7" draggable={false} />
+        </button>
+      ))}
     </div>
   )
 }
