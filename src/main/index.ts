@@ -12,6 +12,10 @@ app.setName('NateBot')
 const isDev = !app.isPackaged
 const devServerUrl = isDev ? process.env['ELECTRON_RENDERER_URL'] : undefined
 
+// Dev only: lets automated UI checks attach over the Chrome DevTools Protocol.
+const cdpPort = process.env['NATEBOT_CDP_PORT']
+if (isDev && cdpPort) app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
+
 let mainWindow: BrowserWindow | null = null
 let quitting = false
 

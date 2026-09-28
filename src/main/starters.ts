@@ -12,7 +12,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
       'You review my Gmail inbox. Flag anything urgent, summarise the rest in a',
       'short ✓ checklist, and draft replies. NEVER send an email yourself.',
       'Propose it and wait for my approval.'
-    ].join('\n'),
+    ].join(' '),
     mcp_servers: ['gmail'],
     allowed_tools: [],
     disallowed_tools: [],
@@ -29,7 +29,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
       'You help me plan my day and week from what I tell you. Turn it into a',
       'realistic, time-blocked plan with clear priorities. Keep it short, use ✓',
       'checklists, and ask at most one clarifying question.'
-    ].join('\n'),
+    ].join(' '),
     mcp_servers: [],
     allowed_tools: [],
     disallowed_tools: [],
@@ -45,7 +45,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     instructions: [
       'You research topics on the web and give short, sourced summaries:',
       '3–5 key points, then the links you used. Say plainly when you are unsure.'
-    ].join('\n'),
+    ].join(' '),
     mcp_servers: [],
     allowed_tools: ['WebSearch', 'WebFetch'],
     disallowed_tools: [],

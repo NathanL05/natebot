@@ -1,0 +1,201 @@
+@import 'tailwindcss';
+
+/* Colour tokens. Dark is the default; light overrides below. */
+:root,
+[data-theme='dark'] {
+  --bg: #1c1c1e;
+  --sidebar: #141416;
+  --elev: #2c2c2e;
+  --elev-2: #3a3a3c;
+  --line: rgb(255 255 255 / 0.08);
+  --text: #f5f5f7;
+  --muted: #8e8e93;
+  --bubble-me: #f2f2f7;
+  --bubble-me-text: #1c1c1e;
+  --bubble-agent: #2c2c2e;
+  --accent: #0a84ff;
+  --danger: #ff453a;
+  --success: #32d74b;
+  --warn: #ffb340;
+  --hover: rgb(255 255 255 / 0.05);
+  --selected: rgb(255 255 255 / 0.09);
+  --overlay: rgb(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #ffffff;
+  --sidebar: #f2f2f5;
+  --elev: #f0f0f3;
+  --elev-2: #e3e3e8;
+  --line: rgb(0 0 0 / 0.08);
+  --text: #1c1c1e;
+  --muted: #6e6e73;
+  --bubble-me: #1c1c1e;
+  --bubble-me-text: #ffffff;
+  --bubble-agent: #ececf0;
+  --accent: #007aff;
+  --danger: #e5352b;
+  --success: #1fa33a;
+  --warn: #c77800;
+  --hover: rgb(0 0 0 / 0.04);
+  --selected: rgb(0 0 0 / 0.07);
+  --overlay: rgb(0 0 0 / 0.3);
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-elev: var(--elev);
+  --color-elev-2: var(--elev-2);
+  --color-line: var(--line);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-me: var(--bubble-me);
+  --color-me-fg: var(--bubble-me-text);
+  --color-agent: var(--bubble-agent);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warn: var(--warn);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-overlay: var(--overlay);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* Native-feeling window dragging from the title areas. */
+.drag {
+  -webkit-app-region: drag;
+}
+.drag button,
+.drag input,
+.drag a,
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.selectable {
+  user-select: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--elev-2);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* Text fields show focus through their own border instead. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+}
+
+/* Running agent: a soft pulsing ring around the avatar. */
+@keyframes nb-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring) 60%, transparent); }
+  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ring) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring) 0%, transparent); }
+}
+.pulse {
+  animation: nb-pulse 1.6s ease-out infinite;
+}
+
+@keyframes nb-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+.typing span {
+  animation: nb-dot 1.2s infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.15s; }
+.typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes nb-spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: nb-spin 0.8s linear infinite;
+}
+
+@keyframes nb-slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.slide-in {
+  animation: nb-slide-in 0.18s ease-out;
+}
+@keyframes nb-pop {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.pop {
+  animation: nb-pop 0.14s ease-out;
+}
+
+/* Markdown inside chat bubbles. */
+.md {
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.md > * + * { margin-top: 0.5em; }
+.md ul { list-style: disc; padding-left: 1.3em; }
+.md ol { list-style: decimal; padding-left: 1.4em; }
+.md li + li { margin-top: 0.15em; }
+.md strong { font-weight: 600; }
+.md em { opacity: 0.8; }
+.md a { color: var(--accent); text-decoration: none; }
+.md a:hover { text-decoration: underline; }
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--elev-2);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
+.md pre {
+  background: var(--sidebar);
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+.md pre code { background: none; padding: 0; }
+.md h1, .md h2, .md h3 { font-weight: 600; font-size: 1.05em; }
+.md blockquote { border-left: 3px solid var(--elev-2); padding-left: 10px; color: var(--muted); }
+.md table { border-collapse: collapse; font-size: 0.92em; }
+.md th, .md td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.md hr { border: 0; border-top: 1px solid var(--line); }
+.md .check { color: var(--success); font-weight: 700; }
+.md .cross { color: var(--danger); font-weight: 700; }
