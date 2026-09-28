@@ -96,12 +96,15 @@ export function agentNotes(agent: AgentConfig): string[] {
  * Writes a per-run MCP config with only this agent's servers. The file can
  * contain credentials from mcp.json, so it is owner-only and deleted after use.
  */
-export function writeRunConfig(agent: AgentConfig): { path: string; servers: string[]; cleanup: () => void } {
+export function writeRunConfig(
+  agent: AgentConfig,
+  skip: string[] = []
+): { path: string; servers: string[]; cleanup: () => void } {
   const servers = loadServers()
   const subset: Record<string, ServerEntry> = {}
   for (const name of agent.mcp_servers) {
     const entry = servers[name]
-    if (!entry) continue
+    if (!entry || skip.includes(name)) continue
     subset[name] = Object.fromEntries(Object.entries(entry).filter(([k]) => !NATEBOT_KEYS.includes(k)))
   }
   mkdirSync(TMP_DIR, { recursive: true, mode: 0o700 })

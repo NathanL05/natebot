@@ -26,7 +26,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { connectGmail, gmailStatus } from './gmail'
+import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { Scheduler } from './scheduler'
@@ -99,7 +99,12 @@ export class Backend implements NateBotApi {
     this.scheduler.sync(this.store.list())
 
     // Editors often replace the file, so poll its stat rather than fs.watch.
-    watchFile(MCP_FILE, { interval: 1500 }, () => emit('mcpServers', listServers()))
+    watchFile(MCP_FILE, { interval: 1500 }, () => emit('mcpServers', this.serverList()))
+  }
+
+  /** mcp.json servers; Gmail only counts as set up once it has a sign-in token. */
+  private serverList(): ReturnType<typeof listServers> {
+    return listServers().map((s) => (s.name === 'gmail' ? { ...s, configured: gmailReady() } : s))
   }
 
   /** Resolves the shell PATH and checks claude. Runs once at startup. */
@@ -110,6 +115,7 @@ export class Backend implements NateBotApi {
   }
 
   shutdown(): void {
+    stopGmailConnect()
     unwatchFile(MCP_FILE)
     this.scheduler.stopAll()
     this.engine.shutdown()
@@ -180,7 +186,8 @@ export class Backend implements NateBotApi {
     if (!agent?.routine?.enabled) return
     const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
-    const missing = agent.mcp_servers.filter((n) => !configuredServersFor(agent).includes(n))
+    const ready = configuredServersFor(agent).filter((n) => n !== 'gmail' || gmailReady())
+    const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
     if (missing.length) {
       this.engine.system(agentId, `Routine skipped at ${time}: ${missing.join(', ')} isn't set up yet`)
       this.emitAgents()
@@ -208,7 +215,7 @@ export class Backend implements NateBotApi {
     return {
       agents: this.summaries(),
       settings: this.settings.get(),
-      mcpServers: listServers(),
+      mcpServers: this.serverList(),
       env: this.envOverride ?? this.env,
       usage: this.usage.get(),
       userAvatarVersion: avatarVersion('user')
@@ -444,12 +451,8 @@ export class Backend implements NateBotApi {
     if ([email, clientId, clientSecret].some((v) => typeof v !== 'string')) return { ok: false, error: 'Missing details.' }
     this.connecting = true
     try {
-      const res = await connectGmail(
-        { email, clientId, clientSecret },
-        (p) => emit('gmailProgress', p),
-        (url) => void shell.openExternal(url)
-      )
-      emit('mcpServers', listServers())
+      const res = await connectGmail({ email, clientId, clientSecret }, (p) => emit('gmailProgress', p))
+      emit('mcpServers', this.serverList())
       return res
     } finally {
       this.connecting = false

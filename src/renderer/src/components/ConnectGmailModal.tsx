@@ -19,6 +19,7 @@ export function ConnectGmailModal() {
     void api.gmailStatus().then((s) => {
       setStatus(s)
       if (s.email) setEmail(s.email)
+      if (s.clientId) setClientId(s.clientId)
     })
     return api.on('gmailProgress', setProgress)
   }, [])
@@ -90,7 +91,7 @@ export function ConnectGmailModal() {
             type="password"
             value={clientSecret}
             onChange={(e) => setClientSecret(e.target.value)}
-            placeholder="GOCSPX-…"
+            placeholder={status?.hasSecret && status.clientId === clientId.trim() ? 'Saved (leave empty to reuse)' : 'GOCSPX-…'}
             disabled={busy}
           />
         </Field>
@@ -125,7 +126,7 @@ export function ConnectGmailModal() {
           {done ? 'Close' : 'Cancel'}
         </Button>
         {!done && (
-          <Button variant="primary" onClick={() => void connect()} disabled={busy || !email || !clientId || !clientSecret}>
+          <Button variant="primary" onClick={() => void connect()} disabled={busy || !email || !clientId || (!clientSecret && !(status?.hasSecret && status.clientId === clientId.trim()))}>
             {busy ? <SpinnerIcon size={13} /> : null} Connect
           </Button>
         )}

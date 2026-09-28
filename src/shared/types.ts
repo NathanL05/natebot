@@ -158,6 +158,9 @@ export interface GmailStatus {
   configured: boolean
   connected: boolean
   email: string | null
+  /** Not secret: shown so reconnecting doesn't need retyping. */
+  clientId: string | null
+  hasSecret: boolean
   uvInstalled: boolean
 }
 
