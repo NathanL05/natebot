@@ -41,6 +41,8 @@ export interface AgentSummary extends AgentConfig {
   unread: number
   lastActivity: number
   lastPreview: string
+  /** Set when the agent has an uploaded picture (cache-busting version). */
+  avatarVersion: number | null
 }
 
 export type AgentDraft = Omit<AgentConfig, 'id' | 'session_id'>
@@ -122,6 +124,7 @@ export interface RoutineInfo {
   agentName: string
   shape: MascotShape | null
   color: string
+  avatarVersion: number | null
   routine: Routine
   nextRun: number | null
   lastRun: { at: number; ok: boolean; summary: string } | null
@@ -133,6 +136,7 @@ export interface Bootstrap {
   mcpServers: McpServerInfo[]
   env: EnvStatus
   usage: UsageInfo | null
+  userAvatarVersion: number | null
 }
 
 export interface GmailProgress {

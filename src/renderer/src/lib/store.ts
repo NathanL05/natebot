@@ -17,6 +17,7 @@ interface State {
   mcpServers: McpServerInfo[]
   env: EnvStatus | null
   usage: UsageInfo | null
+  userAvatarVersion: number | null
   messages: Record<string, ChatMessage[]>
 
   view: View
@@ -65,6 +66,7 @@ export const useStore = create<State>((set, get) => {
     mcpServers: [],
     env: null,
     usage: null,
+    userAvatarVersion: null,
     messages: {},
     view: 'chat',
     selectedId: null,
@@ -107,7 +109,8 @@ export const useStore = create<State>((set, get) => {
         settings: boot.settings,
         mcpServers: boot.mcpServers,
         env: boot.env,
-        usage: boot.usage
+        usage: boot.usage,
+        userAvatarVersion: boot.userAvatarVersion
       })
       const first = sortAgents(boot.agents)[0]
       if (first) get().select(first.id)

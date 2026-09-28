@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, nativeImage, shell, type MenuItemConstructorOptions } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { handleAvatarProtocol, registerAvatarScheme } from './avatars'
 import { Backend } from './backend'
 import { emit, registerApi } from './ipc'
 import { createTray } from './tray'
@@ -15,6 +16,8 @@ const resourcesDir = join(__dirname, '../../resources')
 // Dev only: lets automated UI checks attach over the Chrome DevTools Protocol.
 const cdpPort = process.env['NATEBOT_CDP_PORT']
 if (isDev && cdpPort) app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
+
+registerAvatarScheme()
 
 // One NateBot at a time; a second launch just shows the existing window.
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -161,6 +164,7 @@ app.whenReady().then(async () => {
   // Launched at login: start quietly in the menu bar.
   startHidden = app.isPackaged && app.getLoginItemSettings().wasOpenedAtLogin === true
 
+  handleAvatarProtocol()
   backend = new Backend()
   registerApi(backend, devServerUrl)
   buildMenu()

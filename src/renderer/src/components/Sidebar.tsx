@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { sortAgents, useStore } from '../lib/store'
 import { initials, listTime } from '../lib/format'
+import { agentPicture, userPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
+import { AvatarEditor } from './AvatarEditor'
 import { ClockIcon, GearIcon, PlusIcon, SearchIcon } from './icons'
 import { IconButton } from './ui'
 
@@ -12,6 +14,7 @@ export function Sidebar() {
   const view = useStore((s) => s.view)
   const settings = useStore((s) => s.settings)
   const usage = useStore((s) => s.usage)
+  const userAvatarVersion = useStore((s) => s.userAvatarVersion)
   const { select, setSearch, setAddOpen, setView } = useStore.getState()
 
   const list = useMemo(() => {
@@ -59,7 +62,7 @@ export function Sidebar() {
               }`}
             >
               <div className="relative">
-                <Avatar seed={a.name} shape={a.shape} color={a.color} size={44} running={a.status === 'running'} />
+                <Avatar seed={a.name} shape={a.shape} color={a.color} picture={agentPicture(a.id, a.avatarVersion)} size={44} running={a.status === 'running'} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -88,9 +91,21 @@ export function Sidebar() {
       </nav>
 
       <div className="flex items-center gap-2 border-t border-line px-3 py-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold">
-          {initials(userName)}
-        </div>
+        <AvatarEditor
+          target="user"
+          hasPicture={!!userAvatarVersion}
+          onChanged={(v) => useStore.setState({ userAvatarVersion: v })}
+          label="Change your picture"
+          placement="above"
+        >
+          {userPicture(userAvatarVersion) ? (
+            <img src={userPicture(userAvatarVersion) ?? ''} alt="" className="h-8 w-8 rounded-full object-cover" draggable={false} />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold">
+              {initials(userName)}
+            </div>
+          )}
+        </AvatarEditor>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-medium">{userName}</div>
           {fiveHour !== null && (

@@ -43,6 +43,9 @@ export interface NateBotApi {
   recheckEnv(): Promise<EnvStatus>
   openExternal(url: string): Promise<void>
 
+  /** target: 'user' or 'agent:<id>'. dataUrl null resets to the default. Returns the new version. */
+  setAvatar(target: string, dataUrl: string | null): Promise<number | null>
+
   gmailStatus(): Promise<GmailStatus>
   connectGmail(email: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; error?: string }>
 }
@@ -65,6 +68,7 @@ export const API_METHODS = [
   'updateSettings',
   'recheckEnv',
   'openExternal',
+  'setAvatar',
   'gmailStatus',
   'connectGmail'
 ] as const satisfies readonly (keyof NateBotApi)[]

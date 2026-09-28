@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { AgentConfig, AgentDraft, AgentSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
+import { agentPicture } from '../lib/avatars'
 import { AgentForm, validateDraft } from './AgentForm'
+import { Avatar } from './Avatar'
+import { AvatarEditor } from './AvatarEditor'
 import { RefreshIcon, TrashIcon, XIcon } from './icons'
 import { Button, ConfirmDialog, IconButton } from './ui'
 
@@ -66,7 +69,22 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
-          <AgentForm draft={draft} onChange={setDraft} mcpServers={mcpServers} />
+          <AgentForm
+            draft={draft}
+            onChange={setDraft}
+            mcpServers={mcpServers}
+            avatar={
+              <AvatarEditor target={`agent:${agent.id}`} hasPicture={!!agent.avatarVersion} label="Upload a picture">
+                <Avatar
+                  seed={draft.name}
+                  shape={draft.shape}
+                  color={draft.color}
+                  picture={agentPicture(agent.id, agent.avatarVersion)}
+                  size={64}
+                />
+              </AvatarEditor>
+            }
+          />
 
           <div className="mt-8 space-y-2 border-t border-line pt-5">
             <div className="text-[12px] font-medium tracking-wide text-muted uppercase">Memory & removal</div>

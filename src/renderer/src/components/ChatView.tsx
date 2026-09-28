@@ -3,7 +3,9 @@ import { describeCron } from '@shared/schedule'
 import { useSelectedAgent, useStore } from '../lib/store'
 import { clockTime } from '../lib/format'
 import { AgentDrawer } from './AgentDrawer'
+import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
+import { AvatarEditor } from './AvatarEditor'
 import { Composer } from './Composer'
 import { AlertIcon, SlidersIcon } from './icons'
 import { MessageList } from './MessageList'
@@ -61,7 +63,9 @@ export function ChatView() {
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
       <header className="drag flex h-[52px] shrink-0 items-center gap-3 border-b border-line px-5">
-        <Avatar seed={agent.name} shape={agent.shape} color={agent.color} size={30} running={agent.status === 'running'} />
+        <AvatarEditor target={`agent:${agent.id}`} hasPicture={!!agent.avatarVersion} label={`Change ${agent.name}'s picture`}>
+          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} picture={agentPicture(agent.id, agent.avatarVersion)} size={30} running={agent.status === 'running'} />
+        </AvatarEditor>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] leading-tight font-semibold">{agent.name}</div>
           <div className={`truncate text-[12px] leading-tight ${agent.status === 'running' ? 'text-accent' : 'text-muted'}`}>
@@ -89,7 +93,7 @@ export function ChatView() {
         <div className="flex-1" />
       ) : messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} size={72} />
+          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} picture={agentPicture(agent.id, agent.avatarVersion)} size={72} />
           <div className="text-[17px] font-semibold">{agent.name}</div>
           <div className="max-w-[360px] text-[13px] text-muted">
             {agent.instructions.split('\n')[0] || 'Say hi to get started.'}

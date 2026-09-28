@@ -18,6 +18,7 @@ import type {
 } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { AgentStore } from './agents'
+import { avatarVersion, removeAvatar, saveAvatar } from './avatars'
 import { Db } from './db'
 import { Engine, ensureWorkspace, type RunFinished } from './engine'
 import { checkEnv, resolveShellPath } from './env'
@@ -139,7 +140,8 @@ export class Backend implements NateBotApi {
         queued,
         unread: this.db.unread(a.id),
         lastActivity: last?.createdAt ?? 0,
-        lastPreview: running ? previewOf(this.engine.liveMessage(a.id)) || previewOf(last) : previewOf(last)
+        lastPreview: running ? previewOf(this.engine.liveMessage(a.id)) || previewOf(last) : previewOf(last),
+        avatarVersion: avatarVersion(`agent:${a.id}`)
       }
     })
   }
@@ -199,7 +201,8 @@ export class Backend implements NateBotApi {
       settings: this.settings.get(),
       mcpServers: listServers(),
       env: this.envOverride ?? this.env,
-      usage: this.usage.get()
+      usage: this.usage.get(),
+      userAvatarVersion: avatarVersion('user')
     }
   }
 
@@ -285,6 +288,7 @@ export class Backend implements NateBotApi {
     this.requireAgent(agentId)
     this.engine.stop(agentId)
     this.store.delete(agentId)
+    removeAvatar(`agent:${agentId}`)
     this.db.deleteAgent(agentId)
     // The workspace may hold the user's attachments: move it to the Trash (recoverable).
     const dir = workspaceOf(agentId)
@@ -329,6 +333,7 @@ export class Backend implements NateBotApi {
           agentId: a.id,
           agentName: a.name,
           shape: a.shape,
+          avatarVersion: avatarVersion(`agent:${a.id}`),
           color: a.color,
           routine: a.routine as NonNullable<AgentConfig['routine']>,
           nextRun: a.routine?.enabled ? this.scheduler.nextRun(a.id) : null,
@@ -374,6 +379,15 @@ export class Backend implements NateBotApi {
 
   async openExternal(url: string): Promise<void> {
     if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) await shell.openExternal(url)
+  }
+
+  async setAvatar(target: string, dataUrl: string | null): Promise<number | null> {
+    if (target !== 'user') this.requireAgent(/^agent:(.+)$/.exec(String(target))?.[1])
+    let version: number | null = null
+    if (dataUrl === null) removeAvatar(target)
+    else if (typeof dataUrl === 'string') version = saveAvatar(target, dataUrl)
+    if (target !== 'user') this.emitAgents()
+    return version
   }
 
   async gmailStatus(): Promise<GmailStatus> {

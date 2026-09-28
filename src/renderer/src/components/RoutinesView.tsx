@@ -3,6 +3,7 @@ import type { RoutineInfo } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { api, useStore } from '../lib/store'
 import { listTime, relativeFuture } from '../lib/format'
+import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { PlayIcon, PlusIcon } from './icons'
 import { Button, Toggle } from './ui'
@@ -39,7 +40,7 @@ export function RoutinesView() {
           <div className="space-y-2">
             {routines?.map((r) => (
               <div key={r.agentId} className="flex items-center gap-4 rounded-2xl bg-elev/60 px-4 py-3.5">
-                <Avatar seed={r.agentName} shape={r.shape} color={r.color} size={40} />
+                <Avatar seed={r.agentName} shape={r.shape} color={r.color} picture={agentPicture(r.agentId, r.avatarVersion)} size={40} />
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
