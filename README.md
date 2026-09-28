@@ -79,7 +79,10 @@ UI files, never a localhost URL, and needs no terminal or dev server.
 ## Changing the app icon
 
 Run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG. It regenerates `build/icon.icns`
-and the PNGs, and re-brands the dev app. `npm install` also re-brands dev Electron as NateBot automatically.
+and the PNGs, and rebuilds the dev app. `npm install` sets up dev mode automatically: `npm run dev` launches a
+NateBot-branded copy of Electron (`node_modules/electron/dist/NateBot.app`), so the Dock and menu bar show NateBot.
+To keep NateBot in your Dock, pin the installed `/Applications/NateBot.app` (pinning the dev copy would open a
+blank Electron window when clicked).
 
 ## Rebuild after changes
 
