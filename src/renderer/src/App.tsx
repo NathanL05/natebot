@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from './lib/store'
 import { AddAgentModal } from './components/AddAgentModal'
 import { ChatView } from './components/ChatView'
+import { ConnectGmailModal } from './components/ConnectGmailModal'
 import { RoutinesView } from './components/RoutinesView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -12,6 +13,7 @@ export function App() {
   const env = useStore((s) => s.env)
   const view = useStore((s) => s.view)
   const addOpen = useStore((s) => s.addOpen)
+  const gmailOpen = useStore((s) => s.gmailOpen)
   const theme = useStore((s) => s.settings?.theme ?? 'dark')
 
   useEffect(() => {
@@ -34,6 +36,7 @@ export function App() {
         {view === 'settings' && <SettingsView />}
       </main>
       {addOpen && <AddAgentModal />}
+      {gmailOpen && <ConnectGmailModal />}
     </div>
   )
 }

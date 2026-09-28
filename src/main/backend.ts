@@ -13,6 +13,7 @@ import type {
   Bootstrap,
   ChatMessage,
   EnvStatus,
+  GmailStatus,
   RoutineInfo
 } from '@shared/types'
 import { describeCron } from '@shared/schedule'
@@ -21,6 +22,8 @@ import { Db } from './db'
 import { Engine, ensureWorkspace, type RunFinished } from './engine'
 import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
+import { log } from './log'
+import { connectGmail, gmailStatus } from './gmail'
 import { ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { Scheduler } from './scheduler'
@@ -98,7 +101,8 @@ export class Backend implements NateBotApi {
 
   /** Resolves the shell PATH and checks claude. Runs once at startup. */
   async start(): Promise<void> {
-    await resolveShellPath()
+    const path = await resolveShellPath()
+    log(`startup: version=${app.getVersion()} packaged=${app.isPackaged} pathDirs=${path.split(':').length}`)
     await this.recheckEnv()
   }
 
@@ -160,6 +164,7 @@ export class Backend implements NateBotApi {
   }
 
   private onRunFinished(r: RunFinished): void {
+    log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
     if (r.needsApproval) this.notify(r.agentId, 'Needs your approval', r.summary)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
@@ -360,6 +365,7 @@ export class Backend implements NateBotApi {
 
   async recheckEnv(): Promise<EnvStatus> {
     this.env = await checkEnv(this.settings.get().claudePath)
+    log(`env: found=${this.env.claudeFound} path=${this.env.claudePath ?? '-'} version=${this.env.version ?? '-'} loggedIn=${this.env.loggedIn} plan=${this.env.subscriptionType ?? '-'} error=${this.env.error ?? '-'}`)
     const shown = this.envOverride ?? this.env
     emit('env', shown)
     if (this.env.claudeFound && this.env.loggedIn) this.engine.pump()
@@ -368,5 +374,28 @@ export class Backend implements NateBotApi {
 
   async openExternal(url: string): Promise<void> {
     if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) await shell.openExternal(url)
+  }
+
+  async gmailStatus(): Promise<GmailStatus> {
+    return gmailStatus()
+  }
+
+  private connecting = false
+
+  async connectGmail(email: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; error?: string }> {
+    if (this.connecting) return { ok: false, error: 'Already connecting.' }
+    if ([email, clientId, clientSecret].some((v) => typeof v !== 'string')) return { ok: false, error: 'Missing details.' }
+    this.connecting = true
+    try {
+      const res = await connectGmail(
+        { email, clientId, clientSecret },
+        (p) => emit('gmailProgress', p),
+        (url) => void shell.openExternal(url)
+      )
+      emit('mcpServers', listServers())
+      return res
+    } finally {
+      this.connecting = false
+    }
   }
 }

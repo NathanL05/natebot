@@ -8,6 +8,8 @@ import type {
   Bootstrap,
   ChatMessage,
   EnvStatus,
+  GmailProgress,
+  GmailStatus,
   McpServerInfo,
   RoutineInfo,
   UsageInfo
@@ -40,6 +42,9 @@ export interface NateBotApi {
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   recheckEnv(): Promise<EnvStatus>
   openExternal(url: string): Promise<void>
+
+  gmailStatus(): Promise<GmailStatus>
+  connectGmail(email: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; error?: string }>
 }
 
 export const API_METHODS = [
@@ -59,7 +64,9 @@ export const API_METHODS = [
   'runRoutineNow',
   'updateSettings',
   'recheckEnv',
-  'openExternal'
+  'openExternal',
+  'gmailStatus',
+  'connectGmail'
 ] as const satisfies readonly (keyof NateBotApi)[]
 
 // Compile-time check that API_METHODS lists every method.
@@ -75,6 +82,7 @@ export interface NateBotEvents {
   env: EnvStatus
   /** ~/NateBot/mcp.json changed. */
   mcpServers: McpServerInfo[]
+  gmailProgress: GmailProgress
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Routines. */
@@ -87,6 +95,7 @@ export const EVENT_NAMES = [
   'usage',
   'env',
   'mcpServers',
+  'gmailProgress',
   'focusAgent',
   'navigate'
 ] as const satisfies readonly (keyof NateBotEvents)[]

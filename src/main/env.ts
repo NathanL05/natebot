@@ -50,13 +50,18 @@ function isExecutable(file: string): boolean {
   }
 }
 
-export function findClaude(override: string | null): string | null {
-  if (override) return isExecutable(override) ? override : null
+/** Looks a program up on the resolved login-shell PATH. */
+export function findOnPath(name: string): string | null {
   for (const dir of resolvedPath.split(delimiter)) {
-    const candidate = join(dir, 'claude')
+    const candidate = join(dir, name)
     if (isExecutable(candidate)) return candidate
   }
   return null
+}
+
+export function findClaude(override: string | null): string | null {
+  if (override) return isExecutable(override) ? override : null
+  return findOnPath('claude')
 }
 
 /**

@@ -77,11 +77,11 @@ export function ChatView() {
       {missing.length > 0 && (
         <button
           type="button"
-          onClick={() => useStore.getState().setDrawerOpen(true)}
+          onClick={() => (missing.includes('gmail') ? useStore.getState().setGmailOpen(true) : useStore.getState().setDrawerOpen(true))}
           className="mx-6 mt-2 rounded-xl bg-elev px-3 py-2 text-left text-[12px] text-muted hover:text-fg"
         >
-          <span className="font-semibold text-warn">{missing.includes('gmail') ? 'Connect Gmail' : `Set up ${missing.join(', ')}`}</span>
-          {' · '}This agent needs {missing.join(', ')}, which isn't configured yet. See the README.
+          <span className="font-semibold text-warn">{missing.includes('gmail') ? 'Connect Gmail →' : `Set up ${missing.join(', ')}`}</span>
+          {' · '}This agent needs {missing.join(', ')}, which isn't set up yet.
         </button>
       )}
 

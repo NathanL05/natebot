@@ -130,3 +130,16 @@ export interface Bootstrap {
   env: EnvStatus
   usage: UsageInfo | null
 }
+
+export interface GmailProgress {
+  stage: 'starting' | 'signin' | 'verifying' | 'done' | 'error'
+  message: string
+  url?: string
+}
+
+export interface GmailStatus {
+  configured: boolean
+  connected: boolean
+  email: string | null
+  uvInstalled: boolean
+}

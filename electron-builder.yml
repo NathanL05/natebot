@@ -1,0 +1,31 @@
+# Packaging for NateBot.app + .dmg. Run: npm run dist
+appId: com.nathan.natebot
+productName: NateBot
+copyright: Personal use
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  target:
+    - target: dmg
+  # No paid Apple Developer account: ad-hoc sign (first launch needs right-click → Open).
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  extendInfo:
+    NSUserNotificationAlertStyle: alert
+dmg:
+  title: NateBot
+  artifactName: NateBot-${version}-${arch}.dmg
+  contents:
+    - { x: 150, y: 190 }
+    - { x: 390, y: 190, type: link, path: /Applications }
+  window:
+    width: 540
+    height: 380

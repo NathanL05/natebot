@@ -44,6 +44,7 @@ export function SettingsView() {
   const env = useStore((s) => s.env)
   const usage = useStore((s) => s.usage)
   const patch = useStore((s) => s.patchSettings)
+  const gmail = useStore((s) => s.mcpServers.find((m) => m.name === 'gmail'))
   const [checking, setChecking] = useState(false)
   const [pathDraft, setPathDraft] = useState(settings?.claudePath ?? '')
 
@@ -96,6 +97,15 @@ export function SettingsView() {
                 </Button>
               </div>
             </div>
+          </Section>
+
+          <Section title="Connected tools">
+            <Row label="Gmail" hint={gmail?.configured ? gmail.description : 'Not connected. Lets agents read, search and draft email.'}>
+              <Button onClick={() => useStore.getState().setGmailOpen(true)}>{gmail?.configured ? 'Reconnect…' : 'Connect Gmail…'}</Button>
+            </Row>
+            <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see README). They appear in each agent's settings.">
+              <Button onClick={() => void api.openExternal('https://github.com/NathanL05/natebot#adding-mcp-servers')}>How-to</Button>
+            </Row>
           </Section>
 
           <Section title="Usage">

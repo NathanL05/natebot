@@ -24,6 +24,7 @@ interface State {
   search: string
   drawerOpen: boolean
   addOpen: boolean
+  gmailOpen: boolean
 
   init(): Promise<void>
   select(agentId: string): void
@@ -31,6 +32,7 @@ interface State {
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
   setAddOpen(open: boolean): void
+  setGmailOpen(open: boolean): void
   patchSettings(patch: Partial<AppSettings>): Promise<void>
 }
 
@@ -69,6 +71,7 @@ export const useStore = create<State>((set, get) => {
     search: '',
     drawerOpen: false,
     addOpen: false,
+    gmailOpen: false,
 
     async init() {
       api.on('agents', (agents) => {
@@ -128,6 +131,7 @@ export const useStore = create<State>((set, get) => {
     setSearch: (search) => set({ search }),
     setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
     setAddOpen: (addOpen) => set({ addOpen }),
+    setGmailOpen: (gmailOpen) => set({ gmailOpen }),
 
     async patchSettings(patch) {
       const current = get().settings

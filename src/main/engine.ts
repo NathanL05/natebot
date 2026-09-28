@@ -8,7 +8,7 @@ import type { AgentConfig, ChatMessage, ProposedAction } from '@shared/types'
 import type { AgentStore } from './agents'
 import type { Db } from './db'
 import { childEnv } from './env'
-import { configuredServersFor, writeRunConfig } from './mcp'
+import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
 import { workspaceOf } from './paths'
 import { executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
@@ -169,13 +169,15 @@ export class Engine extends EventEmitter {
 
   private runArgs(agent: AgentConfig, mcpPath: string, mcpServers: string[], sessionArgs: string[]): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
+    // Tools marked require_approval in mcp.json are never available in normal runs.
+    const disallowed = [...new Set([...agent.disallowed_tools, ...approvalOnlyTools(agent)])]
     const args = [
       '-p',
       '--output-format', 'stream-json',
       '--verbose',
       '--include-partial-messages',
       '--model', agent.model,
-      '--append-system-prompt', systemPrompt(agent),
+      '--append-system-prompt', systemPrompt(agent, agentNotes(agent)),
       // Re-render the system prompt on resume so edited instructions apply.
       '--system-prompt-snapshot', 'off',
       // Ignore the user's own Claude Code settings, hooks and plugins.
@@ -188,7 +190,7 @@ export class Engine extends EventEmitter {
       '--tools', builtinTools(agent).join(',')
     ]
     if (allowed.length) args.push('--allowedTools', allowed.join(','))
-    if (agent.disallowed_tools.length) args.push('--disallowedTools', agent.disallowed_tools.join(','))
+    if (disallowed.length) args.push('--disallowedTools', disallowed.join(','))
     return [...args, ...sessionArgs]
   }
 
@@ -361,7 +363,7 @@ export class Engine extends EventEmitter {
       '--output-format', 'stream-json',
       '--verbose',
       '--model', agent.model,
-      '--append-system-prompt', systemPrompt(agent),
+      '--append-system-prompt', systemPrompt(agent, agentNotes(agent)),
       '--no-session-persistence',
       '--setting-sources', 'project,local',
       '--strict-mcp-config', '--mcp-config', mcp.path,
