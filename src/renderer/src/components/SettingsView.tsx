@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { MODELS, type ModelId, type Theme, type UsageWindow } from '@shared/types'
+import { EFFORTS, MODELS, type EffortLevel, type ModelId, type Theme, type UsageWindow } from '@shared/types'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
 import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
@@ -133,6 +133,13 @@ export function SettingsView() {
                 value={settings.defaultModel}
                 onChange={(v) => void patch({ defaultModel: v })}
                 options={MODELS.map((m) => ({ value: m.id, label: m.label }))}
+              />
+            </Row>
+            <Row label="Default effort for new agents" hint={EFFORTS.find((e) => e.id === settings.defaultEffort)?.hint}>
+              <Segmented<EffortLevel>
+                value={settings.defaultEffort}
+                onChange={(v) => void patch({ defaultEffort: v })}
+                options={EFFORTS.map((e) => ({ value: e.id, label: e.label }))}
               />
             </Row>
           </Section>

@@ -13,6 +13,7 @@ import type {
   Bootstrap,
   ChatMessage,
   EnvStatus,
+  Folder,
   GmailStatus,
   MarketplaceData,
   RoomConfig,
@@ -175,7 +176,8 @@ export class Backend implements NateBotApi {
         unread: this.db.unread(a.id),
         lastActivity: last?.createdAt ?? 0,
         lastPreview: running ? previewOf(this.engine.liveMessage(a.id)) || previewOf(last) : previewOf(last),
-        avatarVersion: avatarVersion(`agent:${a.id}`)
+        avatarVersion: avatarVersion(`agent:${a.id}`),
+        folderId: this.db.folderOf(a.id)
       }
     })
   }
@@ -251,6 +253,7 @@ export class Backend implements NateBotApi {
     return {
       agents: this.summaries(),
       rooms: this.rooms.summaries(),
+      folders: this.db.listFolders(),
       settings: this.settings.get(),
       mcpServers: this.serverList(),
       env: this.envOverride ?? this.env,
@@ -270,23 +273,32 @@ export class Backend implements NateBotApi {
     return live ? list.map((m) => (m.id === live.id ? { ...live } : m)) : list
   }
 
-  async sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void> {
-    const body = typeof text === 'string' ? text.trim() : ''
-    if (isRoomId(String(agentId))) {
-      // Group chats are text only.
-      if (body) this.rooms.post(this.rooms.require(agentId).id, body)
-      return
-    }
-    const agent = this.requireAgent(agentId)
+  /** Copies picked files into each agent's workspace (attachments/). Returns their workspace-relative paths. */
+  private saveAttachments(sources: unknown, agentIds: string[]): string[] {
     const saved: string[] = []
-    for (const src of attachments ?? []) {
+    for (const src of Array.isArray(sources) ? sources : []) {
       if (typeof src !== 'string' || !existsSync(src)) continue
       const st = statSync(src)
       if (!st.isFile() || st.size > MAX_ATTACHMENT_BYTES) continue
       const name = `${Date.now()}-${basename(src).replace(/[^\w.\- ]+/g, '_')}`
-      copyFileSync(src, join(ensureWorkspace(agent.id), 'attachments', name))
+      if (saved.includes(`attachments/${name}`)) continue
+      for (const id of agentIds) copyFileSync(src, join(ensureWorkspace(id), 'attachments', name))
       saved.push(`attachments/${name}`)
     }
+    return saved
+  }
+
+  async sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void> {
+    const body = typeof text === 'string' ? text.trim() : ''
+    if (isRoomId(String(agentId))) {
+      const room = this.rooms.require(agentId)
+      // Every member gets its own copy, since agents can only read their own workspace.
+      const files = this.saveAttachments(attachments, room.memberIds.filter((m) => this.store.get(m)))
+      if (body || files.length) this.rooms.post(room.id, body, files)
+      return
+    }
+    const agent = this.requireAgent(agentId)
+    const saved = this.saveAttachments(attachments, [agent.id])
     if (!body && !saved.length) return
     const msg: ChatMessage = {
       id: randomUUID(),
@@ -317,11 +329,11 @@ export class Backend implements NateBotApi {
     }
   }
 
-  async pickAttachment(): Promise<string | null> {
+  async pickAttachments(): Promise<string[]> {
     const win = BrowserWindow.getFocusedWindow()
-    const opts = { properties: ['openFile' as const], message: 'Choose a file to send' }
+    const opts = { properties: ['openFile' as const, 'multiSelections' as const], message: 'Choose files to send (PDFs, images, documents…)' }
     const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
-    return res.canceled ? null : (res.filePaths[0] ?? null)
+    return res.canceled ? [] : res.filePaths
   }
 
   async createAgent(draft: AgentDraft): Promise<AgentConfig> {
@@ -383,8 +395,43 @@ export class Backend implements NateBotApi {
     this.rooms.delete(this.rooms.require(roomId).id)
   }
 
-  async continueRoom(roomId: string): Promise<void> {
-    this.rooms.resume(this.rooms.require(roomId).id)
+  private requireFolder(id: unknown): Folder {
+    const folder = this.db.listFolders().find((f) => f.id === id)
+    if (!folder) throw new Error('Unknown folder')
+    return folder
+  }
+
+  private folderName(name: unknown): string {
+    return (typeof name === 'string' ? name.trim().slice(0, 40) : '') || 'New folder'
+  }
+
+  async createFolder(name: string): Promise<Folder> {
+    const folder: Folder = { id: randomUUID().slice(0, 8), name: this.folderName(name), collapsed: false }
+    this.db.saveFolder(folder)
+    emit('folders', this.db.listFolders())
+    return folder
+  }
+
+  async updateFolder(next: Folder): Promise<void> {
+    const folder = this.requireFolder(next?.id)
+    this.db.saveFolder({ ...folder, name: this.folderName(next.name), collapsed: next.collapsed === true })
+    emit('folders', this.db.listFolders())
+  }
+
+  async deleteFolder(folderId: string): Promise<void> {
+    this.db.deleteFolder(this.requireFolder(folderId).id)
+    emit('folders', this.db.listFolders())
+    this.emitAgents()
+    this.emitRooms()
+  }
+
+  async moveToFolder(chatId: string, folderId: string | null): Promise<void> {
+    const room = isRoomId(String(chatId))
+    if (room) this.rooms.require(chatId)
+    else this.requireAgent(chatId)
+    this.db.setFolder(chatId, folderId === null ? null : this.requireFolder(folderId).id)
+    if (room) this.emitRooms()
+    else this.emitAgents()
   }
 
   async resolveAction(messageId: string, actionId: string, decision: 'approve' | 'reject', details?: Record<string, unknown>): Promise<void> {

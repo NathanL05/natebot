@@ -4,7 +4,8 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import type { AgentConfig, AgentDraft, MascotShape, ModelId, Routine } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS } from '@shared/types'
+import type { AgentConfig, AgentDraft, EffortLevel, MascotShape, ModelId, Routine } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
 
@@ -13,7 +14,8 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 
 const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
-  '# model: sonnet | haiku | opus   routine.cron: minute hour day month weekday\n' +
+  '# model: sonnet | haiku | opus   effort: low | medium | high | xhigh | max\n' +
+  '# routine.cron: minute hour day month weekday\n' +
   '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 
 export function slugify(name: string): string {
@@ -55,6 +57,7 @@ function normalize(raw: unknown, id: string): AgentConfig {
     shape: normalizeShape(r['shape'], id),
     color: /^#[0-9a-f]{6}$/i.test(str(r['color'])) ? str(r['color']) : '#5E8BFF',
     model: MODELS.includes(model) ? model : 'sonnet',
+    effort: EFFORTS.some((e) => e.id === r['effort']) ? (r['effort'] as EffortLevel) : DEFAULT_EFFORT,
     instructions: str(r['instructions']).trim(),
     mcp_servers: strList(r['mcp_servers']),
     allowed_tools: strList(r['allowed_tools']),
@@ -72,6 +75,7 @@ function serialize(a: AgentConfig): string {
     shape: a.shape,
     color: a.color,
     model: a.model,
+    effort: a.effort,
     instructions: a.instructions.endsWith('\n') ? a.instructions : `${a.instructions}\n`,
     mcp_servers: a.mcp_servers,
     allowed_tools: a.allowed_tools,

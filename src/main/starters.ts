@@ -8,6 +8,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     shape: 'hexagon',
     color: '#F5A524',
     model: 'sonnet',
+    effort: 'medium',
     instructions: [
       'You review my Gmail inbox. Flag anything urgent, summarise the rest in a',
       'short ✓ checklist, and draft replies. NEVER send an email yourself.',
@@ -26,6 +27,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     shape: 'pill',
     color: '#5E8BFF',
     model: 'sonnet',
+    effort: 'medium',
     instructions: [
       'You help me plan my day and week from what I tell you. Turn it into a',
       'realistic, time-blocked plan with clear priorities. Keep it short, use ✓',
@@ -43,6 +45,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     shape: 'cloud',
     color: '#30D158',
     model: 'sonnet',
+    effort: 'medium',
     instructions: [
       'You research topics on the web and give short, sourced summaries:',
       '3–5 key points, then the links you used. Say plainly when you are unsure.'

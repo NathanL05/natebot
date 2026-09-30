@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import type { AgentSummary } from '@shared/types'
 import { api } from '../lib/store'
+import { agentPicture } from '../lib/avatars'
 import { basename } from '../lib/format'
+import { Avatar } from './Avatar'
 import { ArrowUpIcon, PlusIcon, StopIcon, XIcon } from './icons'
 
 // Unsent text survives switching between chats.
@@ -12,17 +15,27 @@ export function Composer({
   name,
   running,
   queued = 0,
-  allowAttachments = true
+  mentionables = []
 }: {
   chatId: string
   name: string
   running: boolean
   queued?: number
-  allowAttachments?: boolean
+  /** Group chats: members offered when typing @. */
+  mentionables?: AgentSummary[]
 }) {
   const [text, setText] = useState(() => drafts.get(chatId) ?? '')
   const [attachments, setAttachments] = useState<string[]>([])
+  /** The "@query" being typed before the caret, if any. */
+  const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
+
+  const q = mention?.query.toLowerCase() ?? ''
+  const matches = mention
+    ? mentionables
+        .filter((a) => a.name.toLowerCase().includes(q))
+        .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)))
+    : []
 
   useEffect(() => {
     box.current?.focus()
@@ -41,6 +54,27 @@ export function Composer({
     drafts.set(chatId, value)
   }
 
+  /** Opens the @ picker while the caret sits right after "@something". */
+  const trackMention = (value: string, caret: number): void => {
+    if (!mentionables.length) return
+    const m = /(^|\s)@([^\s@]*)$/.exec(value.slice(0, caret))
+    setMention(m ? { start: caret - (m[2]?.length ?? 0) - 1, query: m[2] ?? '', index: 0 } : null)
+  }
+
+  const pickMention = (agent: AgentSummary): void => {
+    const el = box.current
+    if (!mention || !el) return
+    const caret = el.selectionStart
+    const next = `${text.slice(0, mention.start)}@${agent.name} ${text.slice(caret)}`
+    const at = mention.start + agent.name.length + 2
+    update(next)
+    setMention(null)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(at, at)
+    })
+  }
+
   const send = (): void => {
     const body = text.trim()
     if (!body && attachments.length === 0) return
@@ -50,6 +84,24 @@ export function Composer({
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (mention && matches.length) {
+      const move = (d: number): void => setMention({ ...mention, index: (mention.index + d + matches.length) % matches.length })
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        move(e.key === 'ArrowDown' ? 1 : -1)
+        return
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && !e.nativeEvent.isComposing) {
+        e.preventDefault()
+        pickMention(matches[mention.index] ?? (matches[0] as AgentSummary))
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMention(null)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
@@ -57,8 +109,8 @@ export function Composer({
   }
 
   const attach = async (): Promise<void> => {
-    const path = await api.pickAttachment(chatId)
-    if (path && !attachments.includes(path)) setAttachments([...attachments, path])
+    const paths = await api.pickAttachments()
+    setAttachments((current) => [...current, ...paths.filter((p) => !current.includes(p))])
     box.current?.focus()
   }
 
@@ -89,31 +141,55 @@ export function Composer({
             ))}
           </div>
         )}
+        {mention && matches.length > 0 && (
+          <div className="relative">
+            <div role="listbox" aria-label="Mention an agent" className="pop absolute bottom-2 left-0 w-64 rounded-xl border border-line-strong bg-elev p-1 shadow-2xl">
+              {matches.map((a, i) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="option"
+                  aria-selected={i === mention.index}
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    pickMention(a)
+                  }}
+                  onMouseEnter={() => setMention({ ...mention, index: i })}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] ${i === mention.index ? 'bg-selected' : ''}`}
+                >
+                  <Avatar seed={a.name} shape={a.shape} color={a.color} picture={agentPicture(a.id, a.avatarVersion)} size={22} />
+                  <span className="truncate font-medium">{a.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {/* One pill: + on the left, send on the right, the same 6px inset on every side. */}
         <div
           className="flex items-end gap-1.5 rounded-[23px] border border-line-strong bg-field p-1.5 transition focus-within:border-accent/50"
           style={{ boxShadow: 'var(--field-shadow)' }}
         >
-          {allowAttachments ? (
-            <button
-              type="button"
-              aria-label="Attach a file"
-              title="Attach a file"
-              onClick={() => void attach()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2/70 text-muted transition hover:bg-elev-2 hover:text-fg"
-            >
-              <PlusIcon size={17} />
-            </button>
-          ) : (
-            <span className="w-1.5 shrink-0" />
-          )}
+          <button
+            type="button"
+            aria-label="Attach files"
+            title="Attach files (PDFs, images, documents…)"
+            onClick={() => void attach()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2/70 text-muted transition hover:bg-elev-2 hover:text-fg"
+          >
+            <PlusIcon size={17} />
+          </button>
           <textarea
             ref={box}
             rows={1}
             value={text}
-            onChange={(e) => update(e.target.value)}
+            onChange={(e) => {
+              update(e.target.value)
+              trackMention(e.target.value, e.target.selectionStart)
+            }}
             onKeyDown={onKeyDown}
-            placeholder={`Message ${name}`}
+            onSelect={(e) => trackMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+            onBlur={() => setMention(null)}
+            placeholder={mentionables.length ? `Message ${name} · @ to mention an agent` : `Message ${name}`}
             className="max-h-[200px] flex-1 resize-none bg-transparent px-1.5 py-[6px] text-[14px] leading-[20px] text-fg outline-none placeholder:text-muted"
           />
           {running && (

@@ -3,9 +3,13 @@
 // its own room-only session, so its one-on-one memory stays separate) and can
 // hand the conversation to another member with an @mention.
 //
-// Turn order after a user message: the agents it @mentions, otherwise every
-// member once. An @mention in an agent's reply moves that agent to the front.
-// The room stops when nobody is left to speak or after maxTurns replies.
+// Turn order after a user message: every member once. If the user @mentions
+// agents, those answer first and the rest only chime in if they can add
+// something (they're told they weren't addressed and usually PASS). An
+// @mention in an agent's reply moves that agent to the front. The room stops
+// when nobody is left to speak or after maxTurns replies. Agents are told how
+// many replies are left so they converge, and the last one wraps up (a
+// summary, or a question for the user) instead of the group being cut off.
 import { randomUUID } from 'node:crypto'
 import type { AgentConfig, ChatMessage, RoomConfig, RoomDraft, RoomSummary } from '@shared/types'
 import { ROOM_PREFIX } from '@shared/types'
@@ -24,6 +28,8 @@ const JOIN_HISTORY = 40
 interface Live {
   /** Who speaks next, in order. The user and agents' @mentions reorder it. */
   queue: string[]
+  /** Queued members the user didn't @mention: they only reply if they can help. */
+  optional: Set<string>
   turns: number
   speaking: string | null
   stopped: boolean
@@ -75,7 +81,8 @@ export class Rooms {
         speakingId: live?.speaking ?? null,
         unread: this.deps.db.unread(r.id),
         lastActivity: last?.createdAt ?? 0,
-        lastPreview: last ? `${speaker ? `${speaker}: ` : ''}${preview(last.text)}` : ''
+        lastPreview: last ? `${speaker ? `${speaker}: ` : ''}${preview(last.text)}` : '',
+        folderId: this.deps.db.folderOf(r.id)
       }
     })
   }
@@ -146,19 +153,19 @@ export class Rooms {
 
   // ---- conversation ----
 
-  post(roomId: string, text: string): void {
+  /** files: workspace-relative paths, already copied into every member's workspace. */
+  post(roomId: string, text: string, files: string[] = []): void {
     const room = this.require(roomId)
     const msg: ChatMessage = { id: randomUUID(), agentId: roomId, role: 'user', text, createdAt: Date.now() }
+    if (files.length) {
+      msg.files = files
+      msg.attachments = files.map((f) => f.replace(/^attachments\/\d+-/, ''))
+    }
     this.deps.db.saveMessage(msg)
     this.deps.emitMessage(msg)
     const mentioned = this.mentions(room, text)
-    this.schedule(room, mentioned.length ? mentioned : this.rotation(room))
-  }
-
-  /** Let the agents keep talking without a new user message. */
-  resume(roomId: string): void {
-    const room = this.require(roomId)
-    this.schedule(room, this.rotation(room))
+    const others = this.rotation(room).filter((m) => !mentioned.includes(m))
+    this.schedule(room, [...mentioned, ...others], mentioned.length ? others : [])
   }
 
   stop(roomId: string): void {
@@ -174,10 +181,11 @@ export class Rooms {
   }
 
   /** Puts these members next in line (starting the conversation if it's idle) and resets the turn budget. */
-  private schedule(room: RoomConfig, queue: string[]): void {
+  private schedule(room: RoomConfig, queue: string[], optional: string[]): void {
     const live = this.live.get(room.id)
     if (live) {
       live.queue = [...queue, ...live.queue.filter((m) => !queue.includes(m))]
+      live.optional = new Set(optional)
       live.turns = 0
       return
     }
@@ -185,7 +193,7 @@ export class Rooms {
       this.system(room.id, `This group chat needs at least ${MIN_MEMBERS} agents. Add some in its settings.`)
       return
     }
-    const fresh: Live = { queue, turns: 0, speaking: null, stopped: false }
+    const fresh: Live = { queue, optional: new Set(optional), turns: 0, speaking: null, stopped: false }
     this.live.set(room.id, fresh)
     void this.converse(room.id, fresh)
   }
@@ -197,10 +205,8 @@ export class Rooms {
       while (!live.stopped) {
         const room = this.rooms.get(roomId)
         if (!room) break
-        if (live.turns >= room.maxTurns) {
-          if (live.queue.length) this.system(roomId, `Paused after ${live.turns} replies. Send a message or press Keep going.`)
-          break
-        }
+        // The last reply already wrapped up, so the group just hands back to the user.
+        if (live.turns >= room.maxTurns) break
         const agentId = live.queue.shift()
         if (!agentId) break
         const agent = this.deps.store.get(agentId)
@@ -210,9 +216,10 @@ export class Rooms {
           break
         }
 
+        const optional = live.optional.delete(agentId)
         live.speaking = agentId
         this.deps.emitRooms()
-        const res = await this.turn(room, agent)
+        const res = await this.turn(room, agent, optional, room.maxTurns - live.turns)
         live.speaking = null
 
         if (res.status === 'stopped') {
@@ -234,6 +241,7 @@ export class Rooms {
         // Agents they @mention answer next.
         const mentioned = this.mentions(room, res.text).filter((m) => m !== agentId)
         live.queue = [...mentioned, ...live.queue.filter((m) => !mentioned.includes(m))]
+        for (const m of mentioned) live.optional.delete(m)
         this.deps.emitRooms()
       }
     } finally {
@@ -244,7 +252,8 @@ export class Rooms {
   }
 
   /** Runs one agent's turn, starting a fresh room session if the old one is gone. */
-  private async turn(room: RoomConfig, agent: AgentConfig): Promise<RoomTurnResult> {
+  /** repliesLeft includes this one. */
+  private async turn(room: RoomConfig, agent: AgentConfig, optional: boolean, repliesLeft: number): Promise<RoomTurnResult> {
     for (let attempt = 0; ; attempt++) {
       const seat: Seat = this.deps.db.seats(room.id)[agent.id] ?? { sessionId: null, seenAt: 0 }
       const shown = this.unseen(room, agent, seat)
@@ -255,7 +264,7 @@ export class Rooms {
         agent,
         sessionId,
         roomPrompt: this.prompt(room, agent),
-        input: this.input(room, agent, shown, !seat.sessionId),
+        input: this.input(room, agent, shown, !seat.sessionId, optional, repliesLeft),
         onSession: (id) => {
           sessionId = id
           this.deps.db.setSeat(room.id, agent.id, { sessionId: id, seenAt: seat.seenAt })
@@ -277,20 +286,37 @@ export class Rooms {
     return this.deps.db
       .listMessages(room.id, JOIN_HISTORY)
       .filter((m) => m.createdAt > seat.seenAt && m.speakerId !== agent.id && !m.streaming)
-      .filter((m) => (m.role === 'user' || m.role === 'agent') && m.text)
+      .filter((m) => (m.role === 'user' || m.role === 'agent') && (m.text || m.files?.length))
   }
 
-  private input(room: RoomConfig, agent: AgentConfig, shown: ChatMessage[], joining: boolean): string {
+  private input(
+    room: RoomConfig,
+    agent: AgentConfig,
+    shown: ChatMessage[],
+    joining: boolean,
+    optional: boolean,
+    repliesLeft: number
+  ): string {
     const user = this.deps.userName() || 'The user'
     const lines = shown.map((m) => {
       const who = m.role === 'user' ? `${user} (user)` : (this.deps.store.get(m.speakerId ?? '')?.name ?? 'A former member')
-      return `${who}: ${m.text}`
+      const files = m.files?.length ? `\n[Attached files, saved in your working folder: ${m.files.join(', ')}]` : ''
+      return `${who}: ${m.text}${files}`
     })
+    const budget = `${repliesLeft} repl${repliesLeft === 1 ? 'y' : 'ies'} left before the group hands back to ${user}, including yours${
+      repliesLeft <= 3 ? '. Start converging: no new threads' : ''
+    }.`
+    const cue =
+      repliesLeft <= 1
+        ? `[Your turn, ${agent.name}. This is the group's last reply before it hands back to ${user}. Wrap up: briefly sum up where the group landed (what's agreed, what's still open), or ask ${user} one clear question about what to do next. Don't @mention other agents and don't reply PASS.]`
+        : optional
+          ? `[Your turn, ${agent.name}. ${user} @mentioned someone else, not you. Only reply if you can add something genuinely useful that hasn't been said; otherwise reply PASS. ${budget}]`
+          : `[Your turn, ${agent.name}. Reply to the group, or reply PASS if you have nothing to add. ${budget}]`
     return [
       currentTimeLine(),
       joining ? `[Group chat "${room.name}": the conversation so far]` : '[New in the group since your last turn]',
       lines.join('\n\n') || '(nothing new)',
-      `[Your turn, ${agent.name}. Reply to the group, or reply PASS if you have nothing to add.]`
+      cue
     ].join('\n\n')
   }
 
@@ -309,6 +335,7 @@ How the group chat works:
 - Talk like a group chat: short (1–4 sentences unless asked for more), direct, in character for your role. Build on, question or disagree with what others said instead of repeating it.
 - To ask another agent something directly, @mention them by name (e.g. @${others[0]?.name ?? 'Name'}). They reply next.
 - If you have nothing useful to add, reply with exactly PASS and nothing else.
+- Each message from ${user} gives the group a limited number of replies; your turn note says how many are left. Pace yourself: when few remain, converge rather than opening new threads. The last reply wraps up for ${user}.
 - The proposed_actions block isn't available here. If something needs approval, tell ${user} to ask you in your one-on-one chat.`
   }
 

@@ -4,6 +4,7 @@ import type {
   AppSettings,
   ChatMessage,
   EnvStatus,
+  Folder,
   McpServerInfo,
   RoomSummary,
   UsageInfo
@@ -15,6 +16,7 @@ interface State {
   ready: boolean
   agents: AgentSummary[]
   rooms: RoomSummary[]
+  folders: Folder[]
   settings: AppSettings | null
   mcpServers: McpServerInfo[]
   env: EnvStatus | null
@@ -27,10 +29,14 @@ interface State {
   search: string
   drawerOpen: boolean
   addOpen: boolean
+  /** Folder a new agent goes into (from a folder's + button). */
+  addFolderId: string | null
   gmailOpen: boolean
   marketplaceOpen: boolean
   /** Group chat editor: 'new', a room id to edit, or null when closed. */
   roomEditor: string | null
+  /** Sidebar folder whose name is being edited. */
+  renamingFolderId: string | null
 
   init(): Promise<void>
   /** Opens an agent's chat or a group chat. */
@@ -38,7 +44,7 @@ interface State {
   setView(view: View): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
-  setAddOpen(open: boolean): void
+  setAddOpen(open: boolean, folderId?: string | null): void
   setGmailOpen(open: boolean): void
   setMarketplaceOpen(open: boolean): void
   setRoomEditor(target: string | null): void
@@ -80,6 +86,7 @@ export const useStore = create<State>((set, get) => {
     ready: false,
     agents: [],
     rooms: [],
+    folders: [],
     settings: null,
     mcpServers: [],
     env: null,
@@ -91,9 +98,11 @@ export const useStore = create<State>((set, get) => {
     search: '',
     drawerOpen: false,
     addOpen: false,
+    addFolderId: null,
     gmailOpen: false,
     marketplaceOpen: false,
     roomEditor: null,
+    renamingFolderId: null,
 
     async init() {
       api.on('agents', (agents) => {
@@ -111,12 +120,13 @@ export const useStore = create<State>((set, get) => {
         if (!loaded) return
         set({ messages: { ...get().messages, [msg.agentId]: upsertMessage(loaded, msg) } })
       })
+      api.on('folders', (folders) => set({ folders }))
       api.on('usage', (usage) => set({ usage }))
       api.on('env', (env) => set({ env }))
       api.on('mcpServers', (mcpServers) => set({ mcpServers }))
       api.on('focusAgent', (id) => get().select(id))
       api.on('navigate', (target) => {
-        if (target === 'newAgent') set({ addOpen: true })
+        if (target === 'newAgent') set({ addOpen: true, addFolderId: null })
         else if (target === 'newRoom') set({ roomEditor: 'new' })
         else set({ view: target, drawerOpen: false })
       })
@@ -127,6 +137,7 @@ export const useStore = create<State>((set, get) => {
         ready: true,
         agents: boot.agents,
         rooms: boot.rooms,
+        folders: boot.folders,
         settings: boot.settings,
         mcpServers: boot.mcpServers,
         env: boot.env,
@@ -154,7 +165,7 @@ export const useStore = create<State>((set, get) => {
     setView: (view) => set({ view, drawerOpen: false }),
     setSearch: (search) => set({ search }),
     setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
-    setAddOpen: (addOpen) => set({ addOpen }),
+    setAddOpen: (addOpen, folderId = null) => set({ addOpen, addFolderId: addOpen ? folderId : null }),
     setGmailOpen: (gmailOpen) => set({ gmailOpen }),
     setMarketplaceOpen: (marketplaceOpen) => set({ marketplaceOpen }),
     setRoomEditor: (roomEditor) => set({ roomEditor }),

@@ -14,6 +14,7 @@ function toDraft(a: AgentSummary): AgentDraft {
     shape: a.shape,
     color: a.color,
     model: a.model,
+    effort: a.effort,
     instructions: a.instructions,
     mcp_servers: [...a.mcp_servers],
     allowed_tools: [...a.allowed_tools],

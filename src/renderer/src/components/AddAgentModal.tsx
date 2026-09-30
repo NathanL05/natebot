@@ -9,7 +9,8 @@ import { Button, IconButton, Modal } from './ui'
 export function AddAgentModal() {
   const mcpServers = useStore((s) => s.mcpServers)
   const defaultModel = useStore((s) => s.settings?.defaultModel ?? 'sonnet')
-  const [draft, setDraft] = useState<AgentDraft>(() => blankDraft(defaultModel))
+  const defaultEffort = useStore((s) => s.settings?.defaultEffort ?? 'medium')
+  const [draft, setDraft] = useState<AgentDraft>(() => blankDraft(defaultModel, defaultEffort))
   const [saving, setSaving] = useState(false)
   const [touched, setTouched] = useState(false)
   const [colorPicked, setColorPicked] = useState(false)
@@ -30,6 +31,8 @@ export function AddAgentModal() {
     setSaving(true)
     try {
       const agent = await api.createAgent(draft)
+      const folderId = useStore.getState().addFolderId
+      if (folderId) await api.moveToFolder(agent.id, folderId)
       close()
       useStore.getState().select(agent.id)
     } finally {

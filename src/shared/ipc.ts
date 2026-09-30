@@ -8,6 +8,7 @@ import type {
   Bootstrap,
   ChatMessage,
   EnvStatus,
+  Folder,
   GmailProgress,
   GmailStatus,
   MarketplaceData,
@@ -26,7 +27,8 @@ export interface NateBotApi {
   sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
-  pickAttachment(agentId: string): Promise<string | null>
+  /** Native file picker (multiple files). Returns absolute paths. */
+  pickAttachments(): Promise<string[]>
 
   createAgent(draft: AgentDraft): Promise<AgentConfig>
   updateAgent(agent: AgentConfig): Promise<AgentConfig>
@@ -36,8 +38,14 @@ export interface NateBotApi {
   createRoom(draft: RoomDraft): Promise<RoomConfig>
   updateRoom(room: RoomConfig): Promise<RoomConfig>
   deleteRoom(roomId: string): Promise<void>
-  /** Lets the agents keep talking without a new message from the user. */
-  continueRoom(roomId: string): Promise<void>
+
+  createFolder(name: string): Promise<Folder>
+  /** Rename or collapse/expand. */
+  updateFolder(folder: Folder): Promise<void>
+  /** Its chats move to "No folder". */
+  deleteFolder(folderId: string): Promise<void>
+  /** chatId: an agent or group chat; folderId null = "No folder". */
+  moveToFolder(chatId: string, folderId: string | null): Promise<void>
 
   resolveAction(
     messageId: string,
@@ -75,7 +83,7 @@ export const API_METHODS = [
   'sendMessage',
   'stop',
   'markRead',
-  'pickAttachment',
+  'pickAttachments',
   'createAgent',
   'updateAgent',
   'deleteAgent',
@@ -83,7 +91,10 @@ export const API_METHODS = [
   'createRoom',
   'updateRoom',
   'deleteRoom',
-  'continueRoom',
+  'createFolder',
+  'updateFolder',
+  'deleteFolder',
+  'moveToFolder',
   'resolveAction',
   'listRoutines',
   'setRoutineEnabled',
@@ -111,6 +122,7 @@ void _exhaustive
 export interface NateBotEvents {
   agents: AgentSummary[]
   rooms: RoomSummary[]
+  folders: Folder[]
   message: ChatMessage
   usage: UsageInfo
   env: EnvStatus
@@ -126,6 +138,7 @@ export interface NateBotEvents {
 export const EVENT_NAMES = [
   'agents',
   'rooms',
+  'folders',
   'message',
   'usage',
   'env',

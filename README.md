@@ -172,6 +172,7 @@ name: Email Agent
 shape: hexagon         # blob | circle | square | hexagon | triangle | pill | cloud, or null = from the name
 color: "#F5A524"
 model: sonnet          # sonnet | haiku | opus (haiku uses the least of your limit)
+effort: medium         # low | medium | high | xhigh | max (how hard it thinks; lower uses less of your limit)
 instructions: |
   You review my Gmail inbox. Flag anything urgent, summarise the rest in a
   short ✓ checklist, and draft replies. NEVER send an email yourself.
@@ -185,11 +186,18 @@ routine:
 session_id: null       # managed by NateBot (memory)
 ```
 
+Models are pinned to full names (Sonnet 5.5, Opus 5.5, Haiku 4.5; see `MODEL_IDS` in `src/shared/types.ts`), so an
+agent doesn't change model when an alias moves on. Effort defaults to medium for new agents and can be changed
+per agent or in Settings → Defaults. Agents without an `effort` line in their YAML run at medium.
+
 Every agent also gets a shared NateBot house style: be concise, use ✓ checklists for status, and never take
 irreversible actions without approval.
 
-- **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches a file (copied into the agent's
-  workspace).
+- **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
+  drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
+  agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
+- **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,
+  documents (copied into the agent's workspace).
 - **Queueing:** messages sent while an agent is busy wait their turn.
 - **Stop:** ends the current run and cancels anything queued.
 - **Timeout:** runs time out after 15 minutes.
@@ -199,16 +207,21 @@ irreversible actions without approval.
 Put several agents in one room and let them talk to each other. Create one with the people button at the top of
 the sidebar (or **⇧⌘N**), pick 2–6 agents, and choose how many replies the group may make before it pauses.
 
-- **Turn order:** after your message, every member replies once, each seeing what the others just said. If you
-  **@mention** agents (`@Planner`), only they reply.
+- **Turn order:** after your message, every member replies once, each seeing what the others just said. Type
+  **@** to pick a member: agents you @mention answer first, and the others only chime in if they can genuinely
+  add something (otherwise they stay quiet). Each of those optional turns is still a short run.
 - **Agents talk to each other:** an agent that @mentions another member hands it the next turn, so they can ask
   each other questions and build on each other's answers. An agent with nothing to add replies `PASS` and stays
   quiet.
-- **Pausing:** the group stops when nobody is left to speak or after its reply limit (4–20). Press **Keep going**
-  to let them carry on, or just send another message. Stop ends the conversation immediately.
+- **Pacing:** the group usually finishes on its own, once nobody has anything to add or a question for anyone.
+  Each group also has a **max replies per message** (4–20, a guardrail). Agents are told how many replies are
+  left so they converge, and the last one wraps up with a summary or a question for you. To keep the discussion
+  going, just reply. Stop ends it immediately.
 - **Memory:** each agent has a separate Claude session for each group, so group chats never mix with its
   one-on-one memory. Each turn only sends what the agent hasn't seen yet, which keeps the prompt cache warm.
-- **Limits:** group chats are text only (no attachments) and can't propose actions for approval. Ask the agent
+- **Files:** the **+** attaches PDFs, images or any other file (up to 50 MB each). Every member gets a copy in
+  its own working folder so any of them can read it.
+- **Limits:** group chats can't propose actions for approval. Ask the agent
   in its own chat for that. Every agent reply is one normal run, so a lively group uses your limit faster.
   Pick Haiku agents for chatty groups.
 

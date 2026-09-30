@@ -121,7 +121,10 @@ export function RoomModal() {
             )}
           </div>
         </div>
-        <Field label="Replies before pausing" hint="Agents take turns and can @mention each other. The group pauses after this many replies until you say something or press Keep going.">
+        <Field
+          label="Max replies per message"
+          hint="Agents take turns and can @mention each other, and usually finish on their own. They can see how many replies are left, and the last one wraps up with a summary or a question for you."
+        >
           <Segmented
             value={String(draft.maxTurns)}
             options={TURN_OPTIONS.map((v) => ({ value: v, label: v }))}

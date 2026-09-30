@@ -4,7 +4,7 @@ import { api, useStore } from '../lib/store'
 import { UsageBanner } from './ChatView'
 import { Composer } from './Composer'
 import { GroupAvatar } from './GroupAvatar'
-import { PlayIcon, SlidersIcon } from './icons'
+import { SlidersIcon } from './icons'
 import { MessageList } from './MessageList'
 import { IconButton } from './ui'
 
@@ -25,7 +25,6 @@ export function RoomView({ room }: { room: RoomSummary }) {
   // Show a typing row until the speaker's reply starts streaming in.
   const typing = speaking && !(last?.streaming && last.speakerId === speaking.id) ? speaking : undefined
   const running = room.status === 'running'
-  const canContinue = !running && members.length >= 2 && !!messages?.some((m) => m.speakerId)
 
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
@@ -71,18 +70,7 @@ export function RoomView({ room }: { room: RoomSummary }) {
         <MessageList messages={messages} agentId={room.id} speakers={byId} typing={typing} />
       )}
 
-      {canContinue && (
-        <div className="flex justify-center pb-1">
-          <button
-            type="button"
-            onClick={() => void api.continueRoom(room.id)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elev px-3 py-1 text-[12px] font-medium text-muted transition hover:border-accent hover:text-fg"
-          >
-            <PlayIcon size={11} /> Keep going
-          </button>
-        </div>
-      )}
-      <Composer key={room.id} chatId={room.id} name={room.name} running={running} allowAttachments={false} />
+      <Composer key={room.id} chatId={room.id} name={room.name} running={running} mentionables={members} />
     </div>
   )
 }

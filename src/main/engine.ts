@@ -4,7 +4,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
-import type { AgentConfig, ChatMessage, ProposedAction } from '@shared/types'
+import { MODEL_IDS, type AgentConfig, type ChatMessage, type ProposedAction } from '@shared/types'
 import type { AgentStore } from './agents'
 import type { Db } from './db'
 import { childEnv } from './env'
@@ -210,7 +210,8 @@ export class Engine extends EventEmitter {
       '--output-format', 'stream-json',
       '--verbose',
       '--include-partial-messages',
-      '--model', agent.model,
+      '--model', MODEL_IDS[agent.model],
+      '--effort', agent.effort,
       '--append-system-prompt', prompt,
       // Re-render the system prompt on resume so edited instructions apply.
       '--system-prompt-snapshot', 'off',
@@ -512,7 +513,8 @@ export class Engine extends EventEmitter {
       '-p',
       '--output-format', 'stream-json',
       '--verbose',
-      '--model', agent.model,
+      '--model', MODEL_IDS[agent.model],
+      '--effort', 'low', // carrying out an approved action needs no deep thinking
       '--append-system-prompt', systemPrompt(agent, agentNotes(agent)),
       '--no-session-persistence',
       '--setting-sources', 'project,local',

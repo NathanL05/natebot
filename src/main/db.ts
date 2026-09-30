@@ -1,7 +1,7 @@
 // Chat history, per-agent state and run logs in SQLite (~/NateBot/data.db).
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
-import type { ChatMessage, MessageRole, RoomConfig } from '@shared/types'
+import type { ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
 
 interface MessageRow {
   id: string
@@ -88,7 +88,16 @@ export class Db {
         seats TEXT NOT NULL DEFAULT '{}',
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        collapsed INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      );
     `)
+    // Added after the first release: which sidebar folder a chat is in.
+    const cols = this.db.prepare('PRAGMA table_info(agent_state)').all() as { name: string }[]
+    if (!cols.some((c) => c.name === 'folder_id')) this.db.exec('ALTER TABLE agent_state ADD COLUMN folder_id TEXT')
   }
 
   close(): void {
@@ -214,6 +223,42 @@ export class Db {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM runs WHERE agent_id = ?').run(agentId)
+  }
+
+  // ---- sidebar folders ----
+
+  listFolders(): Folder[] {
+    const rows = this.db.prepare('SELECT * FROM folders ORDER BY created_at').all() as unknown as {
+      id: string
+      name: string
+      collapsed: number
+    }[]
+    return rows.map((r) => ({ id: r.id, name: r.name, collapsed: r.collapsed === 1 }))
+  }
+
+  saveFolder(f: Folder): void {
+    this.db
+      .prepare(
+        `INSERT INTO folders (id, name, collapsed, created_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, collapsed = excluded.collapsed`
+      )
+      .run(f.id, f.name, f.collapsed ? 1 : 0, Date.now())
+  }
+
+  deleteFolder(id: string): void {
+    this.db.prepare('DELETE FROM folders WHERE id = ?').run(id)
+    this.db.prepare('UPDATE agent_state SET folder_id = NULL WHERE folder_id = ?').run(id)
+  }
+
+  /** chatId: an agent or group chat. */
+  folderOf(chatId: string): string | null {
+    const row = this.db.prepare('SELECT folder_id FROM agent_state WHERE agent_id = ?').get(chatId) as { folder_id: string | null } | undefined
+    return row?.folder_id ?? null
+  }
+
+  setFolder(chatId: string, folderId: string | null): void {
+    this.ensureState(chatId)
+    this.db.prepare('UPDATE agent_state SET folder_id = ? WHERE agent_id = ?').run(folderId, chatId)
   }
 
   // ---- group chats ----

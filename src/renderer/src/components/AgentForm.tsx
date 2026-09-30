@@ -1,17 +1,18 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { MODELS, type AgentDraft, type McpServerInfo, type ModelId } from '@shared/types'
+import { EFFORTS, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId } from '@shared/types'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
 import { ChevronIcon } from './icons'
 import { isValidCron, SchedulePicker } from './SchedulePicker'
 import { Field, inputBase, inputClass, Segmented, Toggle } from './ui'
 
-export function blankDraft(model: ModelId): AgentDraft {
+export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
   return {
     name: '',
     shape: null,
     color: seededColor(''),
     model,
+    effort,
     instructions: '',
     mcp_servers: [],
     allowed_tools: [],
@@ -96,6 +97,14 @@ export function AgentForm({
           value={draft.model}
           onChange={(v) => set('model', v)}
           options={MODELS.map((m) => ({ value: m.id, label: m.label }))}
+        />
+      </Field>
+
+      <Field label="Effort" hint={EFFORTS.find((e) => e.id === draft.effort)?.hint}>
+        <Segmented<EffortLevel>
+          value={draft.effort}
+          onChange={(v) => set('effort', v)}
+          options={EFFORTS.map((e) => ({ value: e.id, label: e.label }))}
         />
       </Field>
 

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { AgentSummary, ChatMessage } from '@shared/types'
 import { agentPicture } from '../lib/avatars'
 import { basename, clockTime, separatorTime } from '../lib/format'
@@ -18,6 +18,14 @@ function Typing() {
       <span className="h-2 w-2 rounded-full bg-muted" />
     </div>
   )
+}
+
+/** Your message text with group members' @mentions in bold. */
+function withMentions(text: string, names: string[]): ReactNode {
+  if (!names.length) return text
+  const escaped = [...names].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const parts = text.split(new RegExp(`(@(?:${escaped.join('|')}))(?![\\w-])`, 'gi'))
+  return parts.map((part, i) => (i % 2 ? <strong key={i} className="font-semibold">{part}</strong> : part))
 }
 
 /** Group chats: an agent's avatar and name beside the first of their consecutive messages. */
@@ -42,7 +50,21 @@ function Speaker({ agent, showName, children }: { agent: AgentSummary | undefine
   )
 }
 
-function Message({ msg, speaker, showName = false }: { msg: ChatMessage; speaker?: AgentSummary; showName?: boolean }) {
+function Message({
+  msg,
+  speaker,
+  showName = false,
+  spaced = false,
+  memberNames = []
+}: {
+  msg: ChatMessage
+  speaker?: AgentSummary
+  /** Group chats: names to highlight when @mentioned. */
+  memberNames?: string[]
+  showName?: boolean
+  /** Extra space above: matches the gap above a speaker's name in group chats. */
+  spaced?: boolean
+}) {
   if (msg.role === 'system') {
     return <div className="selectable my-2 text-center text-[12px] text-muted">{msg.text}</div>
   }
@@ -60,7 +82,7 @@ function Message({ msg, speaker, showName = false }: { msg: ChatMessage; speaker
 
   if (msg.role === 'user') {
     return (
-      <div className="flex flex-col items-end" title={clockTime(msg.createdAt)}>
+      <div className={`flex flex-col items-end ${spaced ? 'mt-2' : ''}`} title={clockTime(msg.createdAt)}>
         {msg.attachments?.map((a) => (
           <div key={a} className="mb-1 inline-flex items-center gap-1.5 rounded-lg bg-elev px-2.5 py-1 text-[12px] text-muted">
             <PaperclipIcon size={12} /> {basename(a)}
@@ -68,7 +90,7 @@ function Message({ msg, speaker, showName = false }: { msg: ChatMessage; speaker
         ))}
         {msg.text && (
           <div className="selectable max-w-[70%] rounded-2xl rounded-br-md bg-me px-3.5 py-2 text-[14px] whitespace-pre-wrap text-me-fg">
-            {msg.text}
+            {withMentions(msg.text, memberNames)}
           </div>
         )}
       </div>
@@ -130,6 +152,8 @@ export function MessageList({
     if (el && pinned.current) el.scrollTop = el.scrollHeight
   }, [messages, typing])
 
+  const memberNames = useMemo(() => Object.values(speakers ?? {}).map((a) => a.name), [speakers])
+
   const onScroll = (): void => {
     const el = scroller.current
     if (el) pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
@@ -142,12 +166,14 @@ export function MessageList({
           const prev = messages[i - 1]
           const showTime = !prev || msg.createdAt - prev.createdAt > GAP
           const showName = !!msg.speakerId && (showTime || prev?.speakerId !== msg.speakerId)
+          // In group chats, your message gets the same space above it as the next speaker gets below it.
+          const spaced = !!speakers && msg.role === 'user' && !!prev && prev.role !== 'user' && !showTime
           return (
             <Fragment key={msg.id}>
               {showTime && (
                 <div className="mt-4 mb-1 text-center text-[11px] font-medium text-muted">{separatorTime(msg.createdAt)}</div>
               )}
-              <Message msg={msg} speaker={msg.speakerId ? speakers?.[msg.speakerId] : undefined} showName={showName} />
+              <Message msg={msg} speaker={msg.speakerId ? speakers?.[msg.speakerId] : undefined} showName={showName} spaced={spaced} memberNames={memberNames} />
             </Fragment>
           )
         })}

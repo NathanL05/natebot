@@ -11,6 +11,23 @@ export const MODELS: { id: ModelId; label: string; hint: string }[] = [
   { id: 'opus', label: 'Opus', hint: 'Most capable, heaviest on usage' }
 ]
 
+/** Full model names passed to the CLI, so an agent stays on the same model when an alias moves on. */
+export const MODEL_IDS: Record<ModelId, string> = {
+  haiku: 'claude-haiku-4-5-20251001',
+  sonnet: 'claude-sonnet-5-5',
+  opus: 'claude-opus-5-5'
+}
+
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export const DEFAULT_EFFORT: EffortLevel = 'medium'
+export const EFFORTS: { id: EffortLevel; label: string; hint: string }[] = [
+  { id: 'low', label: 'Low', hint: 'Fastest and cheapest: quick lookups and simple replies' },
+  { id: 'medium', label: 'Medium', hint: 'Balanced (recommended): summaries, planning, research' },
+  { id: 'high', label: 'High', hint: 'Thinks longer: tricky analysis and writing' },
+  { id: 'xhigh', label: 'Extra', hint: 'Very thorough, uses your limit quickly' },
+  { id: 'max', label: 'Max', hint: 'Deepest reasoning, heaviest on usage' }
+]
+
 export interface Routine {
   enabled: boolean
   cron: string
@@ -25,6 +42,7 @@ export interface AgentConfig {
   shape: MascotShape | null
   color: string
   model: ModelId
+  effort: EffortLevel
   instructions: string
   mcp_servers: string[]
   allowed_tools: string[]
@@ -44,6 +62,15 @@ export interface AgentSummary extends AgentConfig {
   lastPreview: string
   /** Set when the agent has an uploaded picture (cache-busting version). */
   avatarVersion: number | null
+  /** Sidebar folder, or null for "No folder". */
+  folderId: string | null
+}
+
+/** A sidebar folder grouping agents and group chats. Stored in data.db. */
+export interface Folder {
+  id: string
+  name: string
+  collapsed: boolean
 }
 
 export type AgentDraft = Omit<AgentConfig, 'id' | 'session_id'>
@@ -84,6 +111,8 @@ export interface ChatMessage {
   attachments?: string[]
   /** Group chats only: the agent who wrote this agent message. */
   speakerId?: string
+  /** Group chats only: attached files, relative to each member's workspace. */
+  files?: string[]
 }
 
 /** Group chat ids share the message and unread tables with agents; agent ids never contain ":". */
@@ -95,7 +124,7 @@ export interface RoomConfig {
   id: string
   name: string
   memberIds: string[]
-  /** Most agent replies in a row before the room waits for the user. */
+  /** Guardrail: most agent replies per user message. Agents see what's left and the last one wraps up. */
   maxTurns: number
 }
 
@@ -108,6 +137,7 @@ export interface RoomSummary extends RoomConfig {
   unread: number
   lastActivity: number
   lastPreview: string
+  folderId: string | null
 }
 
 export interface McpServerInfo {
@@ -121,6 +151,7 @@ export type Theme = 'dark' | 'light'
 export interface AppSettings {
   claudePath: string | null
   defaultModel: ModelId
+  defaultEffort: EffortLevel
   theme: Theme
   /** UI accent colour (see shared/accents.ts). */
   accent: AccentId
@@ -171,6 +202,7 @@ export interface RoutineInfo {
 export interface Bootstrap {
   agents: AgentSummary[]
   rooms: RoomSummary[]
+  folders: Folder[]
   settings: AppSettings
   mcpServers: McpServerInfo[]
   env: EnvStatus
