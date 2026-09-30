@@ -1,6 +1,6 @@
-// Discord-style mascot avatars: a coloured shape with a minimal face, drawn as
-// SVG and fully determined by a seed (the agent's name), so an agent always
-// looks the same.
+// Discord-style mascot avatars: a flat shape in the agent's colour with a
+// white face (two colours, like the app icon), drawn as SVG and fully
+// determined by a seed (the agent's name), so an agent always looks the same.
 
 export const MASCOT_SHAPES = ['blob', 'circle', 'square', 'hexagon', 'triangle', 'pill', 'cloud'] as const
 export type MascotShape = (typeof MASCOT_SHAPES)[number]
@@ -16,7 +16,7 @@ export const MASCOT_COLORS = [
   '#14B8A6' // teal
 ]
 
-type Eyes = 'dot' | 'oval' | 'happy' | 'wide'
+type Eyes = 'dot' | 'oval' | 'happy'
 
 /** 32-bit FNV-1a hash of the seed. */
 function hash(seed: string): number {
@@ -51,27 +51,6 @@ export function seededColor(seed: string): string {
   return pick(MASCOT_COLORS, r())
 }
 
-// ---- colour helpers ----
-
-function parseHex(hex: string): [number, number, number] {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim())
-  const n = m ? parseInt(m[1] as string, 16) : 0x5e8bff
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-
-function mix(hex: string, target: number, amount: number): string {
-  const [r, g, b] = parseHex(hex).map((c) => Math.round(c + (target - c) * amount)) as [number, number, number]
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`
-}
-
-function luminance(hex: string): number {
-  const [r, g, b] = parseHex(hex).map((c) => {
-    const s = c / 255
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
-  }) as [number, number, number]
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
 // ---- shapes ----
 
 interface Body {
@@ -102,11 +81,11 @@ function blobPath(r: () => number): string {
   return `${d} Z`
 }
 
-function body(shape: MascotShape, r: () => number): Body {
-  const fill = 'fill="url(#g)"'
-  // Rounded polygons: fill plus a thick round-joined stroke in the same paint.
+function body(shape: MascotShape, color: string, r: () => number): Body {
+  const fill = `fill="${color}"`
+  // Rounded polygons: fill plus a thick round-joined stroke in the same colour.
   const rounded = (d: string, w: number): string =>
-    `<path d="${d}" ${fill} stroke="url(#g)" stroke-width="${w}" stroke-linejoin="round"/>`
+    `<path d="${d}" ${fill} stroke="${color}" stroke-width="${w}" stroke-linejoin="round"/>`
   switch (shape) {
     case 'circle':
       return { svg: `<circle cx="50" cy="52" r="40" ${fill}/>`, fx: 50, fy: 52, scale: 1 }
@@ -135,7 +114,8 @@ function body(shape: MascotShape, r: () => number): Body {
   }
 }
 
-function face(eyes: Eyes, x: number, y: number, s: number, ink: string, blush: boolean, smile: boolean): string {
+function face(eyes: Eyes, x: number, y: number, s: number, smile: boolean): string {
+  const ink = '#FFFFFF'
   const gap = 12.5 * s
   const out: string[] = []
   for (const dx of [-gap, gap]) {
@@ -145,22 +125,13 @@ function face(eyes: Eyes, x: number, y: number, s: number, ink: string, blush: b
         out.push(`<circle cx="${f(cx)}" cy="${f(y)}" r="${f(5.2 * s)}" fill="${ink}"/>`)
         break
       case 'oval':
-        out.push(`<ellipse cx="${f(cx)}" cy="${f(y)}" rx="${f(4.2 * s)}" ry="${f(6.8 * s)}" fill="${ink}"/>`)
+        out.push(`<rect x="${f(cx - 4.2 * s)}" y="${f(y - 7 * s)}" width="${f(8.4 * s)}" height="${f(14 * s)}" rx="${f(4.2 * s)}" fill="${ink}"/>`)
         break
       case 'happy':
         out.push(
           `<path d="M${f(cx - 5 * s)} ${f(y + 2 * s)} Q${f(cx)} ${f(y - 5 * s)} ${f(cx + 5 * s)} ${f(y + 2 * s)}" fill="none" stroke="${ink}" stroke-width="${f(3.4 * s)}" stroke-linecap="round"/>`
         )
         break
-      case 'wide':
-        out.push(`<circle cx="${f(cx)}" cy="${f(y)}" r="${f(7 * s)}" fill="#fff"/>`)
-        out.push(`<circle cx="${f(cx + 1.2 * s)}" cy="${f(y + 1 * s)}" r="${f(3.6 * s)}" fill="#1D2250"/>`)
-        break
-    }
-  }
-  if (blush) {
-    for (const dx of [-gap - 5 * s, gap + 5 * s]) {
-      out.push(`<ellipse cx="${f(x + dx)}" cy="${f(y + 9 * s)}" rx="${f(4.5 * s)}" ry="${f(2.6 * s)}" fill="#FF7AA8" opacity="0.45"/>`)
     }
   }
   if (smile) {
@@ -176,34 +147,10 @@ export function mascotSvg(seed: string, opts: { shape?: MascotShape | null; colo
   const r = rng(hash(seed) ^ 0x9e3779b9)
   const shape = opts.shape ?? seededShape(seed)
   const color = opts.color ?? seededColor(seed)
-  const eyes = pick<Eyes>(['dot', 'oval', 'dot', 'happy', 'wide'], r())
-  const blush = r() < 0.35
-  const smile = eyes !== 'wide' && r() < 0.3
-  const b = body(shape, r)
-  const light = luminance(color) > 0.6
-  const ink = light ? '#1D2250' : '#FFFFFF'
-  // Depth: a soft top-left highlight and darkening towards the rim, drawn
-  // through a mask of the body so overlapping parts (cloud) don't show seams.
-  const layer = (paint: string): string => `<rect width="100" height="100" fill="url(#${paint})" mask="url(#body)"/>`
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs>` +
-    `<linearGradient id="g" x1="0" y1="12" x2="0" y2="92" gradientUnits="userSpaceOnUse">` +
-    `<stop offset="0" stop-color="${mix(color, 255, 0.28)}"/><stop offset="1" stop-color="${mix(color, 0, 0.16)}"/>` +
-    `</linearGradient>` +
-    `<radialGradient id="hl" cx="36" cy="28" r="42" gradientUnits="userSpaceOnUse">` +
-    `<stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>` +
-    `</radialGradient>` +
-    `<radialGradient id="rim" cx="46" cy="44" r="52" gradientUnits="userSpaceOnUse">` +
-    `<stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.22"/>` +
-    `</radialGradient>` +
-    `<mask id="body">${b.svg.replaceAll('url(#g)', '#fff')}</mask>` +
-    `</defs>` +
-    b.svg +
-    layer('rim') +
-    layer('hl') +
-    face(eyes, b.fx, b.fy, b.scale, ink, blush, smile) +
-    `</svg>`
-  )
+  const eyes = pick<Eyes>(['dot', 'oval', 'oval', 'happy'], r())
+  const smile = r() < 0.3
+  const b = body(shape, color, r)
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">${b.svg}${face(eyes, b.fx, b.fy, b.scale, smile)}</svg>`
 }
 
 export function mascotDataUrl(seed: string, opts: { shape?: MascotShape | null; color?: string | null } = {}): string {

@@ -19,6 +19,7 @@ import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
 const RUN_TIMEOUT = 15 * 60_000
 const ACTION_TIMEOUT = 3 * 60_000
+const ROOM_TURN_TIMEOUT = 5 * 60_000
 const MAX_PARALLEL = 3
 const EMIT_EVERY_MS = 70
 
@@ -48,6 +49,29 @@ export interface RunFinished {
   summary: string
   needsApproval: boolean
 }
+
+/** One agent's turn in a group chat. */
+export interface RoomTurn {
+  roomId: string
+  agent: AgentConfig
+  /** The agent's room-only session (null starts a new one). */
+  sessionId: string | null
+  /** Appended to the agent's system prompt; must stay the same between turns (prompt cache). */
+  roomPrompt: string
+  input: string
+  onSession: (sessionId: string) => void
+}
+
+export interface RoomTurnResult {
+  status: 'ok' | 'stopped' | 'limited' | 'session-lost' | 'error'
+  /** The visible reply; empty when the agent passed. */
+  text: string
+  detail: string
+}
+
+/** Agents in a group chat reply "PASS" when they have nothing to add. */
+const PASS_RE = /^\W*pass\W*$/i
+const PASS_PREFIX_RE = /^\W*p(a(s(s)?)?)?\W*$/i
 
 export interface EngineDeps {
   store: AgentStore
@@ -80,6 +104,7 @@ function builtinTools(agent: AgentConfig): string[] {
 export class Engine extends EventEmitter {
   private queues = new Map<string, Job[]>()
   private running = new Map<string, Running>()
+  private roomProcs = new Map<string, ClaudeProcess>()
   private resumeTimer: NodeJS.Timeout | undefined
 
   constructor(private deps: EngineDeps) {
@@ -125,6 +150,7 @@ export class Engine extends EventEmitter {
       r.stopped = true
       r.proc?.kill('stopped')
     }
+    for (const proc of this.roomProcs.values()) proc.kill('stopped')
   }
 
   /** Starts queued jobs while there's capacity and usage allows. */
@@ -169,7 +195,13 @@ export class Engine extends EventEmitter {
     return parts.join('\n\n')
   }
 
-  private runArgs(agent: AgentConfig, mcpPath: string, mcpServers: string[], sessionArgs: string[]): string[] {
+  private runArgs(
+    agent: AgentConfig,
+    mcpPath: string,
+    mcpServers: string[],
+    sessionArgs: string[],
+    prompt = systemPrompt(agent, agentNotes(agent))
+  ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
     // Tools marked require_approval in mcp.json are never available in normal runs.
     const disallowed = [...new Set([...agent.disallowed_tools, ...approvalOnlyTools(agent)])]
@@ -179,7 +211,7 @@ export class Engine extends EventEmitter {
       '--verbose',
       '--include-partial-messages',
       '--model', agent.model,
-      '--append-system-prompt', systemPrompt(agent, agentNotes(agent)),
+      '--append-system-prompt', prompt,
       // Re-render the system prompt on resume so edited instructions apply.
       '--system-prompt-snapshot', 'off',
       // Ignore the user's own Claude Code settings, hooks and plugins.
@@ -338,6 +370,106 @@ export class Engine extends EventEmitter {
     const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length }
     this.emit('runFinished', finished)
     this.pump()
+  }
+
+  // ---- group chat turns ----
+
+  /** Stops whichever agent is replying in a group chat. */
+  stopRoom(roomId: string): void {
+    this.roomProcs.get(roomId)?.kill('stopped')
+  }
+
+  /**
+   * Runs one agent's reply in a group chat. The reply streams into the room as
+   * a message with speakerId set; nothing is shown if the agent passes.
+   * Proposed actions are not supported in rooms and are stripped.
+   */
+  async roomTurn(t: RoomTurn): Promise<RoomTurnResult> {
+    const { agent, roomId } = t
+    const bin = this.deps.claudePath()
+    if (!bin) return { status: 'error', text: '', detail: "Claude Code isn't available. Open Settings to check the path to the claude program." }
+    const skip = agent.mcp_servers.includes('gmail') && !gmailReady() ? ['gmail'] : []
+    const mcp = writeRunConfig(agent, skip)
+    const state = new StreamState()
+    const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
+    const prompt = `${systemPrompt(agent, agentNotes(agent))}\n\n${t.roomPrompt}`
+    let msg: ChatMessage | null = null
+    let emitTimer: NodeJS.Timeout | undefined
+
+    // The message only appears once it's clear the agent isn't passing.
+    const flush = (): void => {
+      emitTimer = undefined
+      const text = hideActionsBlock(state.text).trim()
+      if (!msg) {
+        if (!state.tools.length && (!text || PASS_PREFIX_RE.test(text))) return
+        msg = { id: randomUUID(), agentId: roomId, speakerId: agent.id, role: 'agent', text: '', createdAt: Date.now(), streaming: true, tools: [] }
+        this.deps.db.saveMessage(msg)
+      }
+      msg.text = text
+      msg.tools = state.tools.map((x) => ({ ...x }))
+      this.deps.emitMessage({ ...msg })
+    }
+
+    let result: RoomTurnResult
+    try {
+      const proc = spawnClaude({
+        bin,
+        args: this.runArgs(agent, mcp.path, mcp.servers, sessionArgs, prompt),
+        cwd: ensureWorkspace(agent.id),
+        env: childEnv(),
+        input: t.input,
+        timeoutMs: ROOM_TURN_TIMEOUT,
+        onEvent: (ev) => {
+          const changed = state.handle(ev)
+          if (ev['type'] === 'rate_limit_event' && state.rateLimit) this.deps.usage.update(state.rateLimit)
+          if (ev['type'] === 'system' && ev['subtype'] === 'init' && state.sessionId) t.onSession(state.sessionId)
+          if (changed && !emitTimer) emitTimer = setTimeout(flush, EMIT_EVERY_MS)
+        }
+      })
+      this.roomProcs.set(roomId, proc)
+      const exit = await proc.done
+      clearTimeout(emitTimer)
+
+      if (exit.reason === 'spawn-error') {
+        result = { status: 'error', text: '', detail: `Couldn't start Claude Code: ${exit.error ?? 'unknown error'}` }
+      } else if (exit.reason === 'stopped') {
+        result = { status: 'stopped', text: hideActionsBlock(state.text).trim(), detail: 'Stopped' }
+      } else if (exit.reason === 'timeout') {
+        result = { status: 'error', text: hideActionsBlock(state.text).trim(), detail: `${agent.name} took longer than 5 minutes, so NateBot stopped it.` }
+      } else if (state.result && !state.result.isError) {
+        const text = extractActions(state.text || state.result.text).text.trim()
+        result = { status: 'ok', text: PASS_RE.test(text) ? '' : text, detail: '' }
+      } else {
+        const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
+        if (looksLikeUsageLimit(detail) || state.rateLimit?.status === 'rejected') {
+          this.deps.usage.markLimited(detail)
+          result = { status: 'limited', text: '', detail }
+        } else if (t.sessionId && /no conversation found|session.*not found|invalid session/i.test(detail)) {
+          result = { status: 'session-lost', text: '', detail }
+        } else {
+          result = { status: 'error', text: '', detail }
+        }
+      }
+    } catch (e) {
+      result = { status: 'error', text: '', detail: `Something went wrong: ${(e as Error).message}` }
+    } finally {
+      mcp.cleanup()
+      this.roomProcs.delete(roomId)
+    }
+
+    const tools = state.tools.map((x) => (x.status === 'running' ? { ...x, status: 'error' as const } : { ...x }))
+    const final = msg as ChatMessage | null
+    if (final) {
+      final.streaming = false
+      final.text = result.text
+      final.tools = tools
+      if (final.text || tools.length) this.save(final)
+      else {
+        const text = result.status === 'ok' ? `${agent.name} had nothing to add` : `${agent.name} didn't finish`
+        this.save({ ...final, role: 'system', text, tools: undefined, speakerId: undefined })
+      }
+    }
+    return result
   }
 
   // ---- approved actions ----

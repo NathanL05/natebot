@@ -15,9 +15,12 @@ import type {
   EnvStatus,
   GmailStatus,
   MarketplaceData,
+  RoomConfig,
+  RoomDraft,
   RoutineInfo,
   UsageInfo
 } from '@shared/types'
+import { isRoomId } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { AgentStore } from './agents'
 import { avatarVersion, removeAvatar, saveAvatar } from './avatars'
@@ -30,6 +33,7 @@ import * as skills from './skills'
 import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
+import { Rooms } from './rooms'
 import { Scheduler } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
@@ -49,9 +53,11 @@ export class Backend implements NateBotApi {
   private db: Db
   private engine: Engine
   private scheduler: Scheduler
+  private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
   private envOverride: EnvStatus | null = null
   private agentsTimer: NodeJS.Timeout | undefined
+  private roomsTimer: NodeJS.Timeout | undefined
   /** Called whenever the agent list changes (tray menu). */
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
   /** Called when a notification is clicked. */
@@ -77,6 +83,21 @@ export class Backend implements NateBotApi {
       if (!r.ok) this.notify(r.agentId, 'Action failed', r.summary)
     })
 
+    this.rooms = new Rooms({
+      db: this.db,
+      store: this.store,
+      engine: this.engine,
+      usage: this.usage,
+      userName: () => this.settings.get().userName,
+      emitMessage: (m) => emit('message', m),
+      emitRooms: () => this.emitRooms(),
+      onIdle: (roomId, replies) => {
+        const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
+        if (replies && !focused) this.notify(roomId, 'New messages', `${replies} new repl${replies > 1 ? 'ies' : 'y'} in the group`)
+        void this.usage.refresh()
+      }
+    })
+
     this.scheduler = new Scheduler((id) => this.fireRoutine(id))
 
     this.usage.on('changed', () => {
@@ -96,6 +117,7 @@ export class Backend implements NateBotApi {
     this.store.on('changed', () => {
       this.scheduler.sync(this.store.list())
       this.emitAgents()
+      this.emitRooms()
     })
     this.scheduler.sync(this.store.list())
 
@@ -121,6 +143,7 @@ export class Backend implements NateBotApi {
     stopGmailConnect()
     unwatchFile(MCP_FILE)
     this.scheduler.stopAll()
+    this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
     this.db.close()
@@ -168,11 +191,20 @@ export class Backend implements NateBotApi {
     }, 30)
   }
 
-  private notify(agentId: string, title: string, body: string): void {
+  private emitRooms(): void {
+    if (this.roomsTimer) return
+    this.roomsTimer = setTimeout(() => {
+      this.roomsTimer = undefined
+      emit('rooms', this.rooms.summaries())
+    }, 30)
+  }
+
+  /** chatId: an agent or a group chat. */
+  private notify(chatId: string, title: string, body: string): void {
     if (!Notification.isSupported()) return
-    const agent = this.store.get(agentId)
-    const n = new Notification({ title: agent ? `${agent.name} · ${title}` : title, body, silent: false })
-    n.on('click', () => this.onOpenAgent(agentId))
+    const name = this.store.get(chatId)?.name ?? this.rooms.get(chatId)?.name
+    const n = new Notification({ title: name ? `${name} · ${title}` : title, body, silent: false })
+    n.on('click', () => this.onOpenAgent(chatId))
     n.show()
   }
 
@@ -218,6 +250,7 @@ export class Backend implements NateBotApi {
   async bootstrap(): Promise<Bootstrap> {
     return {
       agents: this.summaries(),
+      rooms: this.rooms.summaries(),
       settings: this.settings.get(),
       mcpServers: this.serverList(),
       env: this.envOverride ?? this.env,
@@ -227,6 +260,10 @@ export class Backend implements NateBotApi {
   }
 
   async listMessages(agentId: string): Promise<ChatMessage[]> {
+    if (isRoomId(String(agentId))) {
+      this.rooms.require(agentId)
+      return this.db.listMessages(agentId)
+    }
     this.requireAgent(agentId)
     const list = this.db.listMessages(agentId)
     const live = this.engine.liveMessage(agentId)
@@ -234,8 +271,13 @@ export class Backend implements NateBotApi {
   }
 
   async sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void> {
-    const agent = this.requireAgent(agentId)
     const body = typeof text === 'string' ? text.trim() : ''
+    if (isRoomId(String(agentId))) {
+      // Group chats are text only.
+      if (body) this.rooms.post(this.rooms.require(agentId).id, body)
+      return
+    }
+    const agent = this.requireAgent(agentId)
     const saved: string[] = []
     for (const src of attachments ?? []) {
       if (typeof src !== 'string' || !existsSync(src)) continue
@@ -260,15 +302,18 @@ export class Backend implements NateBotApi {
   }
 
   async stop(agentId: string): Promise<void> {
+    if (isRoomId(String(agentId))) return this.rooms.stop(this.rooms.require(agentId).id)
     this.requireAgent(agentId)
     this.engine.stop(agentId)
   }
 
   async markRead(agentId: string): Promise<void> {
-    if (!this.store.get(agentId)) return
+    const room = isRoomId(String(agentId))
+    if (!(room ? this.rooms.get(agentId) : this.store.get(agentId))) return
     if (this.db.unread(agentId)) {
       this.db.clearUnread(agentId)
-      this.emitAgents()
+      if (room) this.emitRooms()
+      else this.emitAgents()
     }
   }
 
@@ -310,6 +355,7 @@ export class Backend implements NateBotApi {
     this.store.delete(agentId)
     removeAvatar(`agent:${agentId}`)
     this.db.deleteAgent(agentId)
+    this.rooms.removeMember(agentId)
     // The workspace may hold the user's attachments: move it to the Trash (recoverable).
     const dir = workspaceOf(agentId)
     if (existsSync(dir)) await shell.trashItem(dir).catch(() => undefined)
@@ -323,6 +369,22 @@ export class Backend implements NateBotApi {
     this.db.takeNotes(agentId)
     this.engine.system(agentId, 'Memory reset. Starting a fresh conversation.')
     this.emitAgents()
+  }
+
+  async createRoom(draft: RoomDraft): Promise<RoomConfig> {
+    return this.rooms.create(draft)
+  }
+
+  async updateRoom(room: RoomConfig): Promise<RoomConfig> {
+    return this.rooms.update(room)
+  }
+
+  async deleteRoom(roomId: string): Promise<void> {
+    this.rooms.delete(this.rooms.require(roomId).id)
+  }
+
+  async continueRoom(roomId: string): Promise<void> {
+    this.rooms.resume(this.rooms.require(roomId).id)
   }
 
   async resolveAction(messageId: string, actionId: string, decision: 'approve' | 'reject', details?: Record<string, unknown>): Promise<void> {
@@ -383,7 +445,7 @@ export class Backend implements NateBotApi {
     }
     if (next.claudePath !== before.claudePath) void this.recheckEnv()
     if (next.theme !== before.theme) {
-      for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#1C1C1E' : '#FFFFFF')
+      for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#0E0E13' : '#FFFFFF')
     }
     return next
   }

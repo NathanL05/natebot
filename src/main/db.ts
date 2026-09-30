@@ -1,7 +1,7 @@
 // Chat history, per-agent state and run logs in SQLite (~/NateBot/data.db).
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
-import type { ChatMessage, MessageRole } from '@shared/types'
+import type { ChatMessage, MessageRole, RoomConfig } from '@shared/types'
 
 interface MessageRow {
   id: string
@@ -10,6 +10,21 @@ interface MessageRow {
   text: string
   created_at: number
   data: string | null
+}
+
+/** One agent's place in a group chat: its room-only session and what it has already read. */
+export interface Seat {
+  sessionId: string | null
+  /** createdAt of the newest message the agent has been shown. */
+  seenAt: number
+}
+
+interface RoomRow {
+  id: string
+  name: string
+  members: string
+  max_turns: number
+  seats: string
 }
 
 export interface RunRecord {
@@ -65,6 +80,14 @@ export class Db {
         summary TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_runs_agent ON runs(agent_id, source, started_at);
+      CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        members TEXT NOT NULL,
+        max_turns INTEGER NOT NULL,
+        seats TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL
+      );
     `)
   }
 
@@ -191,5 +214,43 @@ export class Db {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM runs WHERE agent_id = ?').run(agentId)
+  }
+
+  // ---- group chats ----
+
+  listRooms(): RoomConfig[] {
+    const rows = this.db.prepare('SELECT * FROM rooms ORDER BY created_at').all() as unknown as RoomRow[]
+    return rows.map((r) => ({ id: r.id, name: r.name, memberIds: JSON.parse(r.members) as string[], maxTurns: r.max_turns }))
+  }
+
+  saveRoom(room: RoomConfig): void {
+    this.db
+      .prepare(
+        `INSERT INTO rooms (id, name, members, max_turns, created_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET name = excluded.name, members = excluded.members, max_turns = excluded.max_turns`
+      )
+      .run(room.id, room.name, JSON.stringify(room.memberIds), room.maxTurns, Date.now())
+  }
+
+  seats(roomId: string): Record<string, Seat> {
+    const row = this.db.prepare('SELECT seats FROM rooms WHERE id = ?').get(roomId) as { seats: string } | undefined
+    try {
+      return row ? (JSON.parse(row.seats) as Record<string, Seat>) : {}
+    } catch {
+      return {}
+    }
+  }
+
+  setSeat(roomId: string, agentId: string, seat: Seat | null): void {
+    const seats = this.seats(roomId)
+    if (seat) seats[agentId] = seat
+    else delete seats[agentId]
+    this.db.prepare('UPDATE rooms SET seats = ? WHERE id = ?').run(JSON.stringify(seats), roomId)
+  }
+
+  deleteRoom(roomId: string): void {
+    this.db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
+    // Its messages and unread count are keyed by the room id, like an agent's.
+    this.deleteAgent(roomId)
   }
 }

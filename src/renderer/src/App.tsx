@@ -1,9 +1,12 @@
 import { useEffect } from 'react'
-import { useStore } from './lib/store'
+import { accentById, onFill } from '@shared/accents'
+import { useSelectedRoom, useStore } from './lib/store'
 import { AddAgentModal } from './components/AddAgentModal'
 import { ChatView } from './components/ChatView'
 import { ConnectGmailModal } from './components/ConnectGmailModal'
 import { MarketplaceModal } from './components/MarketplaceModal'
+import { RoomModal } from './components/RoomModal'
+import { RoomView } from './components/RoomView'
 import { RoutinesView } from './components/RoutinesView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -16,7 +19,10 @@ export function App() {
   const addOpen = useStore((s) => s.addOpen)
   const gmailOpen = useStore((s) => s.gmailOpen)
   const marketplaceOpen = useStore((s) => s.marketplaceOpen)
+  const roomEditor = useStore((s) => s.roomEditor)
+  const room = useSelectedRoom()
   const theme = useStore((s) => s.settings?.theme ?? 'dark')
+  const accent = useStore((s) => s.settings?.accent ?? 'violet')
 
   useEffect(() => {
     void useStore.getState().init()
@@ -24,7 +30,12 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme
-  }, [theme])
+    const { text, fill } = accentById(accent)[theme]
+    const root = document.documentElement.style
+    root.setProperty('--accent', text)
+    root.setProperty('--accent-strong', fill)
+    root.setProperty('--on-accent', onFill(fill))
+  }, [theme, accent])
 
   if (!ready || env?.checking) return <div className="drag h-full" />
   if (env && !(env.claudeFound && env.loggedIn)) return <SetupScreen env={env} />
@@ -33,13 +44,14 @@ export function App() {
     <div className="flex h-full">
       <Sidebar />
       <main className="flex min-w-0 flex-1">
-        {view === 'chat' && <ChatView />}
+        {view === 'chat' && (room ? <RoomView room={room} /> : <ChatView />)}
         {view === 'routines' && <RoutinesView />}
         {view === 'settings' && <SettingsView />}
       </main>
       {addOpen && <AddAgentModal />}
       {gmailOpen && <ConnectGmailModal />}
       {marketplaceOpen && <MarketplaceModal />}
+      {roomEditor && <RoomModal key={roomEditor} />}
     </div>
   )
 }

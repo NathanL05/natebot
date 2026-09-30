@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import type { AgentSummary } from '@shared/types'
 import { api } from '../lib/store'
 import { basename } from '../lib/format'
 import { ArrowUpIcon, PlusIcon, StopIcon, XIcon } from './icons'
@@ -7,15 +6,27 @@ import { ArrowUpIcon, PlusIcon, StopIcon, XIcon } from './icons'
 // Unsent text survives switching between chats.
 const drafts = new Map<string, string>()
 
-export function Composer({ agent }: { agent: AgentSummary }) {
-  const [text, setText] = useState(() => drafts.get(agent.id) ?? '')
+/** The message box for an agent's chat or a group chat (chatId is either). */
+export function Composer({
+  chatId,
+  name,
+  running,
+  queued = 0,
+  allowAttachments = true
+}: {
+  chatId: string
+  name: string
+  running: boolean
+  queued?: number
+  allowAttachments?: boolean
+}) {
+  const [text, setText] = useState(() => drafts.get(chatId) ?? '')
   const [attachments, setAttachments] = useState<string[]>([])
   const box = useRef<HTMLTextAreaElement>(null)
-  const running = agent.status === 'running'
 
   useEffect(() => {
     box.current?.focus()
-  }, [agent.id])
+  }, [chatId])
 
   // Auto-grow up to ~8 lines.
   useEffect(() => {
@@ -27,13 +38,13 @@ export function Composer({ agent }: { agent: AgentSummary }) {
 
   const update = (value: string): void => {
     setText(value)
-    drafts.set(agent.id, value)
+    drafts.set(chatId, value)
   }
 
   const send = (): void => {
     const body = text.trim()
     if (!body && attachments.length === 0) return
-    void api.sendMessage(agent.id, body, attachments.length ? attachments : undefined)
+    void api.sendMessage(chatId, body, attachments.length ? attachments : undefined)
     update('')
     setAttachments([])
   }
@@ -46,7 +57,7 @@ export function Composer({ agent }: { agent: AgentSummary }) {
   }
 
   const attach = async (): Promise<void> => {
-    const path = await api.pickAttachment(agent.id)
+    const path = await api.pickAttachment(chatId)
     if (path && !attachments.includes(path)) setAttachments([...attachments, path])
     box.current?.focus()
   }
@@ -56,9 +67,9 @@ export function Composer({ agent }: { agent: AgentSummary }) {
   return (
     <div className="px-6 pt-1 pb-4">
       <div className="mx-auto max-w-[860px]">
-        {agent.queued > 0 && (
+        {queued > 0 && (
           <div className="mb-1.5 text-center text-[12px] text-muted">
-            {agent.queued} message{agent.queued > 1 ? 's' : ''} queued · will send when {agent.name} is free
+            {queued} message{queued > 1 ? 's' : ''} queued · will send when {name} is free
           </div>
         )}
         {attachments.length > 0 && (
@@ -83,28 +94,32 @@ export function Composer({ agent }: { agent: AgentSummary }) {
           className="flex items-end gap-1.5 rounded-[23px] border border-line-strong bg-field p-1.5 transition focus-within:border-accent/50"
           style={{ boxShadow: 'var(--field-shadow)' }}
         >
-          <button
-            type="button"
-            aria-label="Attach a file"
-            title="Attach a file"
-            onClick={() => void attach()}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2/70 text-muted transition hover:bg-elev-2 hover:text-fg"
-          >
-            <PlusIcon size={17} />
-          </button>
+          {allowAttachments ? (
+            <button
+              type="button"
+              aria-label="Attach a file"
+              title="Attach a file"
+              onClick={() => void attach()}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2/70 text-muted transition hover:bg-elev-2 hover:text-fg"
+            >
+              <PlusIcon size={17} />
+            </button>
+          ) : (
+            <span className="w-1.5 shrink-0" />
+          )}
           <textarea
             ref={box}
             rows={1}
             value={text}
             onChange={(e) => update(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder={`Message ${agent.name}`}
+            placeholder={`Message ${name}`}
             className="max-h-[200px] flex-1 resize-none bg-transparent px-1.5 py-[6px] text-[14px] leading-[20px] text-fg outline-none placeholder:text-muted"
           />
           {running && (
             <button
               type="button"
-              onClick={() => void api.stop(agent.id)}
+              onClick={() => void api.stop(chatId)}
               aria-label="Stop"
               title="Stop"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-elev-2 text-fg transition hover:bg-danger hover:text-white"

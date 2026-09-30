@@ -17,6 +17,7 @@ and logged in on your Mac. There is **no API key and no API billing**.
 - [How the subscription (not API) setup works](#how-the-subscription-not-api-setup-works)
 - [Where your data lives](#where-your-data-lives)
 - [Agents](#agents)
+- [Group chats](#group-chats)
 - [Approvals](#approvals)
 - [Routines](#routines)
 - [Avatars](#avatars)
@@ -80,7 +81,26 @@ UI files, never a localhost URL, and needs no terminal or dev server.
 
 The icon's source is `build/icon.svg` (the menu-bar icon is `build/trayTemplate.svg`); `npm run icons` rebuilds
 every size from them. To use your own art, run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG.
-It regenerates `build/icon.icns` and the PNGs, and rebuilds the dev app. `npm install` sets up dev mode automatically: `npm run dev` launches a
+It regenerates `build/icon.icns` and the PNGs, and rebuilds the dev app.
+
+The current icon is a white-to-silver metallic bubble bot on a black tile. The UI's accent colour is separate:
+pick one of 18 in **Settings → Appearance → Accent colour** (defined in `src/shared/accents.ts`).
+
+**macOS caches app icons aggressively.** After changing the icon, to see it everywhere:
+
+1. Build and install the new app (`npm run dist`, then replace `/Applications/NateBot.app`).
+2. Unpin the old Dock icon (right-click → Options → uncheck *Keep in Dock*).
+3. Refresh the icon caches:
+   ```bash
+   touch /Applications/NateBot.app && killall Dock && killall Finder
+   ```
+4. Open NateBot and pin it again (right-click its Dock icon → Options → *Keep in Dock*).
+
+If the old icon still shows, clear the system icon cache (asks for your password) and restart the Mac:
+
+```bash
+sudo rm -rf /Library/Caches/com.apple.iconservices.store
+``` `npm install` sets up dev mode automatically: `npm run dev` launches a
 NateBot-branded copy of Electron (`node_modules/electron/dist/NateBot.app`), so the Dock and menu bar show NateBot.
 To keep NateBot in your Dock, pin the installed `/Applications/NateBot.app` (pinning the dev copy would open a
 blank Electron window when clicked).
@@ -173,6 +193,26 @@ irreversible actions without approval.
 - **Queueing:** messages sent while an agent is busy wait their turn.
 - **Stop:** ends the current run and cancels anything queued.
 - **Timeout:** runs time out after 15 minutes.
+
+## Group chats
+
+Put several agents in one room and let them talk to each other. Create one with the people button at the top of
+the sidebar (or **⇧⌘N**), pick 2–6 agents, and choose how many replies the group may make before it pauses.
+
+- **Turn order:** after your message, every member replies once, each seeing what the others just said. If you
+  **@mention** agents (`@Planner`), only they reply.
+- **Agents talk to each other:** an agent that @mentions another member hands it the next turn, so they can ask
+  each other questions and build on each other's answers. An agent with nothing to add replies `PASS` and stays
+  quiet.
+- **Pausing:** the group stops when nobody is left to speak or after its reply limit (4–20). Press **Keep going**
+  to let them carry on, or just send another message. Stop ends the conversation immediately.
+- **Memory:** each agent has a separate Claude session for each group, so group chats never mix with its
+  one-on-one memory. Each turn only sends what the agent hasn't seen yet, which keeps the prompt cache warm.
+- **Limits:** group chats are text only (no attachments) and can't propose actions for approval. Ask the agent
+  in its own chat for that. Every agent reply is one normal run, so a lively group uses your limit faster.
+  Pick Haiku agents for chatty groups.
+
+Groups are stored in `~/NateBot/data.db` (table `rooms`). The turn logic is in `src/main/rooms.ts`.
 
 ## Approvals
 
@@ -363,7 +403,8 @@ Connect button does.
 src/shared/     types, IPC contract, schedule <-> cron helpers
 src/main/       Electron main process
   claude/         prompt, process spawning, stream-json parsing
-  engine.ts       per-agent queues, runs, approvals
+  engine.ts       per-agent queues, runs, approvals, group chat turns
+  rooms.ts        group chats: turn order, @mentions, per-room sessions
   backend.ts      API used by the UI
   agents.ts       YAML agent store       db.ts       SQLite (node:sqlite)
   mcp.ts          mcp.json + per-run configs   gmail.ts   Connect Gmail flow

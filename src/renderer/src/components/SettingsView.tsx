@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { MODELS, type ModelId, type Theme, type UsageWindow } from '@shared/types'
+import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
 import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
-import { RefreshIcon } from './icons'
+import { CheckIcon, RefreshIcon } from './icons'
 import { Button, inputBase, inputClass, Segmented, Toggle } from './ui'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -147,6 +148,35 @@ export function SettingsView() {
                 ]}
               />
             </Row>
+            <div className="px-4 py-3">
+              <div className="text-[13px] font-medium">Accent colour</div>
+              <div className="mt-0.5 text-[12px] text-muted">
+                {accentById(settings.accent).label} · used for your messages, buttons and highlights.
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2.5" role="radiogroup" aria-label="Accent colour">
+                {ACCENTS.map((a) => {
+                  const fill = a[settings.theme].fill
+                  const on = settings.accent === a.id
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      aria-label={a.label}
+                      title={a.label}
+                      onClick={() => void patch({ accent: a.id })}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full transition hover:scale-110 ${
+                        on ? 'ring-2 ring-fg ring-offset-2 ring-offset-bg' : ''
+                      }`}
+                      style={{ background: fill, color: onFill(fill) }}
+                    >
+                      {on && <CheckIcon size={14} />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </Section>
 
           <Section title="General">

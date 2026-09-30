@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
 import type { AppSettings, ModelId, Theme } from '@shared/types'
+import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
 function fullName(): string {
@@ -20,6 +21,7 @@ function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppSettings
     claudePath: typeof raw.claudePath === 'string' && raw.claudePath.trim() ? raw.claudePath.trim() : null,
     defaultModel: MODELS.includes(raw.defaultModel as ModelId) ? (raw.defaultModel as ModelId) : fallback.defaultModel,
     theme: THEMES.includes(raw.theme as Theme) ? (raw.theme as Theme) : fallback.theme,
+    accent: isAccentId(raw.accent) ? raw.accent : fallback.accent,
     launchAtLogin: typeof raw.launchAtLogin === 'boolean' ? raw.launchAtLogin : fallback.launchAtLogin,
     userName: typeof raw.userName === 'string' && raw.userName.trim() ? raw.userName.trim() : fallback.userName
   }
@@ -33,6 +35,7 @@ export class SettingsStore {
       claudePath: null,
       defaultModel: 'sonnet',
       theme: 'dark',
+      accent: DEFAULT_ACCENT,
       launchAtLogin: false,
       userName: fullName()
     }

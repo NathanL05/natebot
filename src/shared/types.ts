@@ -1,7 +1,8 @@
 // Types shared by the main process, preload and renderer.
+import type { AccentId } from './accents'
 import type { MascotShape } from './mascot'
 
-export type { MascotShape }
+export type { AccentId, MascotShape }
 
 export type ModelId = 'sonnet' | 'haiku' | 'opus'
 export const MODELS: { id: ModelId; label: string; hint: string }[] = [
@@ -81,6 +82,32 @@ export interface ChatMessage {
   tools?: ToolUse[]
   actions?: ProposedAction[]
   attachments?: string[]
+  /** Group chats only: the agent who wrote this agent message. */
+  speakerId?: string
+}
+
+/** Group chat ids share the message and unread tables with agents; agent ids never contain ":". */
+export const ROOM_PREFIX = 'room:'
+export const isRoomId = (id: string): boolean => id.startsWith(ROOM_PREFIX)
+
+/** A group chat: the user plus several agents who reply to each other. Stored in data.db. */
+export interface RoomConfig {
+  id: string
+  name: string
+  memberIds: string[]
+  /** Most agent replies in a row before the room waits for the user. */
+  maxTurns: number
+}
+
+export type RoomDraft = Omit<RoomConfig, 'id'>
+
+export interface RoomSummary extends RoomConfig {
+  status: AgentStatus
+  /** The member currently replying. */
+  speakingId: string | null
+  unread: number
+  lastActivity: number
+  lastPreview: string
 }
 
 export interface McpServerInfo {
@@ -95,6 +122,8 @@ export interface AppSettings {
   claudePath: string | null
   defaultModel: ModelId
   theme: Theme
+  /** UI accent colour (see shared/accents.ts). */
+  accent: AccentId
   launchAtLogin: boolean
   userName: string
 }
@@ -141,6 +170,7 @@ export interface RoutineInfo {
 
 export interface Bootstrap {
   agents: AgentSummary[]
+  rooms: RoomSummary[]
   settings: AppSettings
   mcpServers: McpServerInfo[]
   env: EnvStatus

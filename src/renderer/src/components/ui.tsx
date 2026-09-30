@@ -4,7 +4,7 @@ import { useEffect, type ButtonHTMLAttributes, type ReactNode } from 'react'
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-white hover:brightness-110',
+  primary: 'bg-accent-strong text-on-accent hover:brightness-110',
   secondary: 'bg-elev-2 text-fg hover:brightness-110',
   ghost: 'text-fg hover:bg-hover',
   danger: 'bg-danger/15 text-danger hover:bg-danger/25'

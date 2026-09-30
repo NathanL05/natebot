@@ -11,7 +11,7 @@ import { AlertIcon, SlidersIcon } from './icons'
 import { MessageList } from './MessageList'
 import { IconButton } from './ui'
 
-function UsageBanner() {
+export function UsageBanner() {
   const usage = useStore((s) => s.usage)
   if (!usage) return null
   if (usage.status === 'rejected') {
@@ -103,7 +103,7 @@ export function ChatView() {
         <MessageList messages={messages} agentId={agent.id} />
       )}
 
-      <Composer key={agent.id} agent={agent} />
+      <Composer key={agent.id} chatId={agent.id} name={agent.name} running={agent.status === 'running'} queued={agent.queued} />
 
       {drawerOpen && <AgentDrawer agent={agent} />}
     </div>

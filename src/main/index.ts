@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { handleAvatarProtocol, registerAvatarScheme } from './avatars'
 import { Backend } from './backend'
+import type { NateBotEvents } from '@shared/ipc'
 import { emit, registerApi } from './ipc'
 import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
@@ -26,7 +27,7 @@ let mainWindow: BrowserWindow | null = null
 let quitting = false
 let backend: Backend
 
-const BACKGROUNDS = { dark: '#1C1C1E', light: '#FFFFFF' } as const
+const BACKGROUNDS = { dark: '#0E0E13', light: '#FFFFFF' } as const
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -91,7 +92,7 @@ function openAgent(agentId: string): void {
 }
 
 function buildMenu(): void {
-  const nav = (target: 'settings' | 'routines' | 'newAgent') => () => {
+  const nav = (target: NateBotEvents['navigate']) => () => {
     showWindow()
     emit('navigate', target)
   }
@@ -116,6 +117,7 @@ function buildMenu(): void {
       label: 'File',
       submenu: [
         { label: 'New Agent…', accelerator: 'Cmd+N', click: nav('newAgent') },
+        { label: 'New Group Chat…', accelerator: 'Cmd+Shift+N', click: nav('newRoom') },
         { label: 'Routines', accelerator: 'Cmd+Shift+R', click: nav('routines') },
         { type: 'separator' },
         { label: 'Show Data Folder', click: () => void shell.openPath(join(app.getPath('home'), 'NateBot')) },

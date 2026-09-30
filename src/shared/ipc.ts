@@ -12,22 +12,32 @@ import type {
   GmailStatus,
   MarketplaceData,
   McpServerInfo,
+  RoomConfig,
+  RoomDraft,
+  RoomSummary,
   RoutineInfo,
   UsageInfo
 } from './types'
 
 export interface NateBotApi {
   bootstrap(): Promise<Bootstrap>
-  listMessages(agentId: string): Promise<ChatMessage[]>
-  sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void>
-  stop(agentId: string): Promise<void>
-  markRead(agentId: string): Promise<void>
+  // The chat methods take an agent id or a group chat (room) id.
+  listMessages(chatId: string): Promise<ChatMessage[]>
+  sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
+  stop(chatId: string): Promise<void>
+  markRead(chatId: string): Promise<void>
   pickAttachment(agentId: string): Promise<string | null>
 
   createAgent(draft: AgentDraft): Promise<AgentConfig>
   updateAgent(agent: AgentConfig): Promise<AgentConfig>
   deleteAgent(agentId: string): Promise<void>
   resetMemory(agentId: string): Promise<void>
+
+  createRoom(draft: RoomDraft): Promise<RoomConfig>
+  updateRoom(room: RoomConfig): Promise<RoomConfig>
+  deleteRoom(roomId: string): Promise<void>
+  /** Lets the agents keep talking without a new message from the user. */
+  continueRoom(roomId: string): Promise<void>
 
   resolveAction(
     messageId: string,
@@ -70,6 +80,10 @@ export const API_METHODS = [
   'updateAgent',
   'deleteAgent',
   'resetMemory',
+  'createRoom',
+  'updateRoom',
+  'deleteRoom',
+  'continueRoom',
   'resolveAction',
   'listRoutines',
   'setRoutineEnabled',
@@ -96,6 +110,7 @@ void _exhaustive
 /** Events pushed from main to renderer. */
 export interface NateBotEvents {
   agents: AgentSummary[]
+  rooms: RoomSummary[]
   message: ChatMessage
   usage: UsageInfo
   env: EnvStatus
@@ -104,12 +119,13 @@ export interface NateBotEvents {
   gmailProgress: GmailProgress
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
-  /** Menu shortcuts: Cmd+, / Cmd+N / Routines. */
-  navigate: 'settings' | 'routines' | 'newAgent'
+  /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
+  navigate: 'settings' | 'routines' | 'newAgent' | 'newRoom'
 }
 
 export const EVENT_NAMES = [
   'agents',
+  'rooms',
   'message',
   'usage',
   'env',

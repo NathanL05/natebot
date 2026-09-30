@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   EnvStatus,
   McpServerInfo,
+  RoomSummary,
   UsageInfo
 } from '@shared/types'
 
@@ -13,6 +14,7 @@ export type View = 'chat' | 'routines' | 'settings'
 interface State {
   ready: boolean
   agents: AgentSummary[]
+  rooms: RoomSummary[]
   settings: AppSettings | null
   mcpServers: McpServerInfo[]
   env: EnvStatus | null
@@ -27,15 +29,19 @@ interface State {
   addOpen: boolean
   gmailOpen: boolean
   marketplaceOpen: boolean
+  /** Group chat editor: 'new', a room id to edit, or null when closed. */
+  roomEditor: string | null
 
   init(): Promise<void>
-  select(agentId: string): void
+  /** Opens an agent's chat or a group chat. */
+  select(chatId: string): void
   setView(view: View): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
   setAddOpen(open: boolean): void
   setGmailOpen(open: boolean): void
   setMarketplaceOpen(open: boolean): void
+  setRoomEditor(target: string | null): void
   patchSettings(patch: Partial<AppSettings>): Promise<void>
 }
 
@@ -56,14 +62,24 @@ export function sortAgents(agents: AgentSummary[]): AgentSummary[] {
 export const useStore = create<State>((set, get) => {
   /** Keep the open chat marked read while the user is looking at it. */
   const markOpenChatRead = (): void => {
-    const { selectedId, agents, view } = get()
-    const sel = agents.find((a) => a.id === selectedId)
+    const { selectedId, agents, rooms, view } = get()
+    const sel = agents.find((a) => a.id === selectedId) ?? rooms.find((r) => r.id === selectedId)
     if (sel?.unread && view === 'chat' && document.hasFocus()) void api.markRead(sel.id)
+  }
+
+  /** After the open chat disappears, fall back to the most recent agent. */
+  const keepSelection = (): void => {
+    const { selectedId, agents, rooms } = get()
+    if (selectedId !== null && (agents.some((a) => a.id === selectedId) || rooms.some((r) => r.id === selectedId))) return
+    const first = sortAgents(agents)[0]
+    if (first) get().select(first.id)
+    else set({ selectedId: null })
   }
 
   return {
     ready: false,
     agents: [],
+    rooms: [],
     settings: null,
     mcpServers: [],
     env: null,
@@ -77,17 +93,17 @@ export const useStore = create<State>((set, get) => {
     addOpen: false,
     gmailOpen: false,
     marketplaceOpen: false,
+    roomEditor: null,
 
     async init() {
       api.on('agents', (agents) => {
-        const { selectedId } = get()
-        const stillThere = selectedId !== null && agents.some((a) => a.id === selectedId)
         set({ agents })
-        if (!stillThere) {
-          const first = sortAgents(agents)[0]
-          if (first) get().select(first.id)
-          else set({ selectedId: null })
-        }
+        keepSelection()
+        markOpenChatRead()
+      })
+      api.on('rooms', (rooms) => {
+        set({ rooms })
+        keepSelection()
         markOpenChatRead()
       })
       api.on('message', (msg) => {
@@ -101,6 +117,7 @@ export const useStore = create<State>((set, get) => {
       api.on('focusAgent', (id) => get().select(id))
       api.on('navigate', (target) => {
         if (target === 'newAgent') set({ addOpen: true })
+        else if (target === 'newRoom') set({ roomEditor: 'new' })
         else set({ view: target, drawerOpen: false })
       })
       window.addEventListener('focus', markOpenChatRead)
@@ -109,6 +126,7 @@ export const useStore = create<State>((set, get) => {
       set({
         ready: true,
         agents: boot.agents,
+        rooms: boot.rooms,
         settings: boot.settings,
         mcpServers: boot.mcpServers,
         env: boot.env,
@@ -119,16 +137,16 @@ export const useStore = create<State>((set, get) => {
       if (first) get().select(first.id)
     },
 
-    select(agentId) {
-      set({ selectedId: agentId, view: 'chat', drawerOpen: false })
-      void api.markRead(agentId)
-      if (!get().messages[agentId]) {
+    select(chatId) {
+      set({ selectedId: chatId, view: 'chat', drawerOpen: false })
+      void api.markRead(chatId)
+      if (!get().messages[chatId]) {
         // Start with an empty list so live events are captured while history loads.
-        set({ messages: { ...get().messages, [agentId]: [] } })
-        void api.listMessages(agentId).then((history) => {
-          const live = get().messages[agentId] ?? []
+        set({ messages: { ...get().messages, [chatId]: [] } })
+        void api.listMessages(chatId).then((history) => {
+          const live = get().messages[chatId] ?? []
           const merged = live.reduce(upsertMessage, history)
-          set({ messages: { ...get().messages, [agentId]: merged } })
+          set({ messages: { ...get().messages, [chatId]: merged } })
         })
       }
     },
@@ -139,6 +157,7 @@ export const useStore = create<State>((set, get) => {
     setAddOpen: (addOpen) => set({ addOpen }),
     setGmailOpen: (gmailOpen) => set({ gmailOpen }),
     setMarketplaceOpen: (marketplaceOpen) => set({ marketplaceOpen }),
+    setRoomEditor: (roomEditor) => set({ roomEditor }),
 
     async patchSettings(patch) {
       const current = get().settings
@@ -151,4 +170,8 @@ export const useStore = create<State>((set, get) => {
 
 export function useSelectedAgent(): AgentSummary | undefined {
   return useStore((s) => s.agents.find((a) => a.id === s.selectedId))
+}
+
+export function useSelectedRoom(): RoomSummary | undefined {
+  return useStore((s) => s.rooms.find((r) => r.id === s.selectedId))
 }
