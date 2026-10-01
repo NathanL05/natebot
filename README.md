@@ -14,6 +14,7 @@ and logged in on your Mac. There is **no API key and no API billing**.
 - [Run in development](#run-in-development)
 - [Build the .app and .dmg](#build-the-app-and-dmg)
 - [Rebuild after changes](#rebuild-after-changes)
+- [Development workflow](#development-workflow)
 - [How the subscription (not API) setup works](#how-the-subscription-not-api-setup-works)
 - [Where your data lives](#where-your-data-lives)
 - [Agents](#agents)
@@ -116,6 +117,17 @@ npm run dist
 Then quit NateBot (menu-bar icon → Quit, or ⌘Q), drag the new `NateBot.app` from `dist/mac-arm64/` (or the
 new `.dmg`) into Applications, replace the old one, and open it. Your agents, chats and settings live in
 `~/NateBot`, so they carry over.
+
+## Development workflow
+
+- **Branches:** `main` only accepts pull requests. Work on a short-lived branch, open a PR, and squash-merge it
+  once CI is green.
+- **Checks:** `npm test` runs the unit tests (Vitest, `src/**/*.test.ts`). CI (`.github/workflows/ci.yml`) runs
+  typecheck, tests and build on every PR and push to `main`. Tests never start Electron or `claude`.
+- **Releases:** bump the version in a PR (`npm version minor --no-git-tag-version`), merge it, then tag `main`
+  (`git tag v0.2.0 && git push origin v0.2.0`). `.github/workflows/release.yml` builds the `.dmg` on macOS and
+  attaches it to a draft GitHub release. The app is ad-hoc signed and not notarised: a downloaded copy needs
+  right-click → Open on first launch, and it can't auto-update.
 
 ## How the subscription (not API) setup works
 

@@ -1,0 +1,53 @@
+# Builds NateBot-<version>-arm64.dmg when a version tag is pushed and attaches
+# it to a DRAFT GitHub release (drafts are only visible to you; publish it by
+# hand if you want it public).
+#
+# main only accepts pull requests, so bump the version in a PR, then tag main:
+#   npm version minor --no-git-tag-version   # in a branch; open and merge the PR
+#   git switch main && git pull
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# The app is ad-hoc signed (no Apple Developer ID) and not notarised, so a
+# downloaded copy needs right-click → Open (or Privacy & Security → Open
+# Anyway) on first launch, and it can't auto-update.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Tag matches package.json version
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Package (ad-hoc signed, not notarised)
+        run: npx electron-builder --mac --arm64 --publish never
+        env:
+          # Use the ad-hoc identity from electron-builder.yml, never a keychain cert.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Draft release with the .dmg
+        run: gh release create "$GITHUB_REF_NAME" dist/*.dmg --draft --title "NateBot $GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
