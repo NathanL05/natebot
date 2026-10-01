@@ -557,7 +557,8 @@ export class Engine extends EventEmitter {
         const reason =
           exit.reason === 'timeout'
             ? 'Timed out.'
-            : reply.replace(/^✗\s*/, '') ||
+            : // A "✓" here is a claim the checks above disproved, never a reason.
+              (reply.startsWith('✓') ? '' : reply.replace(/^✗\s*/, '')) ||
               (state.result?.permissionDenials ? `Permission for ${tool} was refused.` : '') ||
               (!used ? `The tool ${tool} was never called.` : '') ||
               tail(exit.stderr, 3) ||
