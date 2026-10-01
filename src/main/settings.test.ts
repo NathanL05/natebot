@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest'
+import type { AppSettings } from '@shared/types'
+import { DEFAULT_ACCENT } from '@shared/accents'
+import { sanitize } from './settings'
+
+const defaults: AppSettings = {
+  claudePath: null,
+  defaultModel: 'sonnet',
+  defaultEffort: 'medium',
+  theme: 'dark',
+  accent: DEFAULT_ACCENT,
+  launchAtLogin: false,
+  userName: 'Nathan'
+}
+
+describe('settings sanitising', () => {
+  it('uses the fallback for a missing or empty file', () => {
+    expect(sanitize({}, defaults)).toEqual(defaults)
+  })
+
+  it('keeps valid values', () => {
+    const next = sanitize(
+      { claudePath: ' /opt/bin/claude ', defaultModel: 'opus', defaultEffort: 'low', theme: 'light', launchAtLogin: true, userName: ' Nate ' },
+      defaults
+    )
+    expect(next).toMatchObject({
+      claudePath: '/opt/bin/claude',
+      defaultModel: 'opus',
+      defaultEffort: 'low',
+      theme: 'light',
+      launchAtLogin: true,
+      userName: 'Nate'
+    })
+  })
+
+  it('ignores invalid values from a hand-edited file', () => {
+    const raw = {
+      claudePath: '   ',
+      defaultModel: 'gpt',
+      defaultEffort: 'turbo',
+      theme: 'sepia',
+      accent: 'not-a-colour',
+      launchAtLogin: 'yes',
+      userName: ''
+    } as unknown as Partial<AppSettings>
+    expect(sanitize(raw, defaults)).toEqual(defaults)
+  })
+})

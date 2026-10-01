@@ -13,6 +13,7 @@
     "dev": "electron-vite dev",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",
+    "test": "vitest run",
     "start": "electron-vite preview",
     "dist": "npm run build && electron-builder --mac --arm64",
     "dist:universal": "npm run build && electron-builder --mac --universal",
@@ -40,6 +41,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
+    "vitest": "^4.1.11",
     "zustand": "^5.0.15"
   }
 }

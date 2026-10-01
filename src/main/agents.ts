@@ -48,7 +48,7 @@ function normalizeShape(v: unknown, id: string): MascotShape | null {
 }
 
 /** Accepts whatever is in a YAML file and returns a valid config. */
-function normalize(raw: unknown, id: string): AgentConfig {
+export function normalize(raw: unknown, id: string): AgentConfig {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const model = str(r['model']) as ModelId
   return {

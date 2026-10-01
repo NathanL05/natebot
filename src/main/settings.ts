@@ -16,7 +16,7 @@ function fullName(): string {
 const MODELS: ModelId[] = ['sonnet', 'haiku', 'opus']
 const THEMES: Theme[] = ['dark', 'light']
 
-function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppSettings {
+export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppSettings {
   return {
     claudePath: typeof raw.claudePath === 'string' && raw.claudePath.trim() ? raw.claudePath.trim() : null,
     defaultModel: MODELS.includes(raw.defaultModel as ModelId) ? (raw.defaultModel as ModelId) : fallback.defaultModel,
