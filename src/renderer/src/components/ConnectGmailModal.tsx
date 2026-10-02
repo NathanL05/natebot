@@ -96,29 +96,7 @@ export function ConnectGmailModal() {
           />
         </Field>
 
-        {progress && (
-          <div
-            className={`flex items-start gap-2 rounded-lg px-3 py-2.5 ${
-              progress.stage === 'error' ? 'bg-danger/10 text-danger' : done ? 'bg-success/10 text-success' : 'bg-elev'
-            }`}
-          >
-            {progress.stage === 'error' ? (
-              <XIcon size={14} className="mt-0.5 shrink-0" />
-            ) : done ? (
-              <CheckIcon size={14} className="mt-0.5 shrink-0" />
-            ) : (
-              <SpinnerIcon size={14} className="mt-0.5 shrink-0" />
-            )}
-            <div className="selectable min-w-0">
-              <div>{progress.message}</div>
-              {progress.stage === 'signin' && progress.url && (
-                <button type="button" className="mt-1 text-accent" onClick={() => void api.openExternal(progress.url as string)}>
-                  Didn't see a browser window? Open the Google sign-in page
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {progress && <SignInProgress progress={progress} />}
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">
@@ -132,5 +110,33 @@ export function ConnectGmailModal() {
         )}
       </div>
     </Modal>
+  )
+}
+
+/** The live status of a Google sign-in (shared with Connect Calendar). */
+export function SignInProgress({ progress }: { progress: GmailProgress }) {
+  const done = progress.stage === 'done'
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 ${
+        progress.stage === 'error' ? 'bg-danger/10 text-danger' : done ? 'bg-success/10 text-success' : 'bg-elev'
+      }`}
+    >
+      {progress.stage === 'error' ? (
+        <XIcon size={14} className="mt-0.5 shrink-0" />
+      ) : done ? (
+        <CheckIcon size={14} className="mt-0.5 shrink-0" />
+      ) : (
+        <SpinnerIcon size={14} className="mt-0.5 shrink-0" />
+      )}
+      <div className="selectable min-w-0">
+        <div>{progress.message}</div>
+        {progress.stage === 'signin' && progress.url && (
+          <button type="button" className="mt-1 text-accent" onClick={() => void api.openExternal(progress.url as string)}>
+            Didn't see a browser window? Open the Google sign-in page
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

@@ -1,5 +1,8 @@
-// "Connect Gmail": writes the gmail entry into ~/NateBot/mcp.json and runs the
-// one-time Google sign-in by talking to the Gmail MCP server directly.
+// "Connect Gmail" and "Connect Calendar": write the server entry into
+// ~/NateBot/mcp.json and run the one-time Google sign-in by talking to the
+// MCP server directly. Calendar reuses Gmail's address and OAuth client but
+// keeps its own token (its own credentials folder), so connecting it can
+// never replace or break the Gmail sign-in.
 //
 // Server: taylorwilsdon/google_workspace_mcp ("workspace-mcp" on PyPI), run
 // with uvx in single-user stdio mode. On the first Gmail call it opens the
@@ -20,6 +23,7 @@ import { ROOT } from './paths'
 
 export const WORKSPACE_MCP_VERSION = '1.29.0'
 export const GMAIL_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google')
+export const CALENDAR_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google-calendar')
 /** workspace-mcp's stdio sign-in callback: http://localhost:8000/oauth2callback */
 const CALLBACK_PORT = 8000
 const SIGNIN_TIMEOUT = 5 * 60_000
@@ -32,6 +36,56 @@ export const GMAIL_APPROVAL_TOOLS = [
   'modify_gmail_message_labels',
   'batch_modify_gmail_message_labels'
 ]
+
+/** Calendar tools that change things (create/update/delete events, RSVP…): only through Approve. */
+export const CALENDAR_APPROVAL_TOOLS = ['manage_event', 'create_calendar', 'manage_out_of_office', 'manage_focus_time']
+
+type GoogleServer = 'gmail' | 'gcal'
+
+interface GoogleService {
+  server: GoogleServer
+  label: string
+  credentialsDir: string
+  /** A harmless read that needs this service's sign-in. */
+  probe: (email: string) => { name: string; arguments: Record<string, unknown> }
+}
+
+const SERVICES: Record<GoogleServer, GoogleService> = {
+  gmail: {
+    server: 'gmail',
+    label: 'Gmail',
+    credentialsDir: GMAIL_CREDENTIALS_DIR,
+    probe: (email) => ({ name: 'search_gmail_messages', arguments: { query: 'in:inbox', user_google_email: email, page_size: 1 } })
+  },
+  gcal: {
+    server: 'gcal',
+    label: 'Google Calendar',
+    credentialsDir: CALENDAR_CREDENTIALS_DIR,
+    probe: (email) => ({ name: 'list_calendars', arguments: { user_google_email: email } })
+  }
+}
+
+const isGoogle = (server: string): server is GoogleServer => server === 'gmail' || server === 'gcal'
+
+export function calendarEntry(email: string, clientId: string, clientSecret: string): ServerEntry {
+  return {
+    command: 'uvx',
+    args: [`workspace-mcp==${WORKSPACE_MCP_VERSION}`, '--single-user', '--tools', 'calendar', '--tool-tier', 'extended'],
+    env: {
+      GOOGLE_OAUTH_CLIENT_ID: clientId,
+      GOOGLE_OAUTH_CLIENT_SECRET: clientSecret,
+      USER_GOOGLE_EMAIL: email,
+      OAUTHLIB_INSECURE_TRANSPORT: '1',
+      WORKSPACE_MCP_CREDENTIALS_DIR: CALENDAR_CREDENTIALS_DIR
+    },
+    description: `Google Calendar (${email}): read events and free time. Changes need your approval.`,
+    agent_notes:
+      `The Google Calendar account is ${email}. Pass user_google_email="${email}" to Calendar tools. ` +
+      'Read with get_events, list_calendars and query_freebusy. Creating, changing, deleting or answering events uses manage_event and always needs approval: propose it. ' +
+      "If a Calendar tool says sign-in or authorization is needed, don't share any link: tell the user to click Connect Calendar in NateBot's Settings.",
+    require_approval: CALENDAR_APPROVAL_TOOLS
+  }
+}
 
 export function gmailEntry(email: string, clientId: string, clientSecret: string): ServerEntry {
   return {
@@ -54,7 +108,7 @@ export function gmailEntry(email: string, clientId: string, clientSecret: string
 }
 
 /** The token file workspace-mcp writes: the email, URL-encoded except @ . _ - (Python quote(safe="@._-")). */
-function tokenFile(email: string): string {
+function tokenFile(email: string, dir: string): string {
   const safe = [...email]
     .map((ch) =>
       /[A-Za-z0-9@._~-]/.test(ch)
@@ -62,19 +116,40 @@ function tokenFile(email: string): string {
         : [...new TextEncoder().encode(ch)].map((b) => `%${b.toString(16).toUpperCase().padStart(2, '0')}`).join('')
     )
     .join('')
-  return join(GMAIL_CREDENTIALS_DIR, `${safe}.json`)
+  return join(dir, `${safe}.json`)
 }
 
-function savedEntry(): { email: string | null; clientId: string | null; clientSecret: string | null } {
-  const env = (loadServers()['gmail']?.['env'] ?? {}) as Record<string, unknown>
+function savedEntry(server: GoogleServer = 'gmail'): { email: string | null; clientId: string | null; clientSecret: string | null } {
+  const env = (loadServers()[server]?.['env'] ?? {}) as Record<string, unknown>
   const str = (k: string): string | null => (typeof env[k] === 'string' && env[k] ? (env[k] as string) : null)
   return { email: str('USER_GOOGLE_EMAIL'), clientId: str('GOOGLE_OAUTH_CLIENT_ID'), clientSecret: str('GOOGLE_OAUTH_CLIENT_SECRET') }
 }
 
-/** Gmail is usable by agents only once it's configured AND a token exists. */
+/**
+ * Whether agents can use a server: Gmail and Calendar only once they're configured
+ * AND signed in (a short agent run can't finish a Google sign-in). Others always.
+ */
+export function googleReady(server: string): boolean {
+  if (!isGoogle(server)) return true
+  const { email } = savedEntry(server)
+  return !!email && existsSync(tokenFile(email, SERVICES[server].credentialsDir))
+}
+
 export function gmailReady(): boolean {
-  const { email } = savedEntry()
-  return !!email && existsSync(tokenFile(email))
+  return googleReady('gmail')
+}
+
+/** Calendar uses Gmail's address and OAuth client, so it can be connected once Gmail is set up. */
+export function calendarStatus(): GmailStatus {
+  const gmail = savedEntry('gmail')
+  return {
+    configured: !!savedEntry('gcal').email,
+    connected: googleReady('gcal'),
+    email: gmail.email,
+    clientId: gmail.clientId,
+    hasSecret: !!gmail.clientSecret,
+    uvInstalled: findOnPath('uvx') !== null
+  }
 }
 
 export function gmailStatus(): GmailStatus {
@@ -186,13 +261,37 @@ export async function connectGmail(
     }
   }
 
-  mkdirSync(GMAIL_CREDENTIALS_DIR, { recursive: true, mode: 0o700 })
-  const entry = gmailEntry(email, clientId, clientSecret)
-  saveServer('gmail', entry)
-  log('gmail: connect started')
+  return signIn(SERVICES.gmail, gmailEntry(email, clientId, clientSecret), email, uvx, onProgress)
+}
+
+export async function connectCalendar(onProgress: (p: GmailProgress) => void): Promise<{ ok: boolean; error?: string }> {
+  const { email, clientId, clientSecret } = savedEntry('gmail')
+  if (!email || !clientId || !clientSecret) {
+    return { ok: false, error: 'Connect Gmail first: Calendar uses the same Google address and OAuth client.' }
+  }
+  const uvx = findOnPath('uvx')
+  if (!uvx) return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv, then try again.' }
+  if (!(await portFree(CALLBACK_PORT))) {
+    return { ok: false, error: `Something else on this Mac is using port ${CALLBACK_PORT}, which Google sign-in needs. Quit it and try again.` }
+  }
+  return signIn(SERVICES.gcal, calendarEntry(email, clientId, clientSecret), email, uvx, onProgress)
+}
+
+/** Saves the entry, starts the connector, and keeps it alive through Google sign-in until a probe call works. */
+async function signIn(
+  service: GoogleService,
+  entry: ServerEntry,
+  email: string,
+  uvx: string,
+  onProgress: (p: GmailProgress) => void
+): Promise<{ ok: boolean; error?: string }> {
+  const { label, server } = service
+  mkdirSync(service.credentialsDir, { recursive: true, mode: 0o700 })
+  saveServer(server, entry)
+  log(`${server}: connect started`)
 
   stopGmailConnect()
-  onProgress({ stage: 'starting', message: 'Starting the Gmail connector (the first time downloads it, ~1 min)…' })
+  onProgress({ stage: 'starting', message: `Starting the ${label} connector (the first time downloads it, ~1 min)…` })
   const child = spawn(uvx, entry['args'] as string[], {
     env: { ...childEnv(), ...(entry['env'] as Record<string, string>) },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -205,13 +304,13 @@ export async function connectGmail(
   })
   const exited = new Promise<never>((_, reject) =>
     child.on('close', (code) =>
-      reject(new Error(`The Gmail connector stopped (code ${code}): ${stderr.trim().split('\n').slice(-2).join(' ')}`))
+      reject(new Error(`The ${label} connector stopped (code ${code}): ${stderr.trim().split('\n').slice(-2).join(' ')}`))
     )
   )
   exited.catch(() => undefined)
   const rpc = rpcClient(child)
-  const search = { name: 'search_gmail_messages', arguments: { query: 'in:inbox', user_google_email: email, page_size: 1 } }
-  const token = tokenFile(email)
+  const probe = service.probe(email)
+  const token = tokenFile(email, service.credentialsDir)
 
   try {
     await Promise.race([
@@ -219,14 +318,14 @@ export async function connectGmail(
       exited
     ])
     rpc.notify('notifications/initialized')
-    log('gmail: connector started')
+    log(`${server}: connector started`)
 
-    onProgress({ stage: 'verifying', message: 'Checking access to Gmail…' })
-    let res = resultText(await Promise.race([rpc.request('tools/call', search, 120_000), exited]))
+    onProgress({ stage: 'verifying', message: `Checking access to ${label}…` })
+    let res = resultText(await Promise.race([rpc.request('tools/call', probe, 120_000), exited]))
 
     if (res.isError || AUTH_NEEDED.test(res.text)) {
       const url = /(https:\/\/accounts\.google\.com\/[^\s)"'>]+)/.exec(res.text)?.[1]
-      log(`gmail: waiting for Google sign-in (auth url ${url ? 'received' : 'missing'})`)
+      log(`${server}: waiting for Google sign-in (auth url ${url ? 'received' : 'missing'})`)
       onProgress({ stage: 'signin', message: 'Finish signing in with Google in your browser. Keep NateBot open until this says Connected.', url })
 
       // Keep the connector (and its localhost:8000 callback) alive until
@@ -234,23 +333,23 @@ export async function connectGmail(
       const deadline = Date.now() + SIGNIN_TIMEOUT
       while (!existsSync(token)) {
         if (Date.now() > deadline) throw new Error('Timed out waiting for Google sign-in (5 minutes). Click Connect to try again.')
-        if (child.exitCode !== null || child.signalCode !== null) throw new Error('The Gmail connector stopped before sign-in finished.')
+        if (child.exitCode !== null || child.signalCode !== null) throw new Error(`The ${label} connector stopped before sign-in finished.`)
         await new Promise((r) => setTimeout(r, 1000))
       }
-      log('gmail: token received')
-      onProgress({ stage: 'verifying', message: 'Signed in. Checking access to Gmail…' })
-      res = resultText(await Promise.race([rpc.request('tools/call', search, 120_000), exited]))
+      log(`${server}: token received`)
+      onProgress({ stage: 'verifying', message: `Signed in. Checking access to ${label}…` })
+      res = resultText(await Promise.race([rpc.request('tools/call', probe, 120_000), exited]))
     }
 
     if (res.isError || AUTH_NEEDED.test(res.text)) {
-      throw new Error(res.text.split('\n').slice(0, 3).join(' ').slice(0, 300) || 'Gmail did not respond as expected.')
+      throw new Error(res.text.split('\n').slice(0, 3).join(' ').slice(0, 300) || `${label} did not respond as expected.`)
     }
-    log('gmail: connected')
-    onProgress({ stage: 'done', message: `Connected to ${email}.` })
+    log(`${server}: connected`)
+    onProgress({ stage: 'done', message: `${label} connected (${email}).` })
     return { ok: true }
   } catch (e) {
     const error = (e as Error).message
-    log(`gmail: failed: ${error.slice(0, 200)}`)
+    log(`${server}: failed: ${error.slice(0, 200)}`)
     onProgress({ stage: 'error', message: error })
     return { ok: false, error }
   } finally {

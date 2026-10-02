@@ -33,7 +33,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, gmailStatus, googleReady, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -145,7 +145,7 @@ export class Backend implements NateBotApi {
 
   /** mcp.json servers; Gmail only counts as set up once it has a sign-in token. */
   private serverList(): ReturnType<typeof listServers> {
-    return listServers().map((s) => (s.name === 'gmail' ? { ...s, configured: gmailReady() } : s))
+    return listServers().map((s) => (s.name === 'gmail' || s.name === 'gcal' ? { ...s, configured: googleReady(s.name) } : s))
   }
 
   /** Resolves the shell PATH and checks claude. Runs once at startup. */
@@ -333,7 +333,7 @@ export class Backend implements NateBotApi {
     const time = clock(now)
     const dueText = late ? ` (it was due at ${new Date(due).toDateString() === new Date(now).toDateString() ? '' : 'yesterday at '}${clock(due)})` : ''
     // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
-    const ready = configuredServersFor(agent).filter((n) => n !== 'gmail' || gmailReady())
+    const ready = configuredServersFor(agent).filter((n) => googleReady(n))
     const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
     if (missing.length) {
       this.engine.system(agentId, `Routine skipped at ${time}${dueText}: ${missing.join(', ')} isn't set up yet`)
@@ -722,6 +722,22 @@ export class Backend implements NateBotApi {
     this.connecting = true
     try {
       const res = await connectGmail({ email, clientId, clientSecret }, (p) => emit('gmailProgress', p))
+      emit('mcpServers', this.serverList())
+      return res
+    } finally {
+      this.connecting = false
+    }
+  }
+
+  async calendarStatus(): Promise<GmailStatus> {
+    return calendarStatus()
+  }
+
+  async connectCalendar(): Promise<{ ok: boolean; error?: string }> {
+    if (this.connecting) return { ok: false, error: 'Already connecting.' }
+    this.connecting = true
+    try {
+      const res = await connectCalendar((p) => emit('gmailProgress', p))
       emit('mcpServers', this.serverList())
       return res
     } finally {

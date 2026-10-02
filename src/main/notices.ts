@@ -12,6 +12,12 @@ export const APPROVAL_BUTTONS = ['Approve', 'Reject']
 
 /** Detail keys shown in a notification, in order. */
 const SHOWN: [string, string][] = [
+  ['action', 'Action'],
+  ['summary', 'Event'],
+  ['start_time', 'Starts'],
+  ['end_time', 'Ends'],
+  ['attendees', 'Guests'],
+  ['location', 'Where'],
   ['to', 'To'],
   ['cc', 'Cc'],
   ['bcc', 'Bcc'],

@@ -49,6 +49,21 @@ describe('approvalNotice', () => {
     expect(body).toContain('To: boss@x.com Boss')
   })
 
+  it('offers buttons for a calendar event whose details are all shown', () => {
+    const n = approvalNotice([
+      action({
+        type: 'create_event',
+        summary: 'Add focus block Friday 2–4 PM',
+        tool: 'mcp__gcal__manage_event',
+        details: { action: 'create', summary: 'Focus: Sarah deadline', start_time: '2026-10-09T14:00', end_time: '2026-10-09T16:00', description: 'Prep' }
+      })
+    ])
+    expect(n?.action?.id).toBe('a1')
+    expect(n?.body).toContain('Event: Focus: Sarah deadline')
+    expect(n?.body).toContain('Starts: 2026-10-09T14:00')
+    expect(n?.body).toContain('Via Calendar · manage_event')
+  })
+
   it('joins list recipients and shortens long values', () => {
     const body = approvalNotice([action({ details: { to: ['a@x.com', 'b@x.com'], subject: 'x'.repeat(100) } })])?.body ?? ''
     expect(body).toContain('To: a@x.com, b@x.com')

@@ -413,6 +413,21 @@ The resulting entry in `~/NateBot/mcp.json` looks like this (written for you by 
 
 (`OAUTHLIB_INSECURE_TRANSPORT=1` only allows the sign-in redirect to `http://localhost` on your own Mac.)
 
+## Connecting Google Calendar
+
+Calendar uses the same Google address and OAuth client as Gmail, so connect Gmail first. Then:
+
+1. In the same Google Cloud project, enable the **Google Calendar API**
+   ([direct link](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)).
+2. In NateBot: **Settings → Connected tools → Connect Calendar…** and approve Calendar access in the browser.
+3. Give **Google Calendar** to the agents that should use it (the Planner is a good fit) in their settings.
+
+Calendar gets its own sign-in token (in `~/NateBot/credentials/google-calendar/`), so connecting or
+reconnecting it never touches the Gmail sign-in. Agents can read events, list calendars and check free time.
+Creating, changing, deleting or answering an event (`manage_event`, plus out-of-office, focus time and new
+calendars) is blocked in normal runs and only happens through **Approve**. The approval notification shows the
+event, start and end times, and guests.
+
 ## Adding MCP servers
 
 Add servers to `~/NateBot/mcp.json` in the same format Claude Code uses (`command`/`args`/`env` for local

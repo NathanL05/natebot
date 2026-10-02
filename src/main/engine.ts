@@ -9,7 +9,7 @@ import type { AgentStore } from './agents'
 import type { Db } from './db'
 import { childEnv } from './env'
 import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
-import { gmailReady } from './gmail'
+import { googleReady } from './gmail'
 import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
@@ -280,8 +280,11 @@ export class Engine extends EventEmitter {
       if (!bin) throw new UserFacingError("Claude Code isn't available. Open Settings to check the path to the claude program.")
       // Gmail's sign-in can't complete inside a short agent run (its callback dies with
       // the run), so agents only get Gmail once Connect Gmail has stored a token.
-      const skip = agent.mcp_servers.includes('gmail') && !gmailReady() ? ['gmail'] : []
-      if (skip.length) extraLines.push({ role: 'system', text: "Gmail isn't connected yet, so this reply didn't use it. Connect it in Settings → Connect Gmail." })
+      const skip = agent.mcp_servers.filter((s) => !googleReady(s))
+      if (skip.length) {
+        const names = skip.map((s) => (s === 'gcal' ? 'Calendar' : 'Gmail')).join(' and ')
+        extraLines.push({ role: 'system', text: `${names} isn't connected yet, so this reply didn't use it. Connect it in Settings → Connected tools.` })
+      }
       mcp = writeRunConfig(agent, skip)
       const sessionArgs = agent.session_id ? ['--resume', agent.session_id] : ['--session-id', randomUUID()]
       const state = new StreamState()
@@ -411,7 +414,7 @@ export class Engine extends EventEmitter {
     const { agent, roomId } = t
     const bin = this.deps.claudePath()
     if (!bin) return { status: 'error', text: '', detail: "Claude Code isn't available. Open Settings to check the path to the claude program." }
-    const skip = agent.mcp_servers.includes('gmail') && !gmailReady() ? ['gmail'] : []
+    const skip = agent.mcp_servers.filter((s) => !googleReady(s))
     const mcp = writeRunConfig(agent, skip)
     const state = new StreamState()
     const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
@@ -520,7 +523,7 @@ export class Engine extends EventEmitter {
     if (!configuredServersFor(agent).includes(server)) {
       return fail(`${tool} isn't part of this agent's connected tools.`)
     }
-    if (server === 'gmail' && !gmailReady()) return fail("Gmail isn't connected. Use Connect Gmail in Settings, then approve again.")
+    if (!googleReady(server)) return fail(`${server === 'gcal' ? 'Calendar' : 'Gmail'} isn't connected. Connect it in Settings, then approve again.`)
     const bin = this.deps.claudePath()
     if (!bin) return fail("Claude Code isn't available.")
     if (this.deps.usage.waitMs() > 0) {

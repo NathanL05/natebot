@@ -32,6 +32,7 @@ interface State {
   /** Folder a new agent goes into (from a folder's + button). */
   addFolderId: string | null
   gmailOpen: boolean
+  calendarOpen: boolean
   marketplaceOpen: boolean
   /** Group chat editor: 'new', a room id to edit, or null when closed. */
   roomEditor: string | null
@@ -46,6 +47,7 @@ interface State {
   setDrawerOpen(open: boolean): void
   setAddOpen(open: boolean, folderId?: string | null): void
   setGmailOpen(open: boolean): void
+  setCalendarOpen(open: boolean): void
   setMarketplaceOpen(open: boolean): void
   setRoomEditor(target: string | null): void
   patchSettings(patch: Partial<AppSettings>): Promise<void>
@@ -100,6 +102,7 @@ export const useStore = create<State>((set, get) => {
     addOpen: false,
     addFolderId: null,
     gmailOpen: false,
+    calendarOpen: false,
     marketplaceOpen: false,
     roomEditor: null,
     renamingFolderId: null,
@@ -167,6 +170,7 @@ export const useStore = create<State>((set, get) => {
     setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
     setAddOpen: (addOpen, folderId = null) => set({ addOpen, addFolderId: addOpen ? folderId : null }),
     setGmailOpen: (gmailOpen) => set({ gmailOpen }),
+    setCalendarOpen: (calendarOpen) => set({ calendarOpen }),
     setMarketplaceOpen: (marketplaceOpen) => set({ marketplaceOpen }),
     setRoomEditor: (roomEditor) => set({ roomEditor }),
 

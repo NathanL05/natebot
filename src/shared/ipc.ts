@@ -81,6 +81,9 @@ export interface NateBotApi {
 
   gmailStatus(): Promise<GmailStatus>
   connectGmail(email: string, clientId: string, clientSecret: string): Promise<{ ok: boolean; error?: string }>
+  /** Calendar reuses Gmail's address and OAuth client; it has its own sign-in. */
+  calendarStatus(): Promise<GmailStatus>
+  connectCalendar(): Promise<{ ok: boolean; error?: string }>
 }
 
 export const API_METHODS = [
@@ -118,7 +121,9 @@ export const API_METHODS = [
   'addSkillSource',
   'removeSkillSource',
   'gmailStatus',
-  'connectGmail'
+  'connectGmail',
+  'calendarStatus',
+  'connectCalendar'
 ] as const satisfies readonly (keyof NateBotApi)[]
 
 // Compile-time check that API_METHODS lists every method.
@@ -136,6 +141,7 @@ export interface NateBotEvents {
   env: EnvStatus
   /** ~/NateBot/mcp.json changed. */
   mcpServers: McpServerInfo[]
+  /** Progress of a Google sign-in (Gmail or Calendar). */
   gmailProgress: GmailProgress
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
