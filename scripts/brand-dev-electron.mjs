@@ -43,6 +43,8 @@ set('CFBundleName', NAME)
 set('CFBundleDisplayName', NAME)
 set('CFBundleIdentifier', BUNDLE_ID)
 set('CFBundleIconFile', `${NAME}.icns`)
+// Like the packaged app: alerts stay on screen and show their Approve / Reject buttons.
+set('NSUserNotificationAlertStyle', 'alert')
 if (existsSync(icon)) copyFileSync(icon, join(target, `Contents/Resources/${NAME}.icns`))
 
 // Editing Info.plist invalidates Electron's signature; re-sign ad hoc.

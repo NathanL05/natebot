@@ -1,0 +1,45 @@
+// Approval notifications: buttons only for a single action, and enough detail
+// to know what Approve will do.
+import { describe, expect, it } from 'vitest'
+import type { ProposedAction } from '@shared/types'
+import { approvalNotice } from './notices'
+
+const action = (over: Partial<ProposedAction> = {}): ProposedAction => ({
+  id: 'a1',
+  type: 'send_email',
+  summary: 'Reply to Sarah re: deadline',
+  tool: 'mcp__gmail__send_gmail_message',
+  details: { to: 'sarah@example.com', subject: 'Re: Deadline', body: 'Hi Sarah, …' },
+  status: 'pending',
+  ...over
+})
+
+describe('approvalNotice', () => {
+  it('offers buttons for a single pending action and shows who and what', () => {
+    const n = approvalNotice([action()])
+    expect(n?.action?.id).toBe('a1')
+    expect(n?.body).toBe('Reply to Sarah re: deadline\nTo: sarah@example.com\nSubject: Re: Deadline')
+  })
+
+  it('never puts the message body in the notification', () => {
+    expect(approvalNotice([action()])?.body).not.toContain('Hi Sarah')
+  })
+
+  it('sends you to the app when there are several actions', () => {
+    const n = approvalNotice([action(), action({ id: 'a2', summary: 'Archive newsletter' })])
+    expect(n?.action).toBeNull()
+    expect(n?.body).toBe('2 actions to approve, starting with: Reply to Sarah re: deadline')
+  })
+
+  it('ignores actions that are already resolved', () => {
+    expect(approvalNotice([action({ status: 'done' })])).toBeNull()
+    expect(approvalNotice(undefined)).toBeNull()
+    expect(approvalNotice([action({ status: 'rejected' }), action({ id: 'a2' })])?.action?.id).toBe('a2')
+  })
+
+  it('joins list recipients and shortens long values', () => {
+    const body = approvalNotice([action({ details: { to: ['a@x.com', 'b@x.com'], subject: 'x'.repeat(100) } })])?.body ?? ''
+    expect(body).toContain('To: a@x.com, b@x.com')
+    expect(body).toMatch(/Subject: x{59}…$/)
+  })
+})
