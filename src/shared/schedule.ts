@@ -83,3 +83,55 @@ export function describeCron(cron: string): string {
       return `Custom (${spec.cron})`
   }
 }
+
+// ---- matching (for catching up on routines missed while the Mac slept) ----
+
+const MINUTE = 60_000
+
+/** The values one cron field allows: "*", "5", "1-5", "*\/15", "0,30", "1-10/2". Null if invalid. */
+function fieldValues(field: string, min: number, max: number): Set<number> | null {
+  const out = new Set<number>()
+  for (const part of field.split(',')) {
+    const m = /^(\*|(\d+)(?:-(\d+))?)(?:\/(\d+))?$/.exec(part)
+    if (!m) return null
+    const step = m[4] ? Number(m[4]) : 1
+    const from = m[1] === '*' ? min : Number(m[2])
+    const to = m[1] === '*' ? max : m[3] ? Number(m[3]) : m[4] ? max : from
+    if (step < 1 || from < min || to > max || from > to) return null
+    for (let v = from; v <= to; v += step) out.add(v)
+  }
+  return out
+}
+
+/** A predicate for a 5-field cron (a 6th, leading seconds field is ignored), or null if invalid. */
+export function cronMatcher(cron: string): ((d: Date) => boolean) | null {
+  let parts = cron.trim().split(/\s+/)
+  if (parts.length === 6) parts = parts.slice(1)
+  if (parts.length !== 5) return null
+  const [minF, hourF, domF, monF, dowF] = parts as [string, string, string, string, string]
+  const minutes = fieldValues(minF, 0, 59)
+  const hours = fieldValues(hourF, 0, 23)
+  const days = fieldValues(domF, 1, 31)
+  const months = fieldValues(monF, 1, 12)
+  const weekdays = fieldValues(dowF, 0, 7)
+  if (!minutes || !hours || !days || !months || !weekdays) return null
+  if (weekdays.has(7)) weekdays.add(0)
+  // Standard cron: when both day fields are restricted, either one matching is enough.
+  const domAny = domF === '*'
+  const dowAny = dowF === '*'
+  return (d) => {
+    if (!minutes.has(d.getMinutes()) || !hours.has(d.getHours()) || !months.has(d.getMonth() + 1)) return false
+    const dom = days.has(d.getDate())
+    const dow = weekdays.has(d.getDay())
+    return domAny || dowAny ? dom && dow : dom || dow
+  }
+}
+
+/** The most recent minute at or before `now`, within `windowMs`, that the cron matches. */
+export function lastOccurrence(cron: string, now: number, windowMs: number): number | null {
+  const matches = cronMatcher(cron)
+  if (!matches) return null
+  const start = Math.floor(now / MINUTE) * MINUTE
+  for (let t = start; t > now - windowMs; t -= MINUTE) if (matches(new Date(t))) return t
+  return null
+}

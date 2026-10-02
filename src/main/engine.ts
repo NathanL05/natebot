@@ -32,6 +32,8 @@ export interface Job {
   /** Paths relative to the agent's workspace. */
   attachments: string[]
   retried?: boolean
+  /** Routines running late (the Mac was asleep or NateBot closed): when they were due. */
+  dueAt?: number
 }
 
 interface Running {
@@ -187,7 +189,13 @@ export class Engine extends EventEmitter {
   private buildInput(job: Job, notes: string[]): string {
     const parts: string[] = [currentTimeLine()]
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
-    if (job.source === 'routine') parts.push('[Scheduled routine run]')
+    if (job.source === 'routine') {
+      parts.push(
+        job.dueAt
+          ? `[Scheduled routine run, due at ${new Date(job.dueAt).toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}. It's running late because the Mac was asleep or NateBot was closed.]`
+          : '[Scheduled routine run]'
+      )
+    }
     parts.push(job.prompt || 'Please look at the attached file(s).')
     if (job.attachments.length) {
       parts.push(`[Attached files, saved in your working folder]\n${job.attachments.map((a) => `- ${a}`).join('\n')}`)
