@@ -23,7 +23,7 @@ vi.mock(import('./paths'), async (importOriginal) => ({
   ...(await importOriginal()),
   workspaceOf: (id: string) => join(tmpdir(), 'natebot-tests', id)
 }))
-vi.mock('./gmail', () => ({ gmailReady: () => true }))
+vi.mock('./gmail', () => ({ googleReady: () => true }))
 vi.mock('./skills', () => ({ hasInstalledSkills: () => false, SKILLS_PLUGIN: '/skills' }))
 vi.mock('./mcp', () => ({
   agentNotes: () => [],

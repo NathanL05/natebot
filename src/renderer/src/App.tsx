@@ -3,6 +3,7 @@ import { accentById, onFill } from '@shared/accents'
 import { useSelectedRoom, useStore } from './lib/store'
 import { AddAgentModal } from './components/AddAgentModal'
 import { ChatView } from './components/ChatView'
+import { ConnectCalendarModal } from './components/ConnectCalendarModal'
 import { ConnectGmailModal } from './components/ConnectGmailModal'
 import { MarketplaceModal } from './components/MarketplaceModal'
 import { RoomModal } from './components/RoomModal'
@@ -18,6 +19,7 @@ export function App() {
   const view = useStore((s) => s.view)
   const addOpen = useStore((s) => s.addOpen)
   const gmailOpen = useStore((s) => s.gmailOpen)
+  const calendarOpen = useStore((s) => s.calendarOpen)
   const marketplaceOpen = useStore((s) => s.marketplaceOpen)
   const roomEditor = useStore((s) => s.roomEditor)
   const room = useSelectedRoom()
@@ -50,6 +52,7 @@ export function App() {
       </main>
       {addOpen && <AddAgentModal />}
       {gmailOpen && <ConnectGmailModal />}
+      {calendarOpen && <ConnectCalendarModal />}
       {marketplaceOpen && <MarketplaceModal />}
       {roomEditor && <RoomModal key={roomEditor} />}
     </div>
