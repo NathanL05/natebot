@@ -2,7 +2,7 @@
 // each scheduled time runs at most once, whether node-cron or the catch-up
 // gets there first.
 import { describe, expect, it } from 'vitest'
-import { dueRun, type Checkpoint } from './scheduler'
+import { dueRun, syncedCheckpoint, type Checkpoint } from './scheduler'
 
 // Local time, like node-cron. 2 Oct 2026 is a Friday.
 const at = (day: number, h: number, m: number): number => new Date(2026, 9, day, h, m).getTime()
@@ -37,5 +37,26 @@ describe('dueRun', () => {
   it('still runs node-cron ticks for crons the matcher cannot read', () => {
     expect(dueRun('0 8 * * MON', null, at(5, 8, 0), 'tick')).toBe(at(5, 8, 0))
     expect(dueRun('0 8 * * MON', null, at(5, 9, 0), 'catch-up')).toBeNull()
+  })
+})
+
+describe('syncedCheckpoint', () => {
+  const on = { enabled: true, cron: DAILY, prompt: 'Sweep' }
+
+  it('keeps the checkpoint while the schedule is unchanged', () => {
+    expect(syncedCheckpoint(on, yesterday, at(2, 15, 0))).toBe(yesterday)
+  })
+
+  it('never catches up on a time from before a routine was turned back on', () => {
+    // Off on Monday, back on Friday at 3 PM, Mac wakes at 4 PM: 8 AM today must not run.
+    const off = syncedCheckpoint({ ...on, enabled: false }, yesterday, at(2, 15, 0))
+    expect(off).toBeNull()
+    const reEnabled = syncedCheckpoint(on, off, at(2, 15, 0))
+    expect(dueRun(DAILY, reEnabled, at(2, 16, 0), 'catch-up')).toBeNull()
+  })
+
+  it('starts a changed schedule counting from now', () => {
+    const changed = syncedCheckpoint({ ...on, cron: '0 7 * * *' }, yesterday, at(2, 15, 0))
+    expect(changed).toEqual({ cron: '0 7 * * *', at: at(2, 15, 0) })
   })
 })

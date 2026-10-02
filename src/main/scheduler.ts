@@ -2,7 +2,7 @@
 // while NateBot is running (window or menu bar) and the Mac is awake, so on
 // launch and on wake the backend catches up on a recently missed run.
 import cron, { type ScheduledTask } from 'node-cron'
-import type { AgentConfig } from '@shared/types'
+import type { AgentConfig, Routine } from '@shared/types'
 import { lastOccurrence } from '@shared/schedule'
 
 /** How long a missed routine is still worth running late. */
@@ -12,6 +12,16 @@ export const CATCH_UP_WINDOW = 12 * 60 * 60_000
 export interface Checkpoint {
   cron: string
   at: number
+}
+
+/**
+ * The checkpoint a routine should have after its settings are saved: none while it's
+ * off, and a new or changed schedule starts counting from now, so a catch-up never
+ * runs a time from before it was set up. Returns `current` itself when nothing changes.
+ */
+export function syncedCheckpoint(routine: Routine | null, current: Checkpoint | null, now: number): Checkpoint | null {
+  if (!routine?.enabled) return null
+  return current?.cron === routine.cron ? current : { cron: routine.cron, at: now }
 }
 
 /**

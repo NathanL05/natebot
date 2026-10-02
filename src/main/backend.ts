@@ -35,7 +35,7 @@ import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { Rooms } from './rooms'
-import { dueRun, Scheduler } from './scheduler'
+import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
 
@@ -66,6 +66,10 @@ export class Backend implements NateBotApi {
   private agentsTimer: NodeJS.Timeout | undefined
   private roomsTimer: NodeJS.Timeout | undefined
   private wakeTimer: NodeJS.Timeout | undefined
+  private onResume = (): void => {
+    clearTimeout(this.wakeTimer)
+    this.wakeTimer = setTimeout(() => this.catchUpRoutines(), WAKE_DELAY_MS)
+  }
   /** Called whenever the agent list changes (tray menu). */
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
   /** Called when a notification is clicked. */
@@ -146,13 +150,11 @@ export class Backend implements NateBotApi {
     this.usage.startPolling()
     // Routines only fire while the Mac is awake and NateBot is open: run what was missed.
     this.catchUpRoutines()
-    powerMonitor.on('resume', () => {
-      clearTimeout(this.wakeTimer)
-      this.wakeTimer = setTimeout(() => this.catchUpRoutines(), WAKE_DELAY_MS)
-    })
+    powerMonitor.on('resume', this.onResume)
   }
 
   shutdown(): void {
+    powerMonitor.off('resume', this.onResume)
     clearTimeout(this.wakeTimer)
     this.usage.stopPolling()
     stopGmailConnect()
@@ -242,16 +244,16 @@ export class Backend implements NateBotApi {
     const now = Date.now()
     for (const a of agents) {
       const cp = this.db.routineCheckpoint(a.id)
-      if (!a.routine?.enabled) {
-        if (cp) this.db.setRoutineCheckpoint(a.id, null)
-      } else if (cp?.cron !== a.routine.cron) {
-        this.db.setRoutineCheckpoint(a.id, { cron: a.routine.cron, at: now })
-      }
+      const next = syncedCheckpoint(a.routine, cp, now)
+      if (next !== cp) this.db.setRoutineCheckpoint(a.id, next)
     }
     this.scheduler.sync(agents)
   }
 
   private catchUpRoutines(): void {
+    // A run that can't start would still use up the missed time: wait for a working claude.
+    const env = this.envOverride ?? this.env
+    if (!env.claudeFound || !env.loggedIn) return
     for (const a of this.store.list()) if (a.routine?.enabled) this.fireRoutine(a.id, 'catch-up')
   }
 
@@ -384,7 +386,7 @@ export class Backend implements NateBotApi {
     ensureWorkspace(agent.id)
     this.engine.system(agent.id, `Created agent: ${agent.name}`)
     if (agent.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(agent.routine.cron)}`)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
     return agent
   }
@@ -399,7 +401,7 @@ export class Backend implements NateBotApi {
       else if (before.routine?.enabled) this.engine.system(agent.id, 'Routine turned off')
     }
     if (before.model !== agent.model) this.engine.system(agent.id, `Model changed to ${agent.model}`)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
     return agent
   }
@@ -414,7 +416,7 @@ export class Backend implements NateBotApi {
     // The workspace may hold the user's attachments: move it to the Trash (recoverable).
     const dir = workspaceOf(agentId)
     if (existsSync(dir)) await shell.trashItem(dir).catch(() => undefined)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
   }
 
