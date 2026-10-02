@@ -11,7 +11,7 @@
 // happen here (where we keep the process running until the token lands),
 // never inside a short-lived agent run.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { createInterface } from 'node:readline'
 import { join } from 'node:path'
@@ -131,8 +131,18 @@ function savedEntry(server: GoogleServer = 'gmail'): { email: string | null; cli
  */
 export function googleReady(server: string): boolean {
   if (!isGoogle(server)) return true
-  const { email } = savedEntry(server)
-  return !!email && existsSync(tokenFile(email, SERVICES[server].credentialsDir))
+  const { email, clientId } = savedEntry(server)
+  if (!email) return false
+  const file = tokenFile(email, SERVICES[server].credentialsDir)
+  if (!existsSync(file)) return false
+  // A token made with a different OAuth client (e.g. before Gmail was reconnected with a new
+  // one) can't be refreshed with the current one: count it as not connected.
+  try {
+    const saved = (JSON.parse(readFileSync(file, 'utf8')) as { client_id?: unknown }).client_id
+    return typeof saved !== 'string' || !clientId || saved === clientId
+  } catch {
+    return true
+  }
 }
 
 export function gmailReady(): boolean {
@@ -249,19 +259,16 @@ export async function connectGmail(
     return { ok: false, error: 'The client ID should end in .apps.googleusercontent.com.' }
   }
   if (!clientSecret) return { ok: false, error: 'Paste the client secret too.' }
-  const uvx = findOnPath('uvx')
-  if (!uvx) {
-    return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv  (or see the README), then try again.' }
-  }
-  if (!(await portFree(CALLBACK_PORT))) {
-    log(`gmail: port ${CALLBACK_PORT} busy`)
-    return {
-      ok: false,
-      error: `Something else on this Mac is using port ${CALLBACK_PORT}, which Google sign-in needs. Quit it (or restart the Mac) and try again.`
-    }
-  }
 
-  return signIn(SERVICES.gmail, gmailEntry(email, clientId, clientSecret), email, uvx, onProgress)
+  const res = await signIn(SERVICES.gmail, gmailEntry(email, clientId, clientSecret), email, onProgress)
+  // Calendar borrows Gmail's address and OAuth client: keep it in step. With a new address its
+  // token no longer matches, and with a new client the old token is ignored, so it asks to reconnect.
+  const cal = savedEntry('gcal')
+  if (res.ok && cal.email && (cal.email !== email || cal.clientId !== clientId || cal.clientSecret !== clientSecret)) {
+    saveServer('gcal', calendarEntry(email, clientId, clientSecret))
+    log('gcal: updated to match Gmail')
+  }
+  return res
 }
 
 export async function connectCalendar(onProgress: (p: GmailProgress) => void): Promise<{ ok: boolean; error?: string }> {
@@ -269,12 +276,7 @@ export async function connectCalendar(onProgress: (p: GmailProgress) => void): P
   if (!email || !clientId || !clientSecret) {
     return { ok: false, error: 'Connect Gmail first: Calendar uses the same Google address and OAuth client.' }
   }
-  const uvx = findOnPath('uvx')
-  if (!uvx) return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv, then try again.' }
-  if (!(await portFree(CALLBACK_PORT))) {
-    return { ok: false, error: `Something else on this Mac is using port ${CALLBACK_PORT}, which Google sign-in needs. Quit it and try again.` }
-  }
-  return signIn(SERVICES.gcal, calendarEntry(email, clientId, clientSecret), email, uvx, onProgress)
+  return signIn(SERVICES.gcal, calendarEntry(email, clientId, clientSecret), email, onProgress)
 }
 
 /** Saves the entry, starts the connector, and keeps it alive through Google sign-in until a probe call works. */
@@ -282,10 +284,20 @@ async function signIn(
   service: GoogleService,
   entry: ServerEntry,
   email: string,
-  uvx: string,
   onProgress: (p: GmailProgress) => void
 ): Promise<{ ok: boolean; error?: string }> {
   const { label, server } = service
+  const uvx = findOnPath('uvx')
+  if (!uvx) {
+    return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv  (or see the README), then try again.' }
+  }
+  if (!(await portFree(CALLBACK_PORT))) {
+    log(`${server}: port ${CALLBACK_PORT} busy`)
+    return {
+      ok: false,
+      error: `Something else on this Mac is using port ${CALLBACK_PORT}, which Google sign-in needs. Quit it (or restart the Mac) and try again.`
+    }
+  }
   mkdirSync(service.credentialsDir, { recursive: true, mode: 0o700 })
   saveServer(server, entry)
   log(`${server}: connect started`)

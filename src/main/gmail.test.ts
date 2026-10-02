@@ -18,9 +18,9 @@ h.root = mkdtempSync(join(tmpdir(), 'natebot-google-'))
 const { calendarEntry, connectCalendar, gmailEntry, googleReady, CALENDAR_APPROVAL_TOOLS } = await import('./gmail')
 
 const EMAIL = 'me@example.com'
-const token = (dir: string): void => {
+const token = (dir: string, body: Record<string, unknown> = {}): void => {
   mkdirSync(join(h.root, 'credentials', dir), { recursive: true })
-  writeFileSync(join(h.root, 'credentials', dir, `${EMAIL}.json`), '{}')
+  writeFileSync(join(h.root, 'credentials', dir, `${EMAIL}.json`), JSON.stringify(body))
 }
 
 // The credentials folders are fixed when gmail.ts loads, so reset what's inside instead.
@@ -42,6 +42,14 @@ describe('googleReady', () => {
     // Gmail's token doesn't count for Calendar.
     expect(googleReady('gcal')).toBe(false)
     token('google-calendar')
+    expect(googleReady('gcal')).toBe(true)
+  })
+
+  it('ignores a token made with a different OAuth client', () => {
+    h.servers = { gcal: { env: { USER_GOOGLE_EMAIL: EMAIL, GOOGLE_OAUTH_CLIENT_ID: 'new.apps.googleusercontent.com' } } }
+    token('google-calendar', { client_id: 'old.apps.googleusercontent.com' })
+    expect(googleReady('gcal')).toBe(false)
+    token('google-calendar', { client_id: 'new.apps.googleusercontent.com' })
     expect(googleReady('gcal')).toBe(true)
   })
 })

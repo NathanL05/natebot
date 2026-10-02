@@ -283,7 +283,8 @@ export class Engine extends EventEmitter {
       const skip = agent.mcp_servers.filter((s) => !googleReady(s))
       if (skip.length) {
         const names = skip.map((s) => (s === 'gcal' ? 'Calendar' : 'Gmail')).join(' and ')
-        extraLines.push({ role: 'system', text: `${names} isn't connected yet, so this reply didn't use it. Connect it in Settings → Connected tools.` })
+        const verb = skip.length > 1 ? "aren't connected yet, so this reply didn't use them" : "isn't connected yet, so this reply didn't use it"
+        extraLines.push({ role: 'system', text: `${names} ${verb}. Connect ${skip.length > 1 ? 'them' : 'it'} in Settings → Connected tools.` })
       }
       mcp = writeRunConfig(agent, skip)
       const sessionArgs = agent.session_id ? ['--resume', agent.session_id] : ['--session-id', randomUUID()]
