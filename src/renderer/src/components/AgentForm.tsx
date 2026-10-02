@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { EFFORTS, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId } from '@shared/types'
+import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
 import { ChevronIcon } from './icons'
@@ -32,11 +33,6 @@ export function validateDraft(d: AgentDraft): string[] {
   return problems
 }
 
-const splitList = (s: string): string[] =>
-  s
-    .split(/[\s,]+/)
-    .map((t) => t.trim())
-    .filter(Boolean)
 
 export function AgentForm({
   draft,
@@ -190,18 +186,18 @@ export function AgentForm({
         </button>
         {advanced && (
           <div className="mt-3 space-y-3">
-            <Field label="Always allowed tools" hint="Space or comma separated, e.g. WebSearch WebFetch">
+            <Field label="Always allowed tools" hint="Space or comma separated, e.g. WebSearch Bash(git status:*)">
               <input
                 className={`${inputClass} font-mono text-[12px]`}
                 defaultValue={draft.allowed_tools.join(' ')}
-                onBlur={(e) => set('allowed_tools', splitList(e.target.value))}
+                onBlur={(e) => set('allowed_tools', splitToolRules(e.target.value))}
               />
             </Field>
             <Field label="Never allowed tools" hint="Blocked even if a server offers them, e.g. mcp__gmail__send_message">
               <input
                 className={`${inputClass} font-mono text-[12px]`}
                 defaultValue={draft.disallowed_tools.join(' ')}
-                onBlur={(e) => set('disallowed_tools', splitList(e.target.value))}
+                onBlur={(e) => set('disallowed_tools', splitToolRules(e.target.value))}
               />
             </Field>
           </div>
