@@ -47,7 +47,7 @@ ${agent.instructions || '(none yet: be a helpful general assistant)'}`
 function handoffRules(roster: { name: string; role: string }[]): string {
   return `- To pass a task to another agent, end your reply with a fenced block (after any proposed_actions block):
 ${FENCE}handoff
-[{"to": "Planner", "task": "Everything Planner needs, written out in full: it can't see this chat."}]
+[{"to": "Planner", "task": "Everything Planner needs, written out in full: it can't see this chat. No code fences inside."}]
 ${FENCE}
   The user confirms before anything is sent. Only hand off when another agent is clearly better placed to do the task, never to avoid the approval flow, and don't describe the block in your text. The other agents are:
 ${roster.map((r) => `  - ${r.name}: ${r.role}`).join('\n')}

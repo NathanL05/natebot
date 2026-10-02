@@ -171,7 +171,9 @@ export class StreamState {
 
 const ACTIONS_BLOCK = /```proposed_actions\s*([\s\S]*?)```/
 const ACTIONS_START = '```proposed_actions'
-const HANDOFF_BLOCK = /```handoff\s*([\s\S]*?)```/
+// The closing fence is the one on its own line: a JSON string can't contain a raw newline,
+// so a code fence written inside a task never ends the block early. The loose form is a fallback.
+const HANDOFF_BLOCKS = [/```handoff\s*([\s\S]*?)\n[ \t]*```/, /```handoff\s*([\s\S]*?)```/]
 const HANDOFF_START = '```handoff'
 
 /** Cuts the text at a block's opening fence, even a half-written one. */
@@ -192,7 +194,7 @@ export interface ParsedHandoff {
 }
 
 export function extractHandoffs(text: string): { text: string; handoffs: ParsedHandoff[]; error: string | null } {
-  const match = HANDOFF_BLOCK.exec(text)
+  const match = HANDOFF_BLOCKS.map((re) => re.exec(text)).find((m) => m !== null)
   if (!match) return { text: cutAt(text, HANDOFF_START), handoffs: [], error: null }
   const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
   try {

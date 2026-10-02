@@ -212,6 +212,7 @@ describe('handoffs', () => {
     expect(done.ok).toBe(true)
     expect(h.spawns).toHaveLength(1)
     const last = saved.at(-1)
+    expect(done.handoffTo).toBe('Planner')
     expect(last?.text).toBe('Sarah needs it Friday.')
     expect(last?.handoffs).toMatchObject([{ toAgentId: 'planner', toName: 'Planner', task: 'Block out Friday afternoon for the Sarah deadline.', status: 'pending' }])
   })

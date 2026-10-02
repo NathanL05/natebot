@@ -142,6 +142,14 @@ describe('handoff blocks', () => {
     expect(r.error).toBeNull()
   })
 
+  it('keeps a code fence written inside a task', () => {
+    const task = 'Fix this: ```sql\nSELECT 1;\n``` then rerun.'
+    const r = extractHandoffs(`Done.\n\n\`\`\`handoff\n${JSON.stringify([{ to: 'Planner', task }])}\n\`\`\``)
+    expect(r.error).toBeNull()
+    expect(r.handoffs).toEqual([{ to: 'Planner', task }])
+    expect(r.text).toBe('Done.')
+  })
+
   it('reports a block it cannot read, and still removes it', () => {
     const r = extractHandoffs('Hi\n\n```handoff\nnot json\n```')
     expect(r.text).toBe('Hi')

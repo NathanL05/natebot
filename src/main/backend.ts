@@ -293,6 +293,7 @@ export class Backend implements NateBotApi {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     void this.usage.refresh()
     if (r.needsApproval) this.notifyApproval(r)
+    else if (r.handoffTo) this.notify(r.agentId, 'Suggests a handoff', `Pass a task to ${r.handoffTo}? Open NateBot to review and confirm.`)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
     else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
@@ -564,6 +565,7 @@ export class Backend implements NateBotApi {
   }
 
   async resolveHandoff(messageId: string, handoffId: string, decision: 'send' | 'dismiss'): Promise<void> {
+    if (decision !== 'send' && decision !== 'dismiss') return
     const msg = typeof messageId === 'string' ? this.db.getMessage(messageId) : null
     const handoff = msg?.handoffs?.find((h) => h.id === handoffId)
     if (!msg || !handoff || handoff.status !== 'pending') return
