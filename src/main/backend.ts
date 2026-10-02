@@ -1,6 +1,6 @@
 // The real NateBot backend: implements the renderer API on top of the agent
 // store (YAML), the database (SQLite), the claude engine and the scheduler.
-import { app, BrowserWindow, dialog, Notification, shell } from 'electron'
+import { app, BrowserWindow, dialog, Notification, powerMonitor, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -35,11 +35,17 @@ import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { Rooms } from './rooms'
-import { Scheduler } from './scheduler'
+import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
 
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
+/** After a wake, give the network a moment before catching up on routines. */
+const WAKE_DELAY_MS = 15_000
+/** A routine that starts this much after its scheduled time is reported as running late. */
+const LATE_AFTER_MS = 2 * 60_000
+
+const clock = (ts: number): string => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 function previewOf(msg: ChatMessage | null): string {
   if (!msg) return ''
@@ -59,6 +65,11 @@ export class Backend implements NateBotApi {
   private envOverride: EnvStatus | null = null
   private agentsTimer: NodeJS.Timeout | undefined
   private roomsTimer: NodeJS.Timeout | undefined
+  private wakeTimer: NodeJS.Timeout | undefined
+  private onResume = (): void => {
+    clearTimeout(this.wakeTimer)
+    this.wakeTimer = setTimeout(() => this.catchUpRoutines(), WAKE_DELAY_MS)
+  }
   /** Called whenever the agent list changes (tray menu). */
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
   /** Called when a notification is clicked. */
@@ -99,7 +110,7 @@ export class Backend implements NateBotApi {
       }
     })
 
-    this.scheduler = new Scheduler((id) => this.fireRoutine(id))
+    this.scheduler = new Scheduler((id) => this.fireRoutine(id, 'tick'))
 
     this.usage.on('changed', () => {
       const info = this.usage.get()
@@ -116,11 +127,11 @@ export class Backend implements NateBotApi {
       }
     }
     this.store.on('changed', () => {
-      this.scheduler.sync(this.store.list())
+      this.syncRoutines()
       this.emitAgents()
       this.emitRooms()
     })
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
 
     // Editors often replace the file, so poll its stat rather than fs.watch.
     watchFile(MCP_FILE, { interval: 1500 }, () => emit('mcpServers', this.serverList()))
@@ -137,9 +148,14 @@ export class Backend implements NateBotApi {
     log(`startup: version=${app.getVersion()} packaged=${app.isPackaged} pathDirs=${path.split(':').length}`)
     await this.recheckEnv()
     this.usage.startPolling()
+    // Routines only fire while the Mac is awake and NateBot is open: run what was missed.
+    this.catchUpRoutines()
+    powerMonitor.on('resume', this.onResume)
   }
 
   shutdown(): void {
+    powerMonitor.off('resume', this.onResume)
+    clearTimeout(this.wakeTimer)
     this.usage.stopPolling()
     stopGmailConnect()
     unwatchFile(MCP_FILE)
@@ -219,27 +235,56 @@ export class Backend implements NateBotApi {
     else if (!focused && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
 
-  private fireRoutine(agentId: string): void {
+  /**
+   * Schedules the enabled routines. A new or changed schedule starts counting
+   * from now, so a catch-up never runs a time from before it was set up.
+   */
+  private syncRoutines(): void {
+    const agents = this.store.list()
+    const now = Date.now()
+    for (const a of agents) {
+      const cp = this.db.routineCheckpoint(a.id)
+      const next = syncedCheckpoint(a.routine, cp, now)
+      if (next !== cp) this.db.setRoutineCheckpoint(a.id, next)
+    }
+    this.scheduler.sync(agents)
+  }
+
+  private catchUpRoutines(): void {
+    // A run that can't start would still use up the missed time: wait for a working claude.
+    const env = this.envOverride ?? this.env
+    if (!env.claudeFound || !env.loggedIn) return
+    for (const a of this.store.list()) if (a.routine?.enabled) this.fireRoutine(a.id, 'catch-up')
+  }
+
+  private fireRoutine(agentId: string, trigger: 'tick' | 'catch-up'): void {
     const agent = this.store.get(agentId)
     if (!agent?.routine?.enabled) return
-    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    const now = Date.now()
+    const due = dueRun(agent.routine.cron, this.db.routineCheckpoint(agentId), now, trigger)
+    if (due === null) return
+    // From here this scheduled time counts as dealt with, whether it runs or is skipped.
+    this.db.setRoutineCheckpoint(agentId, { cron: agent.routine.cron, at: now })
+    const late = now - due > LATE_AFTER_MS
+    if (late) log(`routine: agent=${agentId} catching up on ${new Date(due).toISOString()} (${trigger})`)
+    const time = clock(now)
+    const dueText = late ? ` (it was due at ${new Date(due).toDateString() === new Date(now).toDateString() ? '' : 'yesterday at '}${clock(due)})` : ''
     // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
     const ready = configuredServersFor(agent).filter((n) => n !== 'gmail' || gmailReady())
     const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
     if (missing.length) {
-      this.engine.system(agentId, `Routine skipped at ${time}: ${missing.join(', ')} isn't set up yet`)
+      this.engine.system(agentId, `Routine skipped at ${time}${dueText}: ${missing.join(', ')} isn't set up yet`)
       this.emitAgents()
       return
     }
     const wait = this.usage.waitMs()
     if (wait > 0) {
-      const at = new Date(Date.now() + wait).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-      this.engine.system(agentId, `Routine skipped at ${time}: usage limit reached (resets at ${at})`)
+      this.engine.system(agentId, `Routine skipped at ${time}${dueText}: usage limit reached (resets at ${clock(now + wait)})`)
       this.emitAgents()
       return
     }
-    this.engine.system(agentId, `Routine ran at ${time}`)
-    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [] })
+    this.engine.system(agentId, `Routine ran at ${time}${dueText}`)
+    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
   }
 
   private requireAgent(agentId: unknown): AgentConfig {
@@ -341,7 +386,7 @@ export class Backend implements NateBotApi {
     ensureWorkspace(agent.id)
     this.engine.system(agent.id, `Created agent: ${agent.name}`)
     if (agent.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(agent.routine.cron)}`)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
     return agent
   }
@@ -356,7 +401,7 @@ export class Backend implements NateBotApi {
       else if (before.routine?.enabled) this.engine.system(agent.id, 'Routine turned off')
     }
     if (before.model !== agent.model) this.engine.system(agent.id, `Model changed to ${agent.model}`)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
     return agent
   }
@@ -371,7 +416,7 @@ export class Backend implements NateBotApi {
     // The workspace may hold the user's attachments: move it to the Trash (recoverable).
     const dir = workspaceOf(agentId)
     if (existsSync(dir)) await shell.trashItem(dir).catch(() => undefined)
-    this.scheduler.sync(this.store.list())
+    this.syncRoutines()
     this.emitAgents()
   }
 

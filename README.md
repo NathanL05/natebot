@@ -267,6 +267,11 @@ Turn on a routine in an agent's settings. Pick "Weekdays at 8:00 AM" (or write y
 should do. The **Routines** view (clock icon, ⇧⌘R) lists every routine with its next run, last result, an on/off
 toggle and **Run now**. You get a macOS notification when a routine finishes or an agent needs your approval.
 
+Routines fire while NateBot is running and the Mac is awake. If one was missed in the last 12 hours (the Mac was
+asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, and the chat says so: *Routine ran
+at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A new or changed schedule
+starts counting from when you save it.
+
 ## Avatars
 
 Each agent gets a mascot (a coloured shape with a small face) generated from its name, so it always looks
@@ -400,7 +405,8 @@ Connect button does.
 ## Known limitations
 
 - **Routines only run while NateBot is running** (window open or in the menu bar) **and the Mac is awake.**
-  Runs missed while the Mac was asleep or NateBot was quit are not caught up. Turn on Launch at login.
+  A run missed in the last 12 hours is caught up once on launch or wake; older ones are skipped. Turn on
+  Launch at login. To run at exact times with the lid closed, schedule a wake: `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`.
 - **Shared usage limit.** Agents use the same 5-hour and weekly limits as your own Claude Code use. Haiku uses
   the least. Several agents can run at once (up to 3), which uses the limit faster.
 - **Personal use only.** NateBot drives your personal Claude subscription on your own Mac. Don't share it with

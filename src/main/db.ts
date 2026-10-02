@@ -2,6 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import type { ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
+import type { Checkpoint } from './scheduler'
 
 interface MessageRow {
   id: string
@@ -98,6 +99,8 @@ export class Db {
     // Added after the first release: which sidebar folder a chat is in.
     const cols = this.db.prepare('PRAGMA table_info(agent_state)').all() as { name: string }[]
     if (!cols.some((c) => c.name === 'folder_id')) this.db.exec('ALTER TABLE agent_state ADD COLUMN folder_id TEXT')
+    // Added later: up to when an agent's routine times have been dealt with (JSON Checkpoint).
+    if (!cols.some((c) => c.name === 'routine_checkpoint')) this.db.exec('ALTER TABLE agent_state ADD COLUMN routine_checkpoint TEXT')
   }
 
   close(): void {
@@ -189,6 +192,25 @@ export class Db {
     const notes = this.peekNotes(agentId)
     if (notes.length) this.db.prepare(`UPDATE agent_state SET notes = '[]' WHERE agent_id = ?`).run(agentId)
     return notes
+  }
+
+  // ---- routine checkpoints ----
+
+  routineCheckpoint(agentId: string): Checkpoint | null {
+    const row = this.db.prepare('SELECT routine_checkpoint FROM agent_state WHERE agent_id = ?').get(agentId) as
+      | { routine_checkpoint: string | null }
+      | undefined
+    try {
+      const cp = row?.routine_checkpoint ? (JSON.parse(row.routine_checkpoint) as Checkpoint) : null
+      return cp && typeof cp.cron === 'string' && typeof cp.at === 'number' ? cp : null
+    } catch {
+      return null
+    }
+  }
+
+  setRoutineCheckpoint(agentId: string, cp: Checkpoint | null): void {
+    this.ensureState(agentId)
+    this.db.prepare('UPDATE agent_state SET routine_checkpoint = ? WHERE agent_id = ?').run(cp ? JSON.stringify(cp) : null, agentId)
   }
 
   // ---- runs ----
