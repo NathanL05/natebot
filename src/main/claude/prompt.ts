@@ -23,7 +23,7 @@ const FENCE = '```'
  * Must stay byte-identical across turns for a given agent so the prompt cache
  * is reused: nothing time- or message-dependent belongs here.
  */
-export function systemPrompt(agent: AgentConfig, toolNotes: string[] = []): string {
+export function systemPrompt(agent: AgentConfig, toolNotes: string[] = [], roster: { name: string; role: string }[] = []): string {
   return `You are "${agent.name}", one of the user's personal agents inside NateBot, a Mac chat app. Each agent has its own job; yours is described below.
 
 NateBot house style:
@@ -36,11 +36,22 @@ ${FENCE}proposed_actions
 [{"type": "send_email", "summary": "Reply to Sarah re: deadline", "tool": "mcp__gmail__send_message", "details": {"to": "sarah@example.com", "subject": "Re: Deadline", "body": "Hi Sarah, ..."}}]
 ${FENCE}
   "type" is a short snake_case verb. "summary" is one line the user sees. "tool" is the exact name of the tool that would carry it out. "details" must contain everything needed to do it exactly as approved. The user gets Approve / Edit / Reject buttons, and approved actions are carried out separately. Only include the block when something needs approval, and don't describe the block in your text.
-- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
+${roster.length ? handoffRules(roster) : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
 - Each message starts with a [Current time: …] line; use it for dates and scheduling.
 ${toolNotes.length ? `\nNotes about your connected tools:\n${toolNotes.map((n) => `- ${n}`).join('\n')}\n` : ''}
 Your instructions from the user:
 ${agent.instructions || '(none yet: be a helpful general assistant)'}`
+}
+
+/** How to hand a task to another agent. Only in one-on-one chats, and only when there are other agents. */
+function handoffRules(roster: { name: string; role: string }[]): string {
+  return `- To pass a task to another agent, end your reply with a fenced block (after any proposed_actions block):
+${FENCE}handoff
+[{"to": "Planner", "task": "Everything Planner needs, written out in full: it can't see this chat."}]
+${FENCE}
+  The user confirms before anything is sent. Only hand off when another agent is clearly better placed to do the task, never to avoid the approval flow, and don't describe the block in your text. The other agents are:
+${roster.map((r) => `  - ${r.name}: ${r.role}`).join('\n')}
+`
 }
 
 /** One-off prompt used after the user approves a proposed action. */

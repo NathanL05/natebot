@@ -36,6 +36,7 @@ import * as skills from './skills'
 import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
+import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { Rooms } from './rooms'
 import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
@@ -560,6 +561,32 @@ export class Backend implements NateBotApi {
     // executeAction has marked it executing (or left it pending if usage is limited).
     this.clearApprovalNotice(messageId, msg)
     await run
+  }
+
+  async resolveHandoff(messageId: string, handoffId: string, decision: 'send' | 'dismiss'): Promise<void> {
+    const msg = typeof messageId === 'string' ? this.db.getMessage(messageId) : null
+    const handoff = msg?.handoffs?.find((h) => h.id === handoffId)
+    if (!msg || !handoff || handoff.status !== 'pending') return
+    const from = this.store.get(msg.agentId)
+    if (!from) return
+    const target = this.store.get(handoff.toAgentId)
+
+    handoff.status = decision === 'send' && target ? 'sent' : 'dismissed'
+    this.db.saveMessage(msg)
+    emit('message', msg)
+
+    if (decision === 'dismiss') {
+      this.db.addNote(from.id, `The user dismissed your handoff to ${handoff.toName}. Don't send it again.`)
+      this.engine.system(from.id, `Dismissed handoff to ${handoff.toName}`)
+    } else if (!target) {
+      this.engine.system(from.id, `${handoff.toName} no longer exists, so nothing was handed off`)
+    } else {
+      this.db.addNote(from.id, `The user approved your handoff to ${target.name}, and it was sent.`)
+      this.engine.system(from.id, `Handed off to ${target.name}`)
+      this.engine.system(target.id, `Handed off from ${from.name}: ${handoff.task}`)
+      this.engine.enqueue(target.id, { source: 'chat', prompt: handoffPrompt(from.name, handoff.task), attachments: [] })
+    }
+    this.emitAgents()
   }
 
   async listRoutines(): Promise<RoutineInfo[]> {

@@ -97,6 +97,18 @@ export interface ProposedAction {
   result?: string
 }
 
+export type HandoffStatus = 'pending' | 'sent' | 'dismissed'
+
+/** An agent's proposal to hand a task to another agent, sent only when the user confirms. */
+export interface Handoff {
+  id: string
+  toAgentId: string
+  /** The target's name when it was proposed (the id is what counts). */
+  toName: string
+  task: string
+  status: HandoffStatus
+}
+
 export type MessageRole = 'user' | 'agent' | 'system' | 'error'
 
 export interface ChatMessage {
@@ -108,6 +120,7 @@ export interface ChatMessage {
   streaming?: boolean
   tools?: ToolUse[]
   actions?: ProposedAction[]
+  handoffs?: Handoff[]
   attachments?: string[]
   /** Group chats only: the agent who wrote this agent message. */
   speakerId?: string

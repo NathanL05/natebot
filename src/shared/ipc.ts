@@ -55,6 +55,9 @@ export interface NateBotApi {
     details?: Record<string, unknown>
   ): Promise<void>
 
+  /** Sends (or dismisses) a task an agent proposed handing to another agent. */
+  resolveHandoff(messageId: string, handoffId: string, decision: 'send' | 'dismiss'): Promise<void>
+
   listRoutines(): Promise<RoutineInfo[]>
   setRoutineEnabled(agentId: string, enabled: boolean): Promise<void>
   runRoutineNow(agentId: string): Promise<void>
@@ -99,6 +102,7 @@ export const API_METHODS = [
   'deleteFolder',
   'moveToFolder',
   'resolveAction',
+  'resolveHandoff',
   'listRoutines',
   'setRoutineEnabled',
   'runRoutineNow',

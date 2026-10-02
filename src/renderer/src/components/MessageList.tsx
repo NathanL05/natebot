@@ -4,6 +4,7 @@ import { agentPicture } from '../lib/avatars'
 import { basename, clockTime, separatorTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
+import { HandoffCard } from './HandoffCard'
 import { AlertIcon, PaperclipIcon } from './icons'
 import { Markdown } from './Markdown'
 import { ToolLines } from './ToolLines'
@@ -112,6 +113,7 @@ function Message({
         )
       )}
       {msg.actions?.map((a) => <ActionCard key={a.id} messageId={msg.id} action={a} />)}
+      {msg.handoffs?.map((h) => <HandoffCard key={h.id} messageId={msg.id} handoff={h} />)}
     </div>
   )
   if (!msg.speakerId) return body

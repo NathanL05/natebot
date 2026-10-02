@@ -54,6 +54,8 @@ const emailAgent: AgentConfig = {
   session_id: null
 }
 
+const helper: AgentConfig = { ...emailAgent, id: 'planner', name: 'Planner', instructions: 'You plan my day. Keep it short.', mcp_servers: [], disallowed_tools: [] }
+
 const SEND = 'mcp__gmail__send_gmail_message'
 
 const flag = (s: Spawn | undefined, name: string): string | undefined => {
@@ -75,7 +77,7 @@ function setup(agent: AgentConfig = emailAgent) {
   const saved: ChatMessage[] = []
   const notes: string[] = []
   const engine = new Engine({
-    store: { get: () => agent, require: () => agent, setSession: vi.fn() } as unknown as AgentStore,
+    store: { get: () => agent, require: () => agent, list: () => [agent, helper], setSession: vi.fn() } as unknown as AgentStore,
     db: {
       saveMessage: (m: ChatMessage) => saved.push(structuredClone(m)),
       startRun: vi.fn(),
@@ -197,5 +199,39 @@ describe('approved actions', () => {
     await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
     expect(a.status).toBe('failed')
     expect(a.result).toMatch(/never called/)
+  })
+})
+
+describe('handoffs', () => {
+  const block = '```handoff\n[{"to":"planner","task":"Block out Friday afternoon for the Sarah deadline."}]\n```'
+
+  it('turns a proposed handoff into a pending card without running anything', async () => {
+    const { run, saved } = setup()
+    h.events.push(...reply(`Sarah needs it Friday.\n\n${block}`))
+    const done = await run('Check the inbox')
+    expect(done.ok).toBe(true)
+    expect(h.spawns).toHaveLength(1)
+    const last = saved.at(-1)
+    expect(last?.text).toBe('Sarah needs it Friday.')
+    expect(last?.handoffs).toMatchObject([{ toAgentId: 'planner', toName: 'Planner', task: 'Block out Friday afternoon for the Sarah deadline.', status: 'pending' }])
+  })
+
+  it('tells the agent about the other agents, but only in one-on-one chats', async () => {
+    const { run } = setup()
+    h.events.push(...reply('Hi'))
+    await run('Hi')
+    const prompt = h.spawns[0]?.args[h.spawns[0].args.indexOf('--append-system-prompt') + 1] ?? ''
+    expect(prompt).toContain('```handoff')
+    expect(prompt).toContain('- Planner: You plan my day.')
+    expect(prompt).not.toContain('- Email Agent:') // not itself
+  })
+
+  it('ignores a handoff to an agent that does not exist and says so', async () => {
+    const { run, saved } = setup()
+    h.events.push(...reply('Done.\n\n```handoff\n[{"to":"Accountant","task":"File my taxes"}]\n```'))
+    await run('Go')
+    expect(saved.at(-2)?.handoffs).toBeUndefined()
+    expect(saved.at(-1)).toMatchObject({ role: 'error' })
+    expect(saved.at(-1)?.text).toContain('"Accountant"')
   })
 })

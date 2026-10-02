@@ -171,16 +171,46 @@ export class StreamState {
 
 const ACTIONS_BLOCK = /```proposed_actions\s*([\s\S]*?)```/
 const ACTIONS_START = '```proposed_actions'
+const HANDOFF_BLOCK = /```handoff\s*([\s\S]*?)```/
+const HANDOFF_START = '```handoff'
 
-/** While streaming, hide a proposed_actions block (even a half-written one). */
+/** Cuts the text at a block's opening fence, even a half-written one. */
+function cutAt(text: string, ...starts: string[]): string {
+  const found = starts.map((s) => text.indexOf(s)).filter((i) => i !== -1)
+  return found.length ? text.slice(0, Math.min(...found)).trimEnd() : text
+}
+
+/** While streaming, hide proposed_actions and handoff blocks (even half-written ones). */
 export function hideActionsBlock(text: string): string {
-  const i = text.indexOf(ACTIONS_START)
-  return i === -1 ? text : text.slice(0, i).trimEnd()
+  return cutAt(text, ACTIONS_START, HANDOFF_START)
+}
+
+/** A handoff block as written by the agent. Targets are looked up by the caller. */
+export interface ParsedHandoff {
+  to: string
+  task: string
+}
+
+export function extractHandoffs(text: string): { text: string; handoffs: ParsedHandoff[]; error: string | null } {
+  const match = HANDOFF_BLOCK.exec(text)
+  if (!match) return { text: cutAt(text, HANDOFF_START), handoffs: [], error: null }
+  const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
+  try {
+    const parsed = JSON.parse(match[1] ?? '[]') as unknown
+    const list = Array.isArray(parsed) ? parsed : [parsed]
+    const handoffs = list
+      .filter((h): h is Json => !!h && typeof h === 'object')
+      .filter((h) => typeof h['to'] === 'string' && typeof h['task'] === 'string')
+      .map((h) => ({ to: String(h['to']), task: String(h['task']) }))
+    return { text: clean, handoffs, error: null }
+  } catch {
+    return { text: clean, handoffs: [], error: 'The agent proposed a handoff but its format was invalid, so it was ignored.' }
+  }
 }
 
 export function extractActions(text: string): { text: string; actions: ProposedAction[]; error: string | null } {
   const match = ACTIONS_BLOCK.exec(text)
-  if (!match) return { text: hideActionsBlock(text), actions: [], error: null }
+  if (!match) return { text: cutAt(text, ACTIONS_START), actions: [], error: null }
   const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
   try {
     const parsed = JSON.parse(match[1] ?? '[]') as unknown
