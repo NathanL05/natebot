@@ -157,6 +157,9 @@ export class Backend implements NateBotApi {
   }
 
   shutdown(): void {
+    // Their buttons stop working once NateBot quits, so don't leave them on screen.
+    for (const n of this.approvalNotices.values()) n.close()
+    this.approvalNotices.clear()
     powerMonitor.off('resume', this.onResume)
     clearTimeout(this.wakeTimer)
     this.usage.stopPolling()
@@ -269,9 +272,11 @@ export class Backend implements NateBotApi {
 
   private async approveFromNotification(agentId: string, messageId: string, actionId: string): Promise<void> {
     await this.resolveAction(messageId, actionId, 'approve').catch((e: Error) => log(`approve from notification failed: ${e.message}`))
-    // Approval can be refused before it starts (usage limit): say so outside the app too.
+    // Approval can be refused before it starts: say so outside the app too.
     const still = this.db.getMessage(messageId)?.actions?.find((a) => a.id === actionId)
-    if (still?.status === 'pending') this.notify(agentId, 'Not done yet', `Usage limit reached. Approve "${still.summary}" in NateBot after it resets.`)
+    if (still?.status !== 'pending') return
+    const why = this.usage.waitMs() > 0 ? 'Usage limit reached. Approve it in NateBot after it resets.' : "It couldn't start. Open NateBot to check it."
+    this.notify(agentId, 'Not done yet', `${still.summary}: ${why}`)
   }
 
   /** Removes the approval notification once none of its message's actions are pending. */

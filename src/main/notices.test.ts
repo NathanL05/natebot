@@ -18,7 +18,7 @@ describe('approvalNotice', () => {
   it('offers buttons for a single pending action and shows who and what', () => {
     const n = approvalNotice([action()])
     expect(n?.action?.id).toBe('a1')
-    expect(n?.body).toBe('Reply to Sarah re: deadline\nTo: sarah@example.com\nSubject: Re: Deadline')
+    expect(n?.body).toBe('Reply to Sarah re: deadline\nVia Gmail · send_gmail_message\nTo: sarah@example.com\nSubject: Re: Deadline')
   })
 
   it('never puts the message body in the notification', () => {
@@ -35,6 +35,18 @@ describe('approvalNotice', () => {
     expect(approvalNotice([action({ status: 'done' })])).toBeNull()
     expect(approvalNotice(undefined)).toBeNull()
     expect(approvalNotice([action({ status: 'rejected' }), action({ id: 'a2' })])?.action?.id).toBe('a2')
+  })
+
+  it('sends you to the app when a detail would be carried out unseen', () => {
+    // A recipient under a key the notification doesn't show: no one-tap Approve.
+    const n = approvalNotice([action({ summary: 'Archive the newsletter', details: { recipient: 'x@evil.com', body: '…' } })])
+    expect(n?.action).toBeNull()
+    expect(n?.body).toContain('Via Gmail · send_gmail_message')
+  })
+
+  it('shows recipients given as objects', () => {
+    const body = approvalNotice([action({ details: { to: [{ email: 'boss@x.com', name: 'Boss' }], subject: 'Hi' } })])?.body
+    expect(body).toContain('To: boss@x.com Boss')
   })
 
   it('joins list recipients and shortens long values', () => {

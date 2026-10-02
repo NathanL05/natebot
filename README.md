@@ -259,9 +259,9 @@ NateBot shows the proposal as a card with **Approve / Edit / Reject**:
 - **Reject** tells the agent not to do it.
 
 You don't have to open the app: the **Needs your approval** notification has **Approve** and **Reject** buttons
-when there's a single action. It shows the summary and key details (recipient, subject, date), never the message
-body, so open the chat with a click if you want to read or edit it first. With several actions, the notification
-just opens the chat. Approving or rejecting in the app removes the notification, and you get a **Done** or
+when there's a single action. It names the tool and shows the key details (recipients, subject, date), never the
+message body, so click it to read or edit the full card first. If the action has any other detail the
+notification can't show, or there are several actions, it has no buttons and just opens the chat. Approving or rejecting in the app removes the notification, and you get a **Done** or
 **Action failed** notification when an approved action finishes while NateBot isn't in front. Buttons only work
 while NateBot is still running from when the notification arrived.
 
