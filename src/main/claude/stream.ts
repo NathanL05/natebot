@@ -15,9 +15,37 @@ export interface RunResult {
   subtype: string
   text: string
   permissionDenials: number
+  /** What the run used, from the result event; null if claude didn't report it. */
+  tokens: RunTokens | null
+}
+
+/** Token counts for one claude run (all API calls in it), plus claude's API-price estimate. */
+export interface RunTokens {
+  input: number
+  cacheWrite: number
+  cacheRead: number
+  output: number
+  /** What the run would cost at API prices: a model-aware weight, not a bill. */
+  costUsd: number | null
 }
 
 type Json = Record<string, unknown>
+
+const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+
+function tokensOf(ev: Json): RunTokens | null {
+  const u = ev['usage']
+  if (!u || typeof u !== 'object') return null
+  const usage = u as Json
+  const cost = ev['total_cost_usd']
+  return {
+    input: count(usage['input_tokens']),
+    cacheWrite: count(usage['cache_creation_input_tokens']),
+    cacheRead: count(usage['cache_read_input_tokens']),
+    output: count(usage['output_tokens']),
+    costUsd: typeof cost === 'number' && Number.isFinite(cost) ? cost : null
+  }
+}
 
 const join = (a: string, b: string): string => (a && b ? `${a}\n\n${b}` : a || b)
 
@@ -114,7 +142,8 @@ export class StreamState {
           isError: ev['is_error'] === true || ev['subtype'] !== 'success',
           subtype: String(ev['subtype'] ?? ''),
           text: typeof ev['result'] === 'string' ? ev['result'] : '',
-          permissionDenials: denials
+          permissionDenials: denials,
+          tokens: tokensOf(ev)
         }
         if (typeof ev['session_id'] === 'string') this.sessionId = ev['session_id']
         // Anything still "running" at the end didn't report back.

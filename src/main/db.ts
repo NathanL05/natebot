@@ -1,7 +1,9 @@
 // Chat history, per-agent state and run logs in SQLite (~/NateBot/data.db).
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
-import type { ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
+import { DELETED_AGENT_ID } from '@shared/usage'
+import type { AgentUsage, ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
+import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
 interface MessageRow {
@@ -31,7 +33,7 @@ interface RoomRow {
 export interface RunRecord {
   id: string
   agentId: string
-  source: 'chat' | 'routine' | 'action'
+  source: 'chat' | 'routine' | 'action' | 'room'
   startedAt: number
   endedAt: number | null
   ok: boolean | null
@@ -81,6 +83,7 @@ export class Db {
         summary TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_runs_agent ON runs(agent_id, source, started_at);
+      CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at);
       CREATE TABLE IF NOT EXISTS rooms (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -101,6 +104,12 @@ export class Db {
     if (!cols.some((c) => c.name === 'folder_id')) this.db.exec('ALTER TABLE agent_state ADD COLUMN folder_id TEXT')
     // Added later: up to when an agent's routine times have been dealt with (JSON Checkpoint).
     if (!cols.some((c) => c.name === 'routine_checkpoint')) this.db.exec('ALTER TABLE agent_state ADD COLUMN routine_checkpoint TEXT')
+    // Added later: what each run used (null for runs before this, or that never reported).
+    const runCols = this.db.prepare('PRAGMA table_info(runs)').all() as { name: string }[]
+    for (const col of ['input_tokens', 'cache_write_tokens', 'cache_read_tokens', 'output_tokens']) {
+      if (!runCols.some((c) => c.name === col)) this.db.exec(`ALTER TABLE runs ADD COLUMN ${col} INTEGER`)
+    }
+    if (!runCols.some((c) => c.name === 'cost_usd')) this.db.exec('ALTER TABLE runs ADD COLUMN cost_usd REAL')
   }
 
   close(): void {
@@ -219,8 +228,45 @@ export class Db {
     this.db.prepare('INSERT INTO runs (id, agent_id, source, started_at) VALUES (?, ?, ?, ?)').run(id, agentId, source, Date.now())
   }
 
-  finishRun(id: string, ok: boolean, summary: string): void {
-    this.db.prepare('UPDATE runs SET ended_at = ?, ok = ?, summary = ? WHERE id = ?').run(Date.now(), ok ? 1 : 0, summary.slice(0, 300), id)
+  finishRun(id: string, ok: boolean, summary: string, tokens: RunTokens | null = null): void {
+    this.db
+      .prepare(
+        `UPDATE runs SET ended_at = ?, ok = ?, summary = ?, input_tokens = ?, cache_write_tokens = ?,
+         cache_read_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`
+      )
+      .run(
+        Date.now(),
+        ok ? 1 : 0,
+        summary.slice(0, 300),
+        tokens?.input ?? null,
+        tokens?.cacheWrite ?? null,
+        tokens?.cacheRead ?? null,
+        tokens?.output ?? null,
+        tokens?.costUsd ?? null,
+        id
+      )
+  }
+
+  /** Per-agent totals for runs started since `since` (every kind: chat, routine, action, group chat). */
+  usageByAgent(since: number): AgentUsage[] {
+    const rows = this.db
+      .prepare(
+        `SELECT agent_id, COUNT(*) AS runs,
+           COALESCE(SUM(input_tokens + cache_write_tokens + cache_read_tokens), 0) AS input,
+           COALESCE(SUM(output_tokens), 0) AS output,
+           COALESCE(SUM(cost_usd), 0) AS cost,
+           SUM(CASE WHEN input_tokens IS NULL THEN 1 ELSE 0 END) AS unmeasured
+         FROM runs WHERE started_at >= ? AND ended_at IS NOT NULL GROUP BY agent_id`
+      )
+      .all(since) as { agent_id: string; runs: number; input: number; output: number; cost: number; unmeasured: number }[]
+    return rows.map((r) => ({
+      agentId: r.agent_id,
+      runs: r.runs,
+      inputTokens: r.input,
+      outputTokens: r.output,
+      costUsd: r.cost,
+      unmeasuredRuns: r.unmeasured
+    }))
   }
 
   lastRun(agentId: string, source: RunRecord['source']): RunRecord | null {
@@ -244,7 +290,8 @@ export class Db {
   deleteAgent(agentId: string): void {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
-    this.db.prepare('DELETE FROM runs WHERE agent_id = ?').run(agentId)
+    // Keep what the agent used, so usage totals don't shift onto the others.
+    this.db.prepare('UPDATE runs SET agent_id = ? WHERE agent_id = ?').run(DELETED_AGENT_ID, agentId)
   }
 
   // ---- sidebar folders ----

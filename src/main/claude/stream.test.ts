@@ -75,7 +75,7 @@ describe('StreamState', () => {
     expect(s.tools[0]?.status).toBe('error')
 
     s.handle({ type: 'result', subtype: 'success', result: 'Done', session_id: 'sess-2', permission_denials: [{}, {}] })
-    expect(s.result).toEqual({ isError: false, subtype: 'success', text: 'Done', permissionDenials: 2 })
+    expect(s.result).toEqual({ isError: false, subtype: 'success', text: 'Done', permissionDenials: 2, tokens: null })
     expect(s.sessionId).toBe('sess-2')
     // A tool that never reported back is closed out with the run.
     expect(s.tools[1]?.status).toBe('done')
@@ -91,5 +91,43 @@ describe('StreamState', () => {
     const s = new StreamState()
     s.handle({ type: 'rate_limit_event', rate_limit_info: { status: 'rejected', resetsAt: 123 } })
     expect(s.rateLimit).toEqual({ status: 'rejected', resetsAt: 123 })
+  })
+})
+
+describe('run tokens', () => {
+  const result = (extra: Record<string, unknown>): Record<string, unknown> => ({ type: 'result', subtype: 'success', is_error: false, result: 'ok', ...extra })
+
+  it('reads the token counts and estimated cost from the result event', () => {
+    const state = new StreamState()
+    state.handle(
+      result({
+        usage: { input_tokens: 10, cache_creation_input_tokens: 5000, cache_read_input_tokens: 6000, output_tokens: 300 },
+        total_cost_usd: 0.0421
+      })
+    )
+    expect(state.result?.tokens).toEqual({ input: 10, cacheWrite: 5000, cacheRead: 6000, output: 300, costUsd: 0.0421 })
+  })
+
+  it('matches a real two-call run: the result totals every API call', () => {
+    // Captured from `claude -p` (Haiku, one Read tool call = two API calls).
+    const state = new StreamState()
+    state.handle(
+      result({
+        num_turns: 2,
+        usage: { input_tokens: 18, cache_creation_input_tokens: 34161, cache_read_input_tokens: 33942, output_tokens: 215 },
+        total_cost_usd: 0.0728092
+      })
+    )
+    expect(state.result?.tokens).toEqual({ input: 18, cacheWrite: 34161, cacheRead: 33942, output: 215, costUsd: 0.0728092 })
+  })
+
+  it('is null when claude reports no usage, and ignores bad numbers', () => {
+    const none = new StreamState()
+    none.handle(result({}))
+    expect(none.result?.tokens).toBeNull()
+
+    const odd = new StreamState()
+    odd.handle(result({ usage: { input_tokens: 'many', output_tokens: -5 }, total_cost_usd: 'free' }))
+    expect(odd.result?.tokens).toEqual({ input: 0, cacheWrite: 0, cacheRead: 0, output: 0, costUsd: null })
   })
 })

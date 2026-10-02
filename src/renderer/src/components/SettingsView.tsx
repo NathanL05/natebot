@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { EFFORTS, MODELS, type EffortLevel, type ModelId, type Theme, type UsageWindow } from '@shared/types'
+import { useEffect, useState, type ReactNode } from 'react'
+import { EFFORTS, MODELS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
 import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
@@ -40,6 +41,73 @@ function Meter({ window: w, limited }: { window: UsageWindow; limited: boolean }
         {limited ? '100%' : pct(w.utilization, 1)}
       </span>
     </div>
+  )
+}
+
+type Period = 'fiveHour' | 'sevenDay'
+
+/** Which agents used what over the current 5-hour window or week (NateBot's own runs only). */
+function AgentUsageRows() {
+  const agents = useStore((s) => s.agents)
+  const usage = useStore((s) => s.usage)
+  const [period, setPeriod] = useState<Period>('sevenDay')
+  const [data, setData] = useState<UsageBreakdown | null>(null)
+  // Changes whenever an agent starts or finishes a run, so the list never lags behind.
+  const activity = agents.map((a) => a.status).join()
+
+  // Reload on open, when a run starts or finishes, and when the usage numbers refresh.
+  useEffect(() => {
+    let live = true
+    void api.usageBreakdown().then((d) => live && setData(d))
+    return () => {
+      live = false
+    }
+  }, [usage?.updatedAt, activity])
+
+  const rows = rankUsage(data?.[period] ?? [])
+  const unmeasured = rows.reduce((n, r) => n + r.unmeasuredRuns, 0)
+  const nameOf = (id: string): string => (id === DELETED_AGENT_ID ? 'Deleted agents' : (agents.find((a) => a.id === id)?.name ?? 'Unknown agent'))
+  const since = data ? (period === 'fiveHour' ? data.fiveHourSince : data.sevenDaySince) : null
+
+  return (
+    <>
+      <Row
+        label="By agent"
+        hint={`Share of what NateBot's own runs used${since ? ` since ${new Date(since).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}. Claude Code and claude.ai aren't included.`}
+      >
+        <Segmented<Period>
+          value={period}
+          onChange={setPeriod}
+          options={[
+            { value: 'fiveHour', label: '5 hours' },
+            { value: 'sevenDay', label: 'Week' }
+          ]}
+        />
+      </Row>
+      {rows.length === 0 ? (
+        <div className="px-4 py-3 text-[12px] text-muted">{data ? 'No runs in this period yet.' : 'Loading…'}</div>
+      ) : (
+        rows.map((r) => (
+          <div key={r.agentId} className="flex items-center gap-3 px-4 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px]">{nameOf(r.agentId)}</div>
+              <div className="text-[11px] text-muted tabular-nums">
+                {r.runs} run{r.runs === 1 ? '' : 's'} · {formatTokens(r.inputTokens)} in · {formatTokens(r.outputTokens)} out
+              </div>
+            </div>
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-elev-2">
+              <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(r.share * 100)}%` }} />
+            </div>
+            <span className="w-10 text-right text-[12px] text-muted tabular-nums">{Math.round(r.share * 100)}%</span>
+          </div>
+        ))
+      )}
+      {unmeasured > 0 && (
+        <div className="px-4 py-2 text-[11px] text-muted">
+          {unmeasured} run{unmeasured === 1 ? '' : 's'} had no token report (stopped, timed out, or before tracking) and aren't counted.
+        </div>
+      )}
+    </>
   )
 }
 
@@ -125,6 +193,7 @@ export function SettingsView() {
             <Row label="Weekly limit" hint={resetHint(usage?.sevenDay ?? { utilization: null, resetsAt: null })}>
               <Meter window={usage?.sevenDay ?? { utilization: null, resetsAt: null }} limited={usage?.status === 'rejected' && usage.limitedWindow === 'seven_day'} />
             </Row>
+            <AgentUsageRows />
           </Section>
 
           <Section title="Defaults">
