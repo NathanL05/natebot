@@ -19,7 +19,9 @@ import type {
   RoomConfig,
   RoomDraft,
   RoutineInfo,
-  UsageInfo
+  UsageBreakdown,
+  UsageInfo,
+  UsageWindow
 } from '@shared/types'
 import { isRoomId } from '@shared/types'
 import { describeCron } from '@shared/schedule'
@@ -615,6 +617,16 @@ export class Backend implements NateBotApi {
       void this.usage.refresh()
     }
     return shown
+  }
+
+  async usageBreakdown(): Promise<UsageBreakdown> {
+    const now = Date.now()
+    const info = this.usage.get()
+    // Line up with the subscription's own windows when their reset time is known.
+    const since = (w: UsageWindow | undefined, span: number): number => (w?.resetsAt && w.resetsAt > now ? w.resetsAt - span : now - span)
+    const fiveHourSince = since(info?.fiveHour, 5 * 3_600_000)
+    const sevenDaySince = since(info?.sevenDay, 7 * 86_400_000)
+    return { fiveHourSince, sevenDaySince, fiveHour: this.db.usageByAgent(fiveHourSince), sevenDay: this.db.usageByAgent(sevenDaySince) }
   }
 
   async refreshUsage(): Promise<UsageInfo | null> {

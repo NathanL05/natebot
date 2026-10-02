@@ -315,6 +315,13 @@ The numbers come from `claude -p /usage`, which Claude Code answers locally with
 all your usage (Claude Code and claude.ai too), not just NateBot's. NateBot checks at launch, every 5 minutes,
 whenever you open the panel, and after each agent run. **Settings → Usage** shows the same numbers.
 
+**Settings → Usage → By agent** shows which agents used the most over the current 5-hour window or week: runs,
+tokens in and out, and a share bar. Every run (chats, routines, approved actions and group-chat turns) records
+the token counts Claude Code reports. The share is based on Claude's API-price estimate for each run, so Opus
+counts for more than Haiku and cached reads for less than fresh input. It covers NateBot's own runs only, so it
+won't add up to the rings above, which include Claude Code and claude.ai. Stopped or timed-out runs report no
+tokens and are counted separately; runs from before this was added have no numbers.
+
 ## Connecting Gmail
 
 NateBot uses the open-source [Google Workspace MCP server](https://github.com/taylorwilsdon/google_workspace_mcp)

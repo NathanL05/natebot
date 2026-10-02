@@ -177,6 +177,27 @@ export interface UsageInfo {
   updatedAt: number
 }
 
+/** One agent's share of NateBot's usage over a period (from its runs' token counts). */
+export interface AgentUsage {
+  agentId: string
+  runs: number
+  /** Everything read, cached reads included. */
+  inputTokens: number
+  outputTokens: number
+  /** API-price estimate: weighs models and caching, so it's the fairest share measure. */
+  costUsd: number
+  /** Runs with no token report (stopped, timed out, or from before tracking). */
+  unmeasuredRuns: number
+}
+
+export interface UsageBreakdown {
+  /** Start of each period: the subscription window's start when known, else the last 5 hours / 7 days. */
+  fiveHourSince: number
+  sevenDaySince: number
+  fiveHour: AgentUsage[]
+  sevenDay: AgentUsage[]
+}
+
 export interface EnvStatus {
   /** True until the first check at startup has finished. */
   checking?: boolean

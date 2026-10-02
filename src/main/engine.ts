@@ -14,7 +14,7 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, hideActionsBlock, StreamState } from './claude/stream'
+import { extractActions, hideActionsBlock, StreamState, type RunTokens } from './claude/stream'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
 const RUN_TIMEOUT = 15 * 60_000
@@ -268,6 +268,7 @@ export class Engine extends EventEmitter {
     let requeue = false
     let summary = ''
     let mcp: ReturnType<typeof writeRunConfig> | null = null
+    let tokens: RunTokens | null = null
 
     try {
       const bin = this.deps.claudePath()
@@ -309,6 +310,7 @@ export class Engine extends EventEmitter {
 
       const exit = await r.proc.done
       clearTimeout(emitTimer)
+      tokens = state.result?.tokens ?? null
       msg.tools = state.tools.map((t) => (t.status === 'running' ? { ...t, status: 'error' as const } : { ...t }))
 
       if (exit.reason === 'spawn-error') throw new UserFacingError(`Couldn't start Claude Code: ${exit.error ?? 'unknown error'}`)
@@ -370,7 +372,7 @@ export class Engine extends EventEmitter {
     }
     for (const line of extraLines) this.save({ id: randomUUID(), agentId, role: line.role, text: line.text, createdAt: Date.now() })
 
-    this.deps.db.finishRun(runId, ok, summary)
+    this.deps.db.finishRun(runId, ok, summary, tokens)
     this.running.delete(agentId)
     if (requeue) {
       const q = this.queues.get(agentId) ?? []
@@ -404,6 +406,9 @@ export class Engine extends EventEmitter {
     const state = new StreamState()
     const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
     const prompt = `${systemPrompt(agent, agentNotes(agent))}\n\n${t.roomPrompt}`
+    // Recorded against the agent, so its usage stats include group chats.
+    const runId = randomUUID()
+    this.deps.db.startRun(runId, agent.id, 'room')
     let msg: ChatMessage | null = null
     let emitTimer: NodeJS.Timeout | undefined
 
@@ -467,6 +472,7 @@ export class Engine extends EventEmitter {
       mcp.cleanup()
       this.roomProcs.delete(roomId)
     }
+    this.deps.db.finishRun(runId, result.status === 'ok', result.detail || (result.text ? 'Replied' : 'Passed'), state.result?.tokens ?? null)
 
     const tools = state.tools.map((x) => (x.status === 'running' ? { ...x, status: 'error' as const } : { ...x }))
     const final = msg as ChatMessage | null
@@ -561,7 +567,7 @@ export class Engine extends EventEmitter {
         this.save({ id: randomUUID(), agentId, role: 'agent', text: reply.startsWith('✓') ? reply : `✓ ${action.summary}`, createdAt: Date.now() })
         this.deps.db.bumpUnread(agentId)
         this.deps.db.addNote(agentId, `Your proposed action "${action.summary}" was approved and carried out: ${reply}`)
-        this.deps.db.finishRun(runId, true, action.summary)
+        this.deps.db.finishRun(runId, true, action.summary, state.result?.tokens ?? null)
         this.emit('actionFinished', { agentId, ok: true, summary: action.summary })
       } else {
         const reason =
@@ -573,7 +579,7 @@ export class Engine extends EventEmitter {
               (!used ? `The tool ${tool} was never called.` : '') ||
               tail(exit.stderr, 3) ||
               'Unknown error.'
-        this.deps.db.finishRun(runId, false, reason)
+        this.deps.db.finishRun(runId, false, reason, state.result?.tokens ?? null)
         fail(reason)
       }
     } finally {

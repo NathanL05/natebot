@@ -17,6 +17,7 @@ import type {
   RoomDraft,
   RoomSummary,
   RoutineInfo,
+  UsageBreakdown,
   UsageInfo
 } from './types'
 
@@ -62,6 +63,8 @@ export interface NateBotApi {
   recheckEnv(): Promise<EnvStatus>
   /** Re-reads subscription usage from the CLI (throttled). */
   refreshUsage(): Promise<UsageInfo | null>
+  /** Which agents used what in the current session window and week. */
+  usageBreakdown(): Promise<UsageBreakdown>
   openExternal(url: string): Promise<void>
 
   /** target: 'user' or 'agent:<id>'. dataUrl null resets to the default. Returns the new version. */
@@ -102,6 +105,7 @@ export const API_METHODS = [
   'updateSettings',
   'recheckEnv',
   'refreshUsage',
+  'usageBreakdown',
   'openExternal',
   'setAvatar',
   'marketplace',
