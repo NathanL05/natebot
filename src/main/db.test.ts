@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { mkdtempSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { DELETED_AGENT_ID } from '@shared/usage'
 import { Db } from './db'
 
 const tokens = (input: number, output: number, costUsd: number | null) => ({ input, cacheWrite: 0, cacheRead: 0, output, costUsd })
@@ -24,6 +25,16 @@ describe('usageByAgent', () => {
     expect(rows['email']?.costUsd).toBeCloseTo(0.05)
     expect(rows['planner']).toMatchObject({ runs: 1, inputTokens: 0, outputTokens: 0, costUsd: 0, unmeasuredRuns: 1 })
     expect(db.usageByAgent(Date.now() + 1000)).toEqual([])
+  })
+
+  it('keeps a deleted agent’s usage under one id, not on the others', () => {
+    const db = new Db(':memory:')
+    db.startRun('r1', 'old-agent', 'chat')
+    db.finishRun('r1', true, 'ok', tokens(100, 10, 0.1))
+    db.startRun('r2', 'email', 'chat')
+    db.finishRun('r2', true, 'ok', tokens(50, 5, 0.05))
+    db.deleteAgent('old-agent')
+    expect(db.usageByAgent(0).map((r) => [r.agentId, r.runs])).toEqual(expect.arrayContaining([[DELETED_AGENT_ID, 1], ['email', 1]]))
   })
 
   it('upgrades a database made before tokens were recorded', () => {

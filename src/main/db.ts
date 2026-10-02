@@ -1,6 +1,7 @@
 // Chat history, per-agent state and run logs in SQLite (~/NateBot/data.db).
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
+import { DELETED_AGENT_ID } from '@shared/usage'
 import type { AgentUsage, ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
@@ -82,6 +83,7 @@ export class Db {
         summary TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_runs_agent ON runs(agent_id, source, started_at);
+      CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started_at);
       CREATE TABLE IF NOT EXISTS rooms (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -288,7 +290,8 @@ export class Db {
   deleteAgent(agentId: string): void {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
-    this.db.prepare('DELETE FROM runs WHERE agent_id = ?').run(agentId)
+    // Keep what the agent used, so usage totals don't shift onto the others.
+    this.db.prepare('UPDATE runs SET agent_id = ? WHERE agent_id = ?').run(DELETED_AGENT_ID, agentId)
   }
 
   // ---- sidebar folders ----

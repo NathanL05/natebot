@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { EFFORTS, MODELS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
-import { formatTokens, rankUsage } from '@shared/usage'
+import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
 import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
@@ -52,23 +52,29 @@ function AgentUsageRows() {
   const usage = useStore((s) => s.usage)
   const [period, setPeriod] = useState<Period>('sevenDay')
   const [data, setData] = useState<UsageBreakdown | null>(null)
+  // Changes whenever an agent starts or finishes a run, so the list never lags behind.
+  const activity = agents.map((a) => a.status).join()
 
-  // Reload when a run finishes (the usage numbers refresh then) as well as on open.
+  // Reload on open, when a run starts or finishes, and when the usage numbers refresh.
   useEffect(() => {
     let live = true
     void api.usageBreakdown().then((d) => live && setData(d))
     return () => {
       live = false
     }
-  }, [usage?.updatedAt])
+  }, [usage?.updatedAt, activity])
 
   const rows = rankUsage(data?.[period] ?? [])
   const unmeasured = rows.reduce((n, r) => n + r.unmeasuredRuns, 0)
-  const nameOf = (id: string): string => agents.find((a) => a.id === id)?.name ?? 'Deleted agent'
+  const nameOf = (id: string): string => (id === DELETED_AGENT_ID ? 'Deleted agents' : (agents.find((a) => a.id === id)?.name ?? 'Unknown agent'))
+  const since = data ? (period === 'fiveHour' ? data.fiveHourSince : data.sevenDaySince) : null
 
   return (
     <>
-      <Row label="By agent" hint="Share of what NateBot's own runs used. Claude Code and claude.ai aren't included.">
+      <Row
+        label="By agent"
+        hint={`Share of what NateBot's own runs used${since ? ` since ${new Date(since).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}. Claude Code and claude.ai aren't included.`}
+      >
         <Segmented<Period>
           value={period}
           onChange={setPeriod}

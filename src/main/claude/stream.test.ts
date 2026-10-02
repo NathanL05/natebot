@@ -108,6 +108,19 @@ describe('run tokens', () => {
     expect(state.result?.tokens).toEqual({ input: 10, cacheWrite: 5000, cacheRead: 6000, output: 300, costUsd: 0.0421 })
   })
 
+  it('matches a real two-call run: the result totals every API call', () => {
+    // Captured from `claude -p` (Haiku, one Read tool call = two API calls).
+    const state = new StreamState()
+    state.handle(
+      result({
+        num_turns: 2,
+        usage: { input_tokens: 18, cache_creation_input_tokens: 34161, cache_read_input_tokens: 33942, output_tokens: 215 },
+        total_cost_usd: 0.0728092
+      })
+    )
+    expect(state.result?.tokens).toEqual({ input: 18, cacheWrite: 34161, cacheRead: 33942, output: 215, costUsd: 0.0728092 })
+  })
+
   it('is null when claude reports no usage, and ignores bad numbers', () => {
     const none = new StreamState()
     none.handle(result({}))

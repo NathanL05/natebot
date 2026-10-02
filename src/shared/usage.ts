@@ -7,6 +7,9 @@ export interface UsageShare extends AgentUsage {
   share: number
 }
 
+/** Runs of deleted agents are kept under this id (it can't clash: agent ids never contain ":"). */
+export const DELETED_AGENT_ID = 'deleted:'
+
 const tokens = (u: AgentUsage): number => u.inputTokens + u.outputTokens
 
 /**
