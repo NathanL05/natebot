@@ -34,6 +34,7 @@ import * as skills from './skills'
 import { connectGmail, gmailReady, gmailStatus, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
+import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { Rooms } from './rooms'
 import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
 import { SettingsStore } from './settings'
@@ -66,6 +67,8 @@ export class Backend implements NateBotApi {
   private agentsTimer: NodeJS.Timeout | undefined
   private roomsTimer: NodeJS.Timeout | undefined
   private wakeTimer: NodeJS.Timeout | undefined
+  /** Approval notifications still showing, by message id. */
+  private approvalNotices = new Map<string, Notification>()
   private onResume = (): void => {
     clearTimeout(this.wakeTimer)
     this.wakeTimer = setTimeout(() => this.catchUpRoutines(), WAKE_DELAY_MS)
@@ -93,6 +96,7 @@ export class Backend implements NateBotApi {
     this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
     this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {
       if (!r.ok) this.notify(r.agentId, 'Action failed', r.summary)
+      else if (!this.focused()) this.notify(r.agentId, 'Done', r.summary)
     })
 
     this.rooms = new Rooms({
@@ -104,8 +108,7 @@ export class Backend implements NateBotApi {
       emitMessage: (m) => emit('message', m),
       emitRooms: () => this.emitRooms(),
       onIdle: (roomId, replies) => {
-        const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
-        if (replies && !focused) this.notify(roomId, 'New messages', `${replies} new repl${replies > 1 ? 'ies' : 'y'} in the group`)
+        if (replies && !this.focused()) this.notify(roomId, 'New messages', `${replies} new repl${replies > 1 ? 'ies' : 'y'} in the group`)
         void this.usage.refresh()
       }
     })
@@ -154,6 +157,9 @@ export class Backend implements NateBotApi {
   }
 
   shutdown(): void {
+    // Their buttons stop working once NateBot quits, so don't leave them on screen.
+    for (const n of this.approvalNotices.values()) n.close()
+    this.approvalNotices.clear()
     powerMonitor.off('resume', this.onResume)
     clearTimeout(this.wakeTimer)
     this.usage.stopPolling()
@@ -217,22 +223,75 @@ export class Backend implements NateBotApi {
     }, 30)
   }
 
-  /** chatId: an agent or a group chat. */
-  private notify(chatId: string, title: string, body: string): void {
-    if (!Notification.isSupported()) return
+  private focused(): boolean {
+    return BrowserWindow.getAllWindows().some((w) => w.isFocused())
+  }
+
+  /** chatId: an agent or a group chat. `buttons` adds macOS action buttons (index of the one pressed). */
+  private notify(chatId: string, title: string, body: string, buttons?: { labels: string[]; onAction: (index: number) => void }): Notification | null {
+    if (!Notification.isSupported()) return null
     const name = this.store.get(chatId)?.name ?? this.rooms.get(chatId)?.name
-    const n = new Notification({ title: name ? `${name} · ${title}` : title, body, silent: false })
+    const n = new Notification({
+      title: name ? `${name} · ${title}` : title,
+      body,
+      silent: false,
+      ...(buttons ? { actions: buttons.labels.map((text) => ({ type: 'button' as const, text })), closeButtonText: 'Later' } : {})
+    })
     n.on('click', () => this.onOpenAgent(chatId))
+    if (buttons) n.on('action', (e) => buttons.onAction(e.actionIndex))
     n.show()
+    return n
+  }
+
+  /**
+   * "Needs your approval", with Approve / Reject buttons when there's a single
+   * action. Kept by message so approving or rejecting in the app removes it
+   * (holding the reference also keeps its button handlers alive).
+   */
+  private notifyApproval(r: RunFinished): void {
+    const notice = approvalNotice(this.db.getMessage(r.messageId)?.actions)
+    if (!notice) return
+    const { action } = notice
+    const buttons = action
+      ? {
+          labels: APPROVAL_BUTTONS,
+          onAction: (index: number): void => {
+            if (index === APPROVE) void this.approveFromNotification(r.agentId, r.messageId, action.id)
+            else if (index === REJECT) void this.resolveAction(r.messageId, action.id, 'reject')
+          }
+        }
+      : undefined
+    const n = this.notify(r.agentId, 'Needs your approval', notice.body, buttons)
+    if (!n) return
+    this.approvalNotices.get(r.messageId)?.close()
+    this.approvalNotices.set(r.messageId, n)
+    n.on('close', () => {
+      if (this.approvalNotices.get(r.messageId) === n) this.approvalNotices.delete(r.messageId)
+    })
+  }
+
+  private async approveFromNotification(agentId: string, messageId: string, actionId: string): Promise<void> {
+    await this.resolveAction(messageId, actionId, 'approve').catch((e: Error) => log(`approve from notification failed: ${e.message}`))
+    // Approval can be refused before it starts: say so outside the app too.
+    const still = this.db.getMessage(messageId)?.actions?.find((a) => a.id === actionId)
+    if (still?.status !== 'pending') return
+    const why = this.usage.waitMs() > 0 ? 'Usage limit reached. Approve it in NateBot after it resets.' : "It couldn't start. Open NateBot to check it."
+    this.notify(agentId, 'Not done yet', `${still.summary}: ${why}`)
+  }
+
+  /** Removes the approval notification once none of its message's actions are pending. */
+  private clearApprovalNotice(messageId: string, msg: ChatMessage): void {
+    if (msg.actions?.some((a) => a.status === 'pending')) return
+    this.approvalNotices.get(messageId)?.close()
+    this.approvalNotices.delete(messageId)
   }
 
   private onRunFinished(r: RunFinished): void {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     void this.usage.refresh()
-    const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused())
-    if (r.needsApproval) this.notify(r.agentId, 'Needs your approval', r.summary)
+    if (r.needsApproval) this.notifyApproval(r)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
-    else if (!focused && r.ok) this.notify(r.agentId, 'Replied', r.summary)
+    else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
 
   /**
@@ -491,10 +550,14 @@ export class Backend implements NateBotApi {
       emit('message', msg)
       this.db.addNote(msg.agentId, `The user rejected your proposed action "${action.summary}". Don't do it.`)
       this.engine.system(msg.agentId, `Rejected: ${action.summary}`)
+      this.clearApprovalNotice(messageId, msg)
       return
     }
     if (details && typeof details === 'object') action.details = details
-    await this.engine.executeAction(msg.agentId, msg, action)
+    const run = this.engine.executeAction(msg.agentId, msg, action)
+    // executeAction has marked it executing (or left it pending if usage is limited).
+    this.clearApprovalNotice(messageId, msg)
+    await run
   }
 
   async listRoutines(): Promise<RoutineInfo[]> {

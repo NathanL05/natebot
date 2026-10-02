@@ -50,6 +50,8 @@ export interface RunFinished {
   ok: boolean
   summary: string
   needsApproval: boolean
+  /** The agent message the run produced (its proposed actions, if any). */
+  messageId: string
 }
 
 /** One agent's turn in a group chat. */
@@ -376,7 +378,7 @@ export class Engine extends EventEmitter {
       this.queues.set(agentId, q)
     }
     this.deps.emitAgents()
-    const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length }
+    const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length, messageId: msg.id }
     this.emit('runFinished', finished)
     this.pump()
   }

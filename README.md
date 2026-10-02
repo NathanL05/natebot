@@ -258,6 +258,13 @@ NateBot shows the proposal as a card with **Approve / Edit / Reject**:
 - **Edit** lets you change the details before you approve.
 - **Reject** tells the agent not to do it.
 
+You don't have to open the app: the **Needs your approval** notification has **Approve** and **Reject** buttons
+when there's a single action. It names the tool and shows the key details (recipients, subject, date), never the
+message body, so click it to read or edit the full card first. If the action has any other detail the
+notification can't show, or there are several actions, it has no buttons and just opens the chat. Approving or rejecting in the app removes the notification, and you get a **Done** or
+**Action failed** notification when an approved action finishes while NateBot isn't in front. Buttons only work
+while NateBot is still running from when the notification arrived.
+
 For extra safety, tools listed under `require_approval` in `mcp.json` are blocked in every normal run, whatever
 an agent's YAML says. The Gmail setup lists `send_gmail_message` there, along with filter and label changes.
 
