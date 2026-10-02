@@ -25,7 +25,8 @@ const MAX_PARALLEL = 3
 const EMIT_EVERY_MS = 70
 
 /** Built-in tools agents may use. File tools are confined to the agent's workspace. */
-const BASE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
+// (TodoWrite used to be here; Claude Code replaced it with Task* tools, so it no longer exists.)
+const BASE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch']
 
 export interface Job {
   source: 'chat' | 'routine'
@@ -240,8 +241,8 @@ export class Engine extends EventEmitter {
       // Claude Code's bundled skills (code-review, loop, schedule…) are useless to
       // agents and cost ~1.5k tokens per message whenever the Skill tool is on.
       // This removes them without affecting Marketplace skills (--plugin-dir).
-      // design/doctor aren't covered by disableBundledSkills, so they're listed.
-      '--settings', JSON.stringify({ disableBundledSkills: true, skillOverrides: { design: 'off', doctor: 'off' } })
+      // design/doctor/plugin-authoring aren't covered by disableBundledSkills, so they're listed.
+      '--settings', JSON.stringify({ disableBundledSkills: true, skillOverrides: { design: 'off', doctor: 'off', 'plugin-authoring': 'off' } })
     ]
     // Marketplace skills live in a NateBot-owned plugin; agents invoke them with the Skill tool.
     if (hasInstalledSkills()) {

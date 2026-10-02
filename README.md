@@ -147,7 +147,7 @@ new `.dmg`) into Applications, replace the old one, and open it. Your agents, ch
   - `--setting-sources project,local` ignores your user settings, hooks and plugins.
   - `--strict-mcp-config` means an agent sees only the MCP servers it is assigned.
   - The working directory is `~/NateBot/workspaces/<agent>/`, and file edits are only auto-accepted inside it.
-  - Only a small set of built-in tools is enabled (Read/Write/Edit/Glob/Grep/WebSearch/WebFetch/TodoWrite).
+  - Only a small set of built-in tools is enabled (Read/Write/Edit/Glob/Grep/WebSearch/WebFetch).
   - `--permission-prompts none` means anything that would need permission is refused, never left waiting.
 - Usage limits: NateBot reads Claude Code's `rate_limit_event` during runs and polls `claude -p /usage`
   (answered locally, no tokens). The sidebar shows how much of your 5-hour and weekly limits you've used. When the limit is hit, a banner shows the reset time, messages wait in the queue and
