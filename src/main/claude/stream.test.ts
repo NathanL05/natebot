@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractActions, hideActionsBlock, StreamState } from './stream'
+import { extractActions, extractHandoffs, hideActionsBlock, StreamState } from './stream'
 
 const block = (json: string): string => `Here's a draft.\n\n\`\`\`proposed_actions\n${json}\n\`\`\``
 
@@ -129,5 +129,52 @@ describe('run tokens', () => {
     const odd = new StreamState()
     odd.handle(result({ usage: { input_tokens: 'many', output_tokens: -5 }, total_cost_usd: 'free' }))
     expect(odd.result?.tokens).toEqual({ input: 0, cacheWrite: 0, cacheRead: 0, output: 0, costUsd: null })
+  })
+})
+
+describe('handoff blocks', () => {
+  const handoff = '```handoff\n[{"to":"Planner","task":"Plan Friday"}]\n```'
+
+  it('parses a handoff and removes it from the text', () => {
+    const r = extractHandoffs(`Sarah needs it Friday.\n\n${handoff}`)
+    expect(r.text).toBe('Sarah needs it Friday.')
+    expect(r.handoffs).toEqual([{ to: 'Planner', task: 'Plan Friday' }])
+    expect(r.error).toBeNull()
+  })
+
+  it('keeps a code fence written inside a task', () => {
+    const task = 'Fix this: ```sql\nSELECT 1;\n``` then rerun.'
+    const r = extractHandoffs(`Done.\n\n\`\`\`handoff\n${JSON.stringify([{ to: 'Planner', task }])}\n\`\`\``)
+    expect(r.error).toBeNull()
+    expect(r.handoffs).toEqual([{ to: 'Planner', task }])
+    expect(r.text).toBe('Done.')
+  })
+
+  it('reports a block it cannot read, and still removes it', () => {
+    const r = extractHandoffs('Hi\n\n```handoff\nnot json\n```')
+    expect(r.text).toBe('Hi')
+    expect(r.handoffs).toEqual([])
+    expect(r.error).toContain('invalid')
+  })
+
+  it('works alongside proposed actions, in either order', () => {
+    const actions = '```proposed_actions\n[{"type":"send_email","summary":"Reply","details":{}}]\n```'
+    for (const text of [`Done.\n\n${actions}\n\n${handoff}`, `Done.\n\n${handoff}\n\n${actions}`]) {
+      const a = extractActions(text)
+      const h = extractHandoffs(a.text)
+      expect(a.actions).toHaveLength(1)
+      expect(h.handoffs).toHaveLength(1)
+      expect(h.text).toBe('Done.')
+    }
+  })
+
+  it('hides either block while streaming, even half-written', () => {
+    expect(hideActionsBlock('Hello\n\n```handoff\n[{"to":"Pla')).toBe('Hello')
+    expect(hideActionsBlock('Hello\n\n```proposed_actions\n[')).toBe('Hello')
+    expect(hideActionsBlock('Hello')).toBe('Hello')
+  })
+
+  it('does not lose a handoff when extracting actions from a reply that has none', () => {
+    expect(extractActions(`Hi\n\n${handoff}`).text).toContain('```handoff')
   })
 })

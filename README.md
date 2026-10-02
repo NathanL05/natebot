@@ -268,6 +268,20 @@ while NateBot is still running from when the notification arrived.
 For extra safety, tools listed under `require_approval` in `mcp.json` are blocked in every normal run, whatever
 an agent's YAML says. The Gmail setup lists `send_gmail_message` there, along with filter and label changes.
 
+## Handoffs
+
+In a one-on-one chat, an agent can suggest passing a task to another agent, for example the Email Agent asking
+the Planner to block out Friday afternoon for a deadline. It appears as a **Hand off** card showing who gets it
+and exactly what they'll be told. Nothing is sent until you click **Hand off**; **Dismiss** tells the agent not
+to send it again. When you hand off, the other agent starts working in its own chat (so you'll see a "Handed off
+from…" line there), using its own tools and permissions, and it's told the task came from another agent, not
+from you. Its reply can propose a further handoff, which again needs your click, so agents can't chain
+themselves.
+
+Agents only learn about each other through a short list of names and one-line roles in their system prompt
+(about 25 tokens per other agent, and nothing at all if you have a single agent). Group chats don't support
+handoffs.
+
 ## Routines
 
 Turn on a routine in an agent's settings. Pick "Weekdays at 8:00 AM" (or write your own cron) and say what it

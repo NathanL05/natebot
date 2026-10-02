@@ -14,7 +14,8 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, hideActionsBlock, StreamState, type RunTokens } from './claude/stream'
+import { extractActions, extractHandoffs, hideActionsBlock, StreamState, type RunTokens } from './claude/stream'
+import { resolveHandoffs, rosterFor } from './handoff'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
 const RUN_TIMEOUT = 15 * 60_000
@@ -52,6 +53,8 @@ export interface RunFinished {
   needsApproval: boolean
   /** The agent message the run produced (its proposed actions, if any). */
   messageId: string
+  /** Who the run suggests handing a task to, waiting for the user's OK. */
+  handoffTo?: string
 }
 
 /** One agent's turn in a group chat. */
@@ -210,7 +213,8 @@ export class Engine extends EventEmitter {
     mcpPath: string,
     mcpServers: string[],
     sessionArgs: string[],
-    prompt = systemPrompt(agent, agentNotes(agent))
+    // One-on-one chats can hand tasks to the other agents (group chats pass their own prompt).
+    prompt = systemPrompt(agent, agentNotes(agent), rosterFor(agent, this.deps.store.list()))
   ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
     // Tools marked require_approval in mcp.json are never available in normal runs.
@@ -326,11 +330,16 @@ export class Engine extends EventEmitter {
         extraLines.push({ role: 'error', text: 'This took longer than 15 minutes, so NateBot stopped it.' })
       } else if (state.result && !state.result.isError) {
         const parsed = extractActions(state.text || state.result.text)
-        msg.text = parsed.text
+        const handed = extractHandoffs(parsed.text)
+        const { handoffs, problems } = resolveHandoffs(handed.handoffs, agent, this.deps.store.list())
+        msg.text = handed.text
         if (parsed.actions.length) msg.actions = parsed.actions
-        if (parsed.error) extraLines.push({ role: 'error', text: parsed.error })
+        if (handoffs.length) msg.handoffs = handoffs
+        for (const text of [parsed.error, handed.error, ...problems]) if (text) extraLines.push({ role: 'error', text })
         ok = true
-        summary = firstLine(parsed.text) || (parsed.actions.length ? `${parsed.actions.length} action(s) to approve` : 'Done')
+        summary =
+          firstLine(handed.text) ||
+          (parsed.actions.length ? `${parsed.actions.length} action(s) to approve` : handoffs.length ? `Suggests handing off to ${handoffs[0]?.toName}` : 'Done')
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
         if (looksLikeUsageLimit(detail) || state.rateLimit?.status === 'rejected') {
@@ -360,10 +369,10 @@ export class Engine extends EventEmitter {
     if (!ok) for (const n of notes) this.deps.db.addNote(agentId, n)
 
     msg.streaming = false
-    const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length)
+    const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length || msg.handoffs?.length)
     if (hasContent) {
       this.save(msg)
-      if (msg.text || msg.actions?.length) this.deps.db.bumpUnread(agentId)
+      if (msg.text || msg.actions?.length || msg.handoffs?.length) this.deps.db.bumpUnread(agentId)
     } else {
       // Nothing was produced: turn the placeholder into the status line.
       const first = extraLines.shift()
@@ -380,7 +389,7 @@ export class Engine extends EventEmitter {
       this.queues.set(agentId, q)
     }
     this.deps.emitAgents()
-    const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length, messageId: msg.id }
+    const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length, messageId: msg.id, handoffTo: msg.handoffs?.[0]?.toName }
     this.emit('runFinished', finished)
     this.pump()
   }
@@ -453,7 +462,7 @@ export class Engine extends EventEmitter {
       } else if (exit.reason === 'timeout') {
         result = { status: 'error', text: hideActionsBlock(state.text).trim(), detail: `${agent.name} took longer than 5 minutes, so NateBot stopped it.` }
       } else if (state.result && !state.result.isError) {
-        const text = extractActions(state.text || state.result.text).text.trim()
+        const text = extractHandoffs(extractActions(state.text || state.result.text).text).text.trim()
         result = { status: 'ok', text: PASS_RE.test(text) ? '' : text, detail: '' }
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
