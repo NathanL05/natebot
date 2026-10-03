@@ -145,6 +145,12 @@ export function googleReady(server: string): boolean {
   }
 }
 
+/** The Gmail sign-in token file, once Gmail is connected (read by the email-trigger watcher). */
+export function gmailTokenPath(): string | null {
+  const { email } = savedEntry('gmail')
+  return email && googleReady('gmail') ? tokenFile(email, GMAIL_CREDENTIALS_DIR) : null
+}
+
 export function gmailReady(): boolean {
   return googleReady('gmail')
 }

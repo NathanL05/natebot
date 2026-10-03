@@ -34,7 +34,7 @@ const EMIT_EVERY_MS = 70
 const BASE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch']
 
 export interface Job {
-  source: 'chat' | 'routine' | 'reminder'
+  source: 'chat' | 'routine' | 'reminder' | 'trigger'
   prompt: string
   /** Paths relative to the agent's workspace. */
   attachments: string[]

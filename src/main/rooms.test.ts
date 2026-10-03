@@ -19,6 +19,7 @@ const agent = (id: string, name: string): AgentConfig => ({
   disallowed_tools: [],
   quick_prompts: [],
   routines: [],
+  email_triggers: [],
   session_id: null
 })
 

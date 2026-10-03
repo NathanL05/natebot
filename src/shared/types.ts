@@ -36,6 +36,21 @@ export interface Routine {
   prompt: string
 }
 
+/**
+ * Wakes an agent when new email matches a Gmail search. NateBot checks Gmail itself
+ * every few minutes (no Claude run), and only runs the agent when something matches.
+ */
+export interface EmailTrigger {
+  id: string
+  enabled: boolean
+  /** A Gmail search, e.g. "from:linkedin.com subject:interview". */
+  query: string
+  /** What the agent should do with the matching emails. */
+  prompt: string
+}
+
+export const MAX_EMAIL_TRIGGERS = 3
+
 /** Mirrors ~/NateBot/agents/<id>.yaml */
 export interface AgentConfig {
   id: string
@@ -53,6 +68,8 @@ export interface AgentConfig {
   quick_prompts: string[]
   /** Scheduled runs, up to MAX_ROUTINES. */
   routines: Routine[]
+  /** Runs when new email matches, up to MAX_EMAIL_TRIGGERS (needs Gmail). */
+  email_triggers: EmailTrigger[]
   session_id: string | null
 }
 

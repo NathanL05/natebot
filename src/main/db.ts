@@ -33,12 +33,15 @@ interface RoomRow {
 export interface RunRecord {
   id: string
   agentId: string
-  source: 'chat' | 'routine' | 'action' | 'room' | 'reminder'
+  source: 'chat' | 'routine' | 'action' | 'room' | 'reminder' | 'trigger'
   startedAt: number
   endedAt: number | null
   ok: boolean | null
   summary: string | null
 }
+
+/** Marks a trigger as started (kept forever, unlike the per-message rows). */
+export const TRIGGER_START = '__start__'
 
 interface ReminderRow {
   id: string
@@ -135,6 +138,12 @@ export class Db {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, at);
+      CREATE TABLE IF NOT EXISTS trigger_seen (
+        trigger_key TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        seen_at INTEGER NOT NULL,
+        PRIMARY KEY (trigger_key, message_id)
+      );
       CREATE TABLE IF NOT EXISTS folders (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -388,6 +397,23 @@ export class Db {
       ok: row.ok === null ? null : row.ok === 1,
       summary: row.summary
     }
+  }
+
+  // ---- email triggers ----
+
+  /** Of these Gmail message ids, the ones this trigger hasn't seen; all of them are marked seen. */
+  unseenEmails(triggerKey: string, ids: string[]): string[] {
+    const fresh: string[] = []
+    const insert = this.db.prepare('INSERT OR IGNORE INTO trigger_seen (trigger_key, message_id, seen_at) VALUES (?, ?, ?)')
+    for (const id of ids) if (insert.run(triggerKey, id, Date.now()).changes > 0) fresh.push(id)
+    // Old entries are only needed while Gmail still returns those messages (the search covers 2 days).
+    this.db.prepare(`DELETE FROM trigger_seen WHERE seen_at < ? AND message_id != '${TRIGGER_START}'`).run(Date.now() - 7 * 86_400_000)
+    return fresh
+  }
+
+  /** Whether a trigger has ever checked Gmail (its first check only records what's already there). */
+  triggerStarted(triggerKey: string): boolean {
+    return !!this.db.prepare('SELECT 1 FROM trigger_seen WHERE trigger_key = ? AND message_id = ?').get(triggerKey, TRIGGER_START)
   }
 
   // ---- reminders ----

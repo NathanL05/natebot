@@ -18,6 +18,7 @@ describe('agent YAML normalisation', () => {
         disallowed_tools: [],
         quick_prompts: [],
         routines: [],
+        email_triggers: [],
         session_id: null
       })
     }

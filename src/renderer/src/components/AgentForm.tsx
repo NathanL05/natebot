@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_QUICK_PROMPTS, MAX_ROUTINES, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
+import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_ROUTINES, MODELS, type EmailTrigger, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
@@ -19,7 +19,8 @@ export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
     allowed_tools: [],
     disallowed_tools: [],
     quick_prompts: [],
-    routines: []
+    routines: [],
+    email_triggers: []
   }
 }
 
@@ -30,6 +31,7 @@ export function validateDraft(d: AgentDraft): string[] {
   const on = d.routines.filter((r) => r.enabled)
   if (on.some((r) => !isValidCron(r.cron))) problems.push('A routine schedule is not valid.')
   if (on.some((r) => !r.prompt.trim())) problems.push('Tell each routine what to do.')
+  if (d.email_triggers.some((t) => !t.query.trim())) problems.push('Give each email trigger a Gmail search.')
   return problems
 }
 
@@ -164,6 +166,10 @@ export function AgentForm({
 
       <RoutinesEditor routines={draft.routines} onChange={(routines) => set('routines', routines)} />
 
+      {draft.mcp_servers.includes('gmail') && (
+        <TriggersEditor triggers={draft.email_triggers} onChange={(email_triggers) => set('email_triggers', email_triggers)} />
+      )}
+
       {/* Advanced */}
       <div>
         <button
@@ -281,6 +287,52 @@ function RoutinesEditor({ routines, onChange }: { routines: Routine[]; onChange:
               />
             </Field>
           </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Runs the agent when new email matches a Gmail search. NateBot checks Gmail itself, so waiting costs nothing. */
+function TriggersEditor({ triggers, onChange }: { triggers: EmailTrigger[]; onChange: (t: EmailTrigger[]) => void }) {
+  const update = (id: string, patch: Partial<EmailTrigger>): void => onChange(triggers.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  const add = (): void => onChange([...triggers, { id: `t${Math.random().toString(36).slice(2, 8)}`, enabled: true, query: '', prompt: '' }])
+  return (
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <div className="text-[14px] font-medium">Email triggers</div>
+          <div className="text-[12px] text-muted">
+            When new email matches a Gmail search, this agent runs. NateBot checks Gmail every 5 minutes itself, so it only uses your
+            limit when something matches (at most 10 runs a day per trigger).
+          </div>
+        </div>
+        {triggers.length < MAX_EMAIL_TRIGGERS && (
+          <Button variant="ghost" onClick={add}>
+            <PlusIcon size={13} /> Add
+          </Button>
+        )}
+      </div>
+      {triggers.map((t, i) => (
+        <div key={t.id} className={`mt-4 space-y-2.5 ${i > 0 ? 'border-t border-line pt-4' : ''}`}>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-[13px] font-medium">Trigger {i + 1}</div>
+            <Toggle label={`Trigger ${i + 1} enabled`} checked={t.enabled} onChange={(enabled) => update(t.id, { enabled })} />
+            <IconButton label={`Remove trigger ${i + 1}`} onClick={() => onChange(triggers.filter((x) => x.id !== t.id))}>
+              <TrashIcon size={14} />
+            </IconButton>
+          </div>
+          <Field label="Gmail search" hint="Same syntax as Gmail's search box, e.g. from:(greenhouse.io OR workday.com) or subject:interview">
+            <input className={`${inputClass} font-mono text-[12px]`} value={t.query} onChange={(e) => update(t.id, { query: e.target.value })} placeholder="subject:(interview OR assessment)" />
+          </Field>
+          <Field label="What should it do?">
+            <textarea
+              className={`${inputClass} min-h-[56px] resize-y`}
+              value={t.prompt}
+              onChange={(e) => update(t.id, { prompt: e.target.value })}
+              placeholder="Tell me who it's from and what they want, and draft a reply."
+            />
+          </Field>
         </div>
       ))}
     </div>

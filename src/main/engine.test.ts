@@ -53,6 +53,7 @@ const emailAgent: AgentConfig = {
   disallowed_tools: ['mcp__gmail__manage_gmail_filter'],
   quick_prompts: [],
   routines: [],
+  email_triggers: [],
   session_id: null
 }
 

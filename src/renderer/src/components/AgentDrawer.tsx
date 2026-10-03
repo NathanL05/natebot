@@ -20,7 +20,8 @@ function toDraft(a: AgentSummary): AgentDraft {
     allowed_tools: [...a.allowed_tools],
     disallowed_tools: [...a.disallowed_tools],
     quick_prompts: [...a.quick_prompts],
-    routines: a.routines.map((r) => ({ ...r }))
+    routines: a.routines.map((r) => ({ ...r })),
+    email_triggers: a.email_triggers.map((t) => ({ ...t }))
   }
 }
 

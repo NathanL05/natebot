@@ -342,6 +342,20 @@ asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, 
 at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A new or changed schedule
 starts counting from when you save it.
 
+## Email triggers
+
+An agent with Gmail can react to new email instead of waiting for its routine. In its settings, under **Email
+triggers**, add a Gmail search (for example `subject:(interview OR assessment)`) and say what it should do. NateBot
+checks Gmail itself every 5 minutes through the Gmail API, using your Connect Gmail sign-in, so **waiting costs no
+Claude usage**. Only when new mail matches does the agent run once, in a light session, with the sender, subject and
+preview of the matching emails, which are framed as data, never instructions. You get a **New email** notification
+with its answer.
+
+- A trigger's first check only records what's already there, so turning one on never fires on old mail. Changing
+  the search starts it over.
+- At most 10 runs a day per trigger, up to 3 triggers per agent, and the weekly pause in Settings → Usage applies.
+- Checks only happen while NateBot is running.
+
 ## Reminders
 
 Ask any agent to remind you about something: *"remind me at 7pm to call Mum"*, *"tomorrow at 8:30 check
