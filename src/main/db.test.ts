@@ -125,3 +125,14 @@ describe('message search', () => {
     expect(snip.length).toBeLessThan(140)
   })
 })
+
+describe('pending messages', () => {
+  it('lists agent messages with a pending action or handoff, newest first', () => {
+    const db = new Db(':memory:')
+    const action = (status: string) => ({ id: 'a', type: 'send_email', summary: 'Reply', details: {}, status })
+    db.saveMessage({ id: 'done', agentId: 'email', role: 'agent', text: 'x', createdAt: 1, actions: [action('done') as never] })
+    db.saveMessage({ id: 'act', agentId: 'email', role: 'agent', text: 'x', createdAt: 2, actions: [action('pending') as never] })
+    db.saveMessage({ id: 'hand', agentId: 'planner', role: 'agent', text: 'x', createdAt: 3, handoffs: [{ id: 'h', toAgentId: 'email', toName: 'Email', task: 't', status: 'pending' }] })
+    expect(db.pendingMessages().map((m) => m.id)).toEqual(['hand', 'act'])
+  })
+})

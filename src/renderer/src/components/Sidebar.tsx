@@ -4,11 +4,12 @@ import { userPicture } from '../lib/avatars'
 import { AvatarEditor } from './AvatarEditor'
 import { ChatList, newFolder } from './ChatList'
 import { UsageMenu } from './UsageMenu'
-import { ClockIcon, FolderPlusIcon, GearIcon, GridIcon, PlusIcon, SearchIcon, UsersIcon } from './icons'
+import { CheckIcon, ClockIcon, FolderPlusIcon, GearIcon, GridIcon, PlusIcon, SearchIcon, UsersIcon } from './icons'
 import { IconButton } from './ui'
 
 export function Sidebar() {
   const search = useStore((s) => s.search)
+  const pendingTotal = useStore((s) => s.agents.reduce((n, x) => n + x.pending, 0))
   const view = useStore((s) => s.view)
   const settings = useStore((s) => s.settings)
   const userAvatarVersion = useStore((s) => s.userAvatarVersion)
@@ -58,6 +59,21 @@ export function Sidebar() {
             <GridIcon size={19} />
           </span>
           Marketplace
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('today')}
+          className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover ${view === 'today' ? 'bg-selected' : ''}`}
+        >
+          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
+            <CheckIcon size={19} />
+          </span>
+          Today
+          {pendingTotal > 0 && (
+            <span className="ml-auto rounded-full bg-warn/20 px-2 py-0.5 text-[11px] font-semibold text-warn" title="Waiting for your OK">
+              {pendingTotal}
+            </span>
+          )}
         </button>
       </div>
 

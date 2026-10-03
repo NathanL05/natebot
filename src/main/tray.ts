@@ -10,6 +10,7 @@ export function createTray(opts: {
   onOpen: () => void
   onOpenAgent: (id: string) => void
   onRoutines: () => void
+  onToday: () => void
   /** Sends one of an agent's quick prompts without opening the window. */
   onQuickPrompt: (agentId: string, prompt: string) => void
   /** Opens the quick-capture box. */
@@ -45,6 +46,7 @@ export function createTray(opts: {
           ? [{ type: 'separator' as const }, { label: 'Quick prompts (reply comes as a notification)', enabled: false }, ...quick]
           : []),
         { type: 'separator' },
+        { label: 'Today', click: opts.onToday },
         { label: 'Routines & reminders', click: opts.onRoutines },
         { type: 'separator' },
         { label: 'Quit NateBot', accelerator: 'Cmd+Q', click: () => app.quit() }

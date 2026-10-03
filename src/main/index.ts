@@ -119,6 +119,7 @@ function buildMenu(): void {
       submenu: [
         { label: 'New Agent…', accelerator: 'Cmd+N', click: nav('newAgent') },
         { label: 'New Group Chat…', accelerator: 'Cmd+Shift+N', click: nav('newRoom') },
+        { label: 'Today', accelerator: 'Cmd+Shift+T', click: nav('today') },
         { label: 'Routines', accelerator: 'Cmd+Shift+R', click: nav('routines') },
         { type: 'separator' },
         { label: 'Show Data Folder', click: () => void shell.openPath(join(app.getPath('home'), 'NateBot')) },
@@ -189,6 +190,10 @@ app.whenReady().then(async () => {
     onRoutines: () => {
       showWindow()
       emit('navigate', 'routines')
+    },
+    onToday: () => {
+      showWindow()
+      emit('navigate', 'today')
     },
     onQuickPrompt: (agentId, prompt) => void backend.sendMessage(agentId, prompt),
     onCapture: () => capture.show()

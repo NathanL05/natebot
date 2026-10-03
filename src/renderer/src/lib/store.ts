@@ -10,7 +10,7 @@ import type {
   UsageInfo
 } from '@shared/types'
 
-export type View = 'chat' | 'routines' | 'settings'
+export type View = 'chat' | 'today' | 'routines' | 'settings'
 
 interface State {
   ready: boolean

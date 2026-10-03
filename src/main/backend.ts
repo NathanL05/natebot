@@ -212,6 +212,11 @@ export class Backend implements NateBotApi {
   // ---- internals ----
 
   private summaries(): AgentSummary[] {
+    const pending = new Map<string, number>()
+    for (const m of this.db.pendingMessages()) {
+      const n = (m.actions?.filter((a) => a.status === 'pending').length ?? 0) + (m.handoffs?.filter((h) => h.status === 'pending').length ?? 0)
+      pending.set(m.agentId, (pending.get(m.agentId) ?? 0) + n)
+    }
     return this.store.list().map((a) => {
       const last = this.db.lastMessage(a.id)
       const { running, queued } = this.engine.status(a.id)
@@ -223,7 +228,8 @@ export class Backend implements NateBotApi {
         lastActivity: last?.createdAt ?? 0,
         lastPreview: running ? previewOf(this.engine.liveMessage(a.id)) || previewOf(last) : previewOf(last),
         avatarVersion: avatarVersion(`agent:${a.id}`),
-        folderId: this.db.folderOf(a.id)
+        folderId: this.db.folderOf(a.id),
+        pending: pending.get(a.id) ?? 0
       }
     })
   }
@@ -534,6 +540,10 @@ export class Backend implements NateBotApi {
     }
   }
 
+  async pendingMessages(): Promise<ChatMessage[]> {
+    return this.db.pendingMessages().filter((m) => this.store.get(m.agentId))
+  }
+
   async searchMessages(query: string): Promise<MessageHit[]> {
     const q = typeof query === 'string' ? query.trim() : ''
     if (q.length < 2) return []
@@ -668,6 +678,7 @@ export class Backend implements NateBotApi {
       this.db.addNote(msg.agentId, `The user rejected your proposed action "${action.summary}". Don't do it.`)
       this.engine.system(msg.agentId, `Rejected: ${action.summary}`)
       this.clearApprovalNotice(messageId, msg)
+      this.emitAgents()
       return
     }
     if (details && typeof details === 'object') action.details = details
