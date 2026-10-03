@@ -44,6 +44,7 @@ import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspace
 import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
+import { backupIfDue } from './backup'
 import { dueAction, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
@@ -75,6 +76,7 @@ export class Backend implements NateBotApi {
   private scheduler: Scheduler
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
+  private backupTimer: NodeJS.Timeout | undefined
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
   private envOverride: EnvStatus | null = null
@@ -192,6 +194,8 @@ export class Backend implements NateBotApi {
     this.catchUpRoutines()
     this.fireReminders()
     this.emailWatcher.start()
+    this.backup()
+    this.backupTimer = setInterval(() => this.backup(), 60 * 60_000)
     powerMonitor.on('resume', this.onResume)
   }
 
@@ -207,6 +211,7 @@ export class Backend implements NateBotApi {
     this.scheduler.stopAll()
     this.reminderClock.stop()
     this.emailWatcher.stop()
+    clearInterval(this.backupTimer)
     this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
@@ -545,6 +550,16 @@ export class Backend implements NateBotApi {
     }
     this.engine.system(agentId, `Email trigger: ${what} (search: ${trigger.query})`)
     this.engine.enqueue(agentId, { source: 'trigger', prompt: triggerPrompt(trigger, hits), attachments: [] })
+  }
+
+  /** Today's backup of ~/NateBot (checked hourly; does nothing once it exists). */
+  private backup(): void {
+    try {
+      const made = backupIfDue(this.db.raw)
+      if (made) log(`backup: ${made}`)
+    } catch (e) {
+      log(`backup failed: ${(e as Error).message}`)
+    }
   }
 
   /** Why unattended runs are paused this week (Settings → Usage), or null if they aren't. */

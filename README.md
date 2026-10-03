@@ -185,6 +185,7 @@ Everything stays on this Mac:
 | `~/NateBot/skills/` | Skills installed from the Marketplace (a small Claude Code plugin) |
 | `~/NateBot/skill-sources.json` | GitHub repos the Marketplace browses |
 | `~/NateBot/usage.json` | Last known usage numbers (so the widget works at launch) |
+| `~/NateBot/backups/<date>/` | Daily backup (last 7 kept): the database, agent files, settings and lasting notes. Not `mcp.json`, which can hold secrets |
 | `~/Library/Application Support/NateBot/avatars/` | Uploaded profile pictures (256px PNGs) |
 | `~/Library/Logs/NateBot/main.log` | Diagnostic log (no prompts, replies or secrets) |
 
