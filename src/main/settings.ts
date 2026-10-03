@@ -34,7 +34,14 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
     lightRuns: typeof raw.lightRuns === 'boolean' ? raw.lightRuns : fallback.lightRuns,
     pauseRoutinesAt:
       raw.pauseRoutinesAt === null ? null : PAUSE_LEVELS.includes(raw.pauseRoutinesAt as number) ? (raw.pauseRoutinesAt as number) : fallback.pauseRoutinesAt,
-    aboutMe: typeof raw.aboutMe === 'string' ? raw.aboutMe.trim().slice(0, MAX_ABOUT_ME) : fallback.aboutMe
+    aboutMe: typeof raw.aboutMe === 'string' ? raw.aboutMe.trim().slice(0, MAX_ABOUT_ME) : fallback.aboutMe,
+    pushTopic:
+      raw.pushTopic === null || raw.pushTopic === ''
+        ? null
+        : typeof raw.pushTopic === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(raw.pushTopic.trim())
+          ? raw.pushTopic.trim()
+          : fallback.pushTopic,
+    pushDetails: typeof raw.pushDetails === 'boolean' ? raw.pushDetails : fallback.pushDetails
   }
 }
 
@@ -53,7 +60,9 @@ export class SettingsStore {
       quickCapture: DEFAULT_QUICK_CAPTURE,
       lightRuns: true,
       pauseRoutinesAt: 0.7,
-      aboutMe: ''
+      aboutMe: '',
+      pushTopic: null,
+      pushDetails: false
     }
     let raw: Partial<AppSettings> = {}
     try {

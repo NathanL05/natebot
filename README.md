@@ -425,6 +425,16 @@ counts for more than Haiku and cached reads for less than fresh input. It covers
 won't add up to the rings above, which include Claude Code and claude.ai. Stopped or timed-out runs report no
 tokens and are counted separately; runs from before this was added have no numbers.
 
+## Phone notifications
+
+**Settings → General → Phone notifications → Set up** makes a private topic name. Install the free
+[ntfy](https://ntfy.sh) app on your phone and subscribe to that topic: every NateBot notification (replies, routines,
+reminders, approvals, new email) then also reaches your phone through ntfy.sh. By default only the title is sent
+(for example "Planner · Reminder"). Turn on **Include message text** for the full text. Anyone who knows the topic
+name can read it, so keep it private. **Send test** checks the setup.
+
+NateBot also checks the Gmail sign-in every few hours (no tokens) and warns you, once a day, if it has expired.
+
 ## Connecting Gmail
 
 NateBot uses the open-source [Google Workspace MCP server](https://github.com/taylorwilsdon/google_workspace_mcp)

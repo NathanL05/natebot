@@ -262,6 +262,10 @@ export interface AppSettings {
   pauseRoutinesAt: number | null
   /** A short profile every agent sees (studies, work, goals, preferences). */
   aboutMe: string
+  /** ntfy topic that also gets every notification (for your phone), or null for off. */
+  pushTopic: string | null
+  /** Include notification text, not just the title, in phone notifications. */
+  pushDetails: boolean
 }
 
 export const MAX_ABOUT_ME = 1200

@@ -11,6 +11,7 @@ const FIRST_CHECK_MS = 30_000
 /** Most runs one trigger may start per day, whatever arrives. */
 export const MAX_RUNS_PER_DAY = 10
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me'
+const SIGN_IN_CHECK_MS = 6 * 60 * 60_000
 
 export interface EmailHit {
   from: string
@@ -50,6 +51,7 @@ export class EmailWatcher {
   private runs = new Map<string, { day: string; count: number }>()
   private checking = false
   private lastError = ''
+  private signInCheckedAt = 0
 
   constructor(
     private deps: {
@@ -57,6 +59,8 @@ export class EmailWatcher {
       agents: () => AgentConfig[]
       tokenPath: () => string | null
       onMatch: (agentId: string, trigger: EmailTrigger, hits: EmailHit[]) => void
+      /** Gmail's sign-in can no longer be refreshed (expired or revoked). */
+      onSignInExpired: () => void
       log: (line: string) => void
     }
   ) {}
@@ -74,8 +78,11 @@ export class EmailWatcher {
   async check(): Promise<void> {
     if (this.checking) return
     const watched = this.deps.agents().flatMap((a) => (a.mcp_servers.includes('gmail') ? a.email_triggers.filter((t) => t.enabled).map((t) => ({ a, t })) : []))
-    const path = watched.length ? this.deps.tokenPath() : null
+    // Without triggers, still check the sign-in every few hours, so an expired one is caught before a routine needs it.
+    const due = watched.length > 0 || Date.now() - this.signInCheckedAt > SIGN_IN_CHECK_MS
+    const path = due ? this.deps.tokenPath() : null
     if (!path) return
+    this.signInCheckedAt = Date.now()
     this.checking = true
     try {
       const token = await this.token(path)
@@ -122,6 +129,7 @@ export class EmailWatcher {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: f.client_id, client_secret: f.client_secret, refresh_token: f.refresh_token, grant_type: 'refresh_token' })
     })
+    if (res.status === 400 || res.status === 401) this.deps.onSignInExpired()
     if (!res.ok) throw new Error(`Google sign-in refresh failed (${res.status}); reconnect Gmail if this keeps happening`)
     const body = (await res.json()) as { access_token: string; expires_in: number }
     this.access = { token: body.access_token, until: Date.now() + body.expires_in * 1000 }
