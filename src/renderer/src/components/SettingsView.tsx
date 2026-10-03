@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { EFFORTS, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { EFFORTS, MAX_ABOUT_ME, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
 import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
@@ -280,6 +280,20 @@ export function SettingsView() {
                 onBlur={(e) => e.target.value.trim() && void patch({ userName: e.target.value.trim() })}
               />
             </Row>
+            <div className="px-4 py-3">
+              <div className="text-[13px] font-medium">About you</div>
+              <div className="mt-0.5 mb-2 text-[12px] text-muted">
+                Every agent reads this, so you don't have to repeat yourself: what you study or do, where you live, goals, how
+                you like answers. Keep it short ({MAX_ABOUT_ME} characters at most); it's sent with every message.
+              </div>
+              <textarea
+                className={`${inputClass} min-h-[90px] resize-y`}
+                defaultValue={settings.aboutMe}
+                maxLength={MAX_ABOUT_ME}
+                onBlur={(e) => e.target.value.trim() !== settings.aboutMe && void patch({ aboutMe: e.target.value })}
+                placeholder="e.g. Final-year student in Galway, applying for 2027 software graduate roles. Gym Mon/Wed/Fri evenings. Prefer short, direct answers."
+              />
+            </div>
             <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />

@@ -13,7 +13,8 @@ const defaults: AppSettings = {
   userName: 'Nathan',
   quickCapture: 'Alt+Space',
   lightRuns: true,
-  pauseRoutinesAt: 0.7
+  pauseRoutinesAt: 0.7,
+  aboutMe: ''
 }
 
 describe('settings sanitising', () => {

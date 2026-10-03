@@ -108,7 +108,8 @@ export class Backend implements NateBotApi {
       claudePath: () => (this.env.claudeFound ? this.env.claudePath : null),
       emitMessage: (m) => emit('message', m),
       emitAgents: () => this.emitAgents(),
-      lightRuns: () => this.settings.get().lightRuns
+      lightRuns: () => this.settings.get().lightRuns,
+      user: () => ({ name: this.settings.get().userName, about: this.settings.get().aboutMe })
     })
     this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
     this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {

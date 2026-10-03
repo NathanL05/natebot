@@ -98,7 +98,8 @@ function setup(agent: AgentConfig = emailAgent) {
     claudePath: () => '/usr/local/bin/claude',
     emitMessage: vi.fn(),
     emitAgents: vi.fn(),
-    lightRuns: () => true
+    lightRuns: () => true,
+    user: () => ({ name: 'Nathan', about: 'Student in Galway.' })
   })
   const run = (prompt: string): Promise<RunFinished> =>
     new Promise((resolve) => {
@@ -270,6 +271,7 @@ describe('reminders', () => {
     await run('Hi')
     const prompt = h.spawns[0]?.args[h.spawns[0].args.indexOf('--append-system-prompt') + 1] ?? ''
     expect(prompt).toContain('```reminders')
+    expect(prompt).toContain('Their name is Nathan.\nStudent in Galway.')
   })
 
   it('labels a reminder run in the prompt', async () => {
