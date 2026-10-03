@@ -16,6 +16,7 @@ import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
 import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
+import { memoryBlock } from './memory'
 import { resolveReminders } from './reminders'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
@@ -206,8 +207,9 @@ export class Engine extends EventEmitter {
     this.deps.db.bumpUnread(agentId)
   }
 
-  private buildInput(job: Job, notes: string[]): string {
+  private buildInput(job: Job, notes: string[], memory: string | null = null): string {
     const parts: string[] = [currentTimeLine()]
+    if (memory) parts.push(memory)
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
     if (job.source === 'routine') {
       parts.push(
@@ -330,7 +332,8 @@ export class Engine extends EventEmitter {
         args: this.runArgs(agent, mcp.path, mcp.servers, sessionArgs),
         cwd: ensureWorkspace(agent.id),
         env: childEnv(),
-        input: this.buildInput(job, notes),
+        // A fresh session starts from the agent's lasting notes; a resumed one already has them.
+        input: this.buildInput(job, notes, agent.session_id ? null : memoryBlock(agent.id)),
         timeoutMs: RUN_TIMEOUT,
         onEvent: (ev) => {
           const changed = state.handle(ev)

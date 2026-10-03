@@ -144,6 +144,10 @@ new `.dmg`) into Applications, replace the old one, and open it. Your agents, ch
   (so nvm, Homebrew and `~/.local/bin` work). You can also set the full path to `claude` in **Settings**.
 - Each agent has its own Claude Code session (`--session-id`, then `--resume`), so it remembers the
   conversation. **Reset memory** starts a new session. Instructions you edit apply from the next message.
+- **Lasting notes:** each agent keeps `memory.md` in its workspace with what it has learned about you (people,
+  preferences, recurring commitments). It updates the file itself, and every fresh session (after **Reset memory**,
+  or if a session is lost) starts by being shown it, so resets no longer wipe everything. Read or edit the notes
+  under **Agent settings → Memory & removal → Lasting notes**. Agents are told never to store secrets there.
 - Agents are isolated from your normal Claude Code setup:
   - `--setting-sources project,local` ignores your user settings, hooks and plugins.
   - `--strict-mcp-config` means an agent sees only the MCP servers it is assigned.
@@ -165,6 +169,7 @@ Everything stays on this Mac:
 | `~/NateBot/data.db` | Chat history and run log (SQLite) |
 | `~/NateBot/settings.json` | App settings |
 | `~/NateBot/workspaces/<id>/` | Each agent's private working folder; attachments go in `attachments/` |
+| `~/NateBot/workspaces/<id>/memory.md` | The agent's lasting notes about you (editable in agent settings) |
 | `~/NateBot/credentials/google/` | Gmail OAuth token (after connecting Gmail) |
 | `~/NateBot/skills/` | Skills installed from the Marketplace (a small Claude Code plugin) |
 | `~/NateBot/skill-sources.json` | GitHub repos the Marketplace browses |

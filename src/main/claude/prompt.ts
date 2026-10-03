@@ -43,6 +43,7 @@ ${FENCE}proposed_actions
 ${FENCE}
   "type" is a short snake_case verb. "summary" is one line the user sees. "tool" is the exact name of the tool that would carry it out. "details" must contain everything needed to do it exactly as approved. The user gets Approve / Edit / Reject buttons, and approved actions are carried out separately. Only include the block when something needs approval, and don't describe the block in your text.
 ${roster.length ? handoffRules(roster) : ''}${chat ? REMINDER_RULES : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
+- memory.md in your working folder holds your lasting notes about the user, and survives memory resets. When you learn something worth remembering for later (names, people, preferences, recurring commitments, how they like things done), add or update a short line there with Edit or Write, without mentioning it unless asked. Keep it under about 60 lines, remove what's no longer true, and never store passwords, card numbers or other secrets. At the start of a fresh conversation NateBot shows you its contents.
 - Each message starts with a [Current time: …] line; use it for dates and scheduling.
 ${toolNotes.length ? `\nNotes about your connected tools:\n${toolNotes.map((n) => `- ${n}`).join('\n')}\n` : ''}
 Your instructions from the user:
