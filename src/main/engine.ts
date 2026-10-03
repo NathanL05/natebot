@@ -21,6 +21,9 @@ import { resolveReminders } from './reminders'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
 const RUN_TIMEOUT = 15 * 60_000
+/** A chat session that reads more than this per call starts over (lasting notes and recent messages carried over). */
+export const ROTATE_AT_TOKENS = 60_000
+const short = (text: string, n: number): string => (text.length > n ? `${text.slice(0, n - 1)}…` : text)
 const ACTION_TIMEOUT = 3 * 60_000
 const ROOM_TURN_TIMEOUT = 5 * 60_000
 const MAX_PARALLEL = 3
@@ -94,6 +97,8 @@ export interface EngineDeps {
   claudePath: () => string | null
   emitMessage: (m: ChatMessage) => void
   emitAgents: () => void
+  /** Unattended runs (routines, task reminders) use Haiku at low effort. */
+  lightRuns?: () => boolean
 }
 
 class UserFacingError extends Error {}
@@ -207,9 +212,10 @@ export class Engine extends EventEmitter {
     this.deps.db.bumpUnread(agentId)
   }
 
-  private buildInput(job: Job, notes: string[], memory: string | null = null): string {
+  private buildInput(job: Job, notes: string[], memory: string | null = null, lastReport: string | null = null): string {
     const parts: string[] = [currentTimeLine()]
     if (memory) parts.push(memory)
+    if (lastReport) parts.push(`[Your latest reply in this chat, for reference]\n${short(lastReport, 1500)}`)
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
     if (job.source === 'routine') {
       parts.push(
@@ -292,7 +298,11 @@ export class Engine extends EventEmitter {
 
     const runId = randomUUID()
     this.deps.db.startRun(runId, agentId, job.source, job.routineId ?? null)
-    const notes = this.deps.db.takeNotes(agentId)
+    // Routines and task reminders run in a throwaway session that starts from the agent's notes
+    // and its latest reply, so they stay small instead of growing (and re-reading) the chat session.
+    const fresh = job.source !== 'chat'
+    // They only peek at notes: those are for the chat session, which didn't see them yet.
+    const notes = fresh ? this.deps.db.peekNotes(agentId) : this.deps.db.takeNotes(agentId)
     const extraLines: { role: 'system' | 'error'; text: string }[] = []
     let ok = false
     let requeue = false
@@ -300,6 +310,7 @@ export class Engine extends EventEmitter {
     let mcp: ReturnType<typeof writeRunConfig> | null = null
     let tokens: RunTokens | null = null
     let remindersSet = false
+    const state = new StreamState()
     let quiet = false
 
     try {
@@ -314,8 +325,8 @@ export class Engine extends EventEmitter {
         extraLines.push({ role: 'system', text: `${names} ${verb}. Connect ${skip.length > 1 ? 'them' : 'it'} in Settings → Connected tools.` })
       }
       mcp = writeRunConfig(agent, skip)
-      const sessionArgs = agent.session_id ? ['--resume', agent.session_id] : ['--session-id', randomUUID()]
-      const state = new StreamState()
+      const sessionArgs = fresh ? ['--no-session-persistence'] : agent.session_id ? ['--resume', agent.session_id] : ['--session-id', randomUUID()]
+      const runAgent: AgentConfig = fresh && this.deps.lightRuns?.() ? { ...agent, model: 'haiku', effort: 'low' } : agent
 
       let emitTimer: NodeJS.Timeout | undefined
       // Unattended runs may start with the [quiet] marker: never show it.
@@ -329,17 +340,19 @@ export class Engine extends EventEmitter {
 
       r.proc = spawnClaude({
         bin,
-        args: this.runArgs(agent, mcp.path, mcp.servers, sessionArgs),
+        args: this.runArgs(runAgent, mcp.path, mcp.servers, sessionArgs),
         cwd: ensureWorkspace(agent.id),
         env: childEnv(),
         // A fresh session starts from the agent's lasting notes; a resumed one already has them.
-        input: this.buildInput(job, notes, agent.session_id ? null : memoryBlock(agent.id)),
+        input: fresh
+          ? this.buildInput(job, notes, memoryBlock(agent.id), this.deps.db.lastAgentText(agentId))
+          : this.buildInput(job, notes, agent.session_id ? null : memoryBlock(agent.id)),
         timeoutMs: RUN_TIMEOUT,
         onEvent: (ev) => {
           const changed = state.handle(ev)
           if (ev['type'] === 'rate_limit_event' && state.rateLimit) this.deps.usage.update(state.rateLimit)
           // Remember the session as soon as it exists, so memory survives a Stop.
-          if (ev['type'] === 'system' && ev['subtype'] === 'init' && state.sessionId) {
+          if (!fresh && ev['type'] === 'system' && ev['subtype'] === 'init' && state.sessionId) {
             this.deps.store.setSession(agentId, state.sessionId)
           }
           if (changed && !emitTimer) emitTimer = setTimeout(flush, EMIT_EVERY_MS)
@@ -397,7 +410,7 @@ export class Engine extends EventEmitter {
           requeue = true
           summary = 'Usage limit reached'
           extraLines.push({ role: 'system', text: 'Usage limit reached. This will run automatically when your limit resets.' })
-        } else if (agent.session_id && /no conversation found|session.*not found|invalid session/i.test(detail) && !job.retried) {
+        } else if (!fresh && agent.session_id && /no conversation found|session.*not found|invalid session/i.test(detail) && !job.retried) {
           this.deps.store.setSession(agentId, null)
           job.retried = true
           requeue = true
@@ -416,7 +429,9 @@ export class Engine extends EventEmitter {
     }
 
     // Keep notes for next time if this run didn't get through.
-    if (!ok) for (const n of notes) this.deps.db.addNote(agentId, n)
+    if (!ok && !fresh) for (const n of notes) this.deps.db.addNote(agentId, n)
+    // The chat session didn't see an unattended run: tell it what was reported.
+    if (ok && fresh && msg.text) this.deps.db.addNote(agentId, `Your ${job.source === 'routine' ? 'scheduled routine' : 'reminder task'} reported: ${short(msg.text, 600)}`)
 
     msg.streaming = false
     const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length)
@@ -432,6 +447,8 @@ export class Engine extends EventEmitter {
       else this.save({ ...msg, role: 'system', text: 'No reply', tools: undefined })
     }
     for (const line of extraLines) this.save({ id: randomUUID(), agentId, role: line.role, text: line.text, createdAt: Date.now() })
+    // A long chat session starts over, carrying the latest messages across as a note.
+    if (ok && !fresh && state.contextTokens > ROTATE_AT_TOKENS) this.rotate(agentId)
 
     this.deps.db.finishRun(runId, ok, summary, tokens)
     if (remindersSet) this.emit('remindersChanged')
@@ -454,6 +471,15 @@ export class Engine extends EventEmitter {
     }
     this.emit('runFinished', finished)
     this.pump()
+  }
+
+  /** Ends a long chat session: the next message starts a new one from the notes plus the last few messages. */
+  private rotate(agentId: string): void {
+    const turns = this.deps.db.recentTurns(agentId)
+    this.deps.store.setSession(agentId, null)
+    const excerpt = turns.map((m) => `${m.role === 'user' ? 'User' : 'You'}: ${short(m.text.replace(/\s+/g, ' '), 400)}`).join('\n')
+    this.deps.db.addNote(agentId, `NateBot started a fresh conversation to keep usage down. Your lasting notes are above; the last messages were:\n${excerpt}`)
+    this.system(agentId, 'Started a fresh session to keep usage down (lasting notes and recent messages carried over)')
   }
 
   // ---- group chat turns ----

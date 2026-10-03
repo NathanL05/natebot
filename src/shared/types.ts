@@ -212,7 +212,13 @@ export interface AppSettings {
   userName: string
   /** Global shortcut for the quick-capture box (an Electron accelerator), or null for off. */
   quickCapture: string | null
+  /** Routines and task reminders run on Haiku at low effort (the agent's own model otherwise). */
+  lightRuns: boolean
+  /** Skip routines and task reminders once the week's usage reaches this share (0–1), or null for never. */
+  pauseRoutinesAt: number | null
 }
+
+export const PAUSE_LEVELS = [0.5, 0.7, 0.9]
 
 /** The shortcuts offered for quick capture. */
 export const QUICK_CAPTURE_SHORTCUTS: { id: string; label: string }[] = [

@@ -86,6 +86,9 @@ function setup(agent: AgentConfig = emailAgent) {
       startRun: vi.fn(),
       finishRun: vi.fn(),
       takeNotes: () => [],
+      peekNotes: () => [],
+      lastAgentText: () => 'Earlier: 3 emails, none urgent.',
+      recentTurns: () => [{ id: 'u', agentId: agent.id, role: 'user', text: 'Plan my week', createdAt: 1 }],
       addNote: (_id: string, n: string) => notes.push(n),
       bumpUnread: vi.fn(),
       scheduledCount: () => 0,
@@ -94,7 +97,8 @@ function setup(agent: AgentConfig = emailAgent) {
     usage: { waitMs: () => 0, update: vi.fn(), markLimited: vi.fn() } as unknown as UsageTracker,
     claudePath: () => '/usr/local/bin/claude',
     emitMessage: vi.fn(),
-    emitAgents: vi.fn()
+    emitAgents: vi.fn(),
+    lightRuns: () => true
   })
   const run = (prompt: string): Promise<RunFinished> =>
     new Promise((resolve) => {
@@ -317,5 +321,40 @@ describe('lasting notes', () => {
     h.events.push(...reply('Hi again'))
     await resumed.run('Hi again')
     expect(h.spawns[1]?.input).not.toContain('Prefers short replies')
+  })
+})
+
+describe('saving usage', () => {
+  it('runs routines on Haiku in a throwaway session that starts from notes and the last reply', async () => {
+    const { engine, notes } = setup({ ...emailAgent, session_id: 'chat-sess' })
+    h.events.push(...reply('[quiet] Nothing new.'))
+    await new Promise((resolve) => {
+      engine.once('runFinished', resolve)
+      engine.enqueue(emailAgent.id, { source: 'routine', prompt: 'Sweep', attachments: [] })
+    })
+    const s = h.spawns[0]
+    expect(s?.args).toContain('--no-session-persistence')
+    expect(s?.args).not.toContain('--resume')
+    expect(flag(s, '--model')).toBe('claude-haiku-4-5-20251001')
+    expect(flag(s, '--effort')).toBe('low')
+    expect(s?.input).toContain('Earlier: 3 emails, none urgent.')
+    expect(s?.input).toContain('Prefers short replies')
+    expect(notes.at(-1)).toMatch(/^Your scheduled routine reported: Nothing new\./)
+  })
+
+  it('starts a long chat session over, carrying the last messages across', async () => {
+    const setSession = vi.fn()
+    const { engine, notes, saved } = setup({ ...emailAgent, session_id: 'chat-sess' })
+    ;(engine as unknown as { deps: { store: { setSession: unknown } } }).deps.store.setSession = setSession
+    const big = reply('Done.')
+    big.splice(1, 0, { type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: 70_000 }, content: [] } })
+    h.events.push(...big)
+    await new Promise((resolve) => {
+      engine.once('runFinished', resolve)
+      engine.enqueue(emailAgent.id, { source: 'chat', prompt: 'Hi', attachments: [] })
+    })
+    expect(setSession).toHaveBeenLastCalledWith('email-agent', null)
+    expect(notes.at(-1)).toContain('User: Plan my week')
+    expect(saved.at(-1)?.text).toMatch(/fresh session/)
   })
 })

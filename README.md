@@ -158,6 +158,17 @@ new `.dmg`) into Applications, replace the old one, and open it. Your agents, ch
   (answered locally, no tokens). The sidebar shows how much of your 5-hour and weekly limits you've used. When the limit is hit, a banner shows the reset time, messages wait in the queue and
   send themselves after the reset, and routines are skipped until then.
 
+### Keeping usage down
+
+- **Light routines** (Settings → Usage, on by default): routines and reminder tasks run on Haiku at low effort, in a
+  throwaway session that starts from the agent's lasting notes and its latest reply, instead of growing the chat
+  session. Afterwards the chat gets a short note of what was reported, so you can ask about it.
+- **Fresh sessions for long chats:** once a chat's conversation passes about 60k tokens per call, the next message
+  starts a new session, carrying across the lasting notes and the last few messages. Each reply then stops
+  re-reading weeks of history.
+- **Pause routines when the week reaches** 50%, 70% (default) or 90%: routines and reminder tasks are skipped above
+  that. Message reminders still arrive.
+
 ## Where your data lives
 
 Everything stays on this Mac:

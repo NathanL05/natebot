@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { EFFORTS, MODELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { EFFORTS, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
 import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
@@ -191,6 +191,16 @@ export function SettingsView() {
           </Section>
 
           <Section title="Usage">
+            <Row label="Light routines" hint="Routines and reminder tasks run on Haiku at low effort, in a short fresh session. Uses far less of your limit.">
+              <Toggle label="Light routines" checked={settings.lightRuns} onChange={(v) => void patch({ lightRuns: v })} />
+            </Row>
+            <Row label="Pause routines when the week reaches" hint="Routines and reminder tasks are skipped above this, so they can't use up your week. Message reminders still arrive.">
+              <Segmented<string>
+                value={settings.pauseRoutinesAt === null ? 'never' : String(settings.pauseRoutinesAt)}
+                onChange={(v) => void patch({ pauseRoutinesAt: v === 'never' ? null : Number(v) })}
+                options={[...PAUSE_LEVELS.map((l) => ({ value: String(l), label: `${Math.round(l * 100)}%` })), { value: 'never', label: 'Never' }]}
+              />
+            </Row>
             <Row label="5-hour session window" hint={resetHint(usage?.fiveHour ?? { utilization: null, resetsAt: null }) ?? 'Checking…'}>
               <Meter
                 window={usage?.fiveHour ?? { utilization: null, resetsAt: null }}
