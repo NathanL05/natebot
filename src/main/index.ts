@@ -178,7 +178,8 @@ app.whenReady().then(async () => {
     onRoutines: () => {
       showWindow()
       emit('navigate', 'routines')
-    }
+    },
+    onQuickPrompt: (agentId, prompt) => void backend.sendMessage(agentId, prompt)
   })
   backend.onAgentsChanged = tray.update
   backend.onOpenAgent = openAgent

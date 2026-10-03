@@ -15,7 +15,8 @@ export function Composer({
   name,
   running,
   queued = 0,
-  mentionables = []
+  mentionables = [],
+  quickPrompts = []
 }: {
   chatId: string
   name: string
@@ -23,6 +24,8 @@ export function Composer({
   queued?: number
   /** Group chats: members offered when typing @. */
   mentionables?: AgentSummary[]
+  /** One-click messages, shown while the box is empty. */
+  quickPrompts?: string[]
 }) {
   const [text, setText] = useState(() => drafts.get(chatId) ?? '')
   const [attachments, setAttachments] = useState<string[]>([])
@@ -138,6 +141,21 @@ export function Composer({
                   <XIcon size={12} />
                 </button>
               </span>
+            ))}
+          </div>
+        )}
+        {quickPrompts.length > 0 && !text && attachments.length === 0 && (
+          <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Quick prompts">
+            {quickPrompts.map((p) => (
+              <button
+                key={p}
+                type="button"
+                title="Send this now"
+                onClick={() => void api.sendMessage(chatId, p)}
+                className="max-w-full truncate rounded-full border border-line-strong bg-elev/70 px-3 py-1 text-[12px] text-muted transition hover:border-accent/50 hover:text-fg"
+              >
+                {p}
+              </button>
             ))}
           </div>
         )}

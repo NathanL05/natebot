@@ -19,6 +19,7 @@ function toDraft(a: AgentSummary): AgentDraft {
     mcp_servers: [...a.mcp_servers],
     allowed_tools: [...a.allowed_tools],
     disallowed_tools: [...a.disallowed_tools],
+    quick_prompts: [...a.quick_prompts],
     routines: a.routines.map((r) => ({ ...r }))
   }
 }
@@ -71,6 +72,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <AgentForm
+            key={agent.id}
             draft={draft}
             onChange={setDraft}
             mcpServers={mcpServers}

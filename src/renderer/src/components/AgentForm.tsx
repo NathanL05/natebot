@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_ROUTINES, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
+import { EFFORTS, MAX_QUICK_PROMPTS, MAX_ROUTINES, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
@@ -18,6 +18,7 @@ export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
     mcp_servers: [],
     allowed_tools: [],
     disallowed_tools: [],
+    quick_prompts: [],
     routines: []
   }
 }
@@ -142,6 +143,23 @@ export function AgentForm({
             README. Until then the agent runs without it.
           </div>
         )}
+      </Field>
+
+      <Field
+        label="Quick prompts"
+        hint={`One per line, up to ${MAX_QUICK_PROMPTS}. Shown as buttons above the message box and in the menu-bar menu, so you can send them in one click.`}
+      >
+        <textarea
+          className={`${inputClass} min-h-[64px] resize-y`}
+          defaultValue={draft.quick_prompts.join('\n')}
+          onBlur={(e) =>
+            set(
+              'quick_prompts',
+              [...new Set(e.target.value.split('\n').map((l) => l.trim()).filter(Boolean))].slice(0, MAX_QUICK_PROMPTS)
+            )
+          }
+          placeholder={'Give me a summary of my emails\nAnything urgent?'}
+        />
       </Field>
 
       <RoutinesEditor routines={draft.routines} onChange={(routines) => set('routines', routines)} />

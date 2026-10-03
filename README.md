@@ -192,6 +192,8 @@ instructions: |
 mcp_servers: [gmail]   # names from ~/NateBot/mcp.json
 allowed_tools: []      # extra tools, e.g. WebSearch WebFetch, or mcp__server__tool
 disallowed_tools: []   # tools this agent may never use
+quick_prompts:         # one-click messages (up to 6): buttons above the message box and in the menu bar
+  - Give me a summary of my emails
 routines:              # up to 5, each with its own schedule
   - id: main
     enabled: true
@@ -216,6 +218,9 @@ irreversible actions without approval.
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
 - **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,
   documents (copied into the agent's workspace).
+- **Quick prompts:** messages you send often (*"Give me a summary of my emails"*) can be saved in the agent's
+  settings, one per line. They show as buttons above an empty message box, and under **Quick prompts** in the
+  menu-bar icon's menu, where one click sends it without opening the window and the reply arrives as a notification.
 - **Queueing:** messages sent while an agent is busy wait their turn.
 - **Stop:** ends the current run and cancels anything queued.
 - **Timeout:** runs time out after 15 minutes.
