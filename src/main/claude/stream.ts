@@ -181,6 +181,8 @@ const HANDOFF_BLOCKS = [/```handoff\s*([\s\S]*?)\n[ \t]*```/, /```handoff\s*([\s
 const HANDOFF_START = '```handoff'
 const REMINDER_BLOCKS = [/```reminders\s*([\s\S]*?)\n[ \t]*```/, /```reminders\s*([\s\S]*?)```/]
 const REMINDER_START = '```reminders'
+const JOBS_BLOCKS = [/```jobs\s*([\s\S]*?)\n[ \t]*```/, /```jobs\s*([\s\S]*?)```/]
+const JOBS_START = '```jobs'
 
 /** Cuts the text at a block's opening fence, even a half-written one. */
 function cutAt(text: string, ...starts: string[]): string {
@@ -190,7 +192,7 @@ function cutAt(text: string, ...starts: string[]): string {
 
 /** While streaming, hide proposed_actions, handoff and reminders blocks (even half-written ones). */
 export function hideActionsBlock(text: string): string {
-  return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START)
+  return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START, JOBS_START)
 }
 
 const QUIET = '[quiet]'
@@ -208,7 +210,7 @@ export function quietMarker(text: string): { quiet: boolean; text: string } {
 
 /** Removes every NateBot block from a finished reply (group chats, which use none of them). */
 export function stripBlocks(text: string): string {
-  return extractReminders(extractHandoffs(extractActions(text).text).text).text
+  return extractJobs(extractReminders(extractHandoffs(extractActions(text).text).text).text).text
 }
 
 /** A handoff block as written by the agent. Targets are looked up by the caller. */
@@ -259,6 +261,20 @@ export function extractReminders(text: string): { text: string; reminders: Parse
     return { text: clean, reminders, error: null }
   } catch {
     return { text: clean, reminders: [], error: 'The agent tried to set a reminder but its format was invalid, so it was ignored.' }
+  }
+}
+
+/** A ```jobs block: job-tracker entries as the agent wrote them (checked by the caller). */
+export function extractJobs(text: string): { text: string; jobs: Json[]; error: string | null } {
+  const match = JOBS_BLOCKS.map((re) => re.exec(text)).find((m) => m !== null)
+  if (!match) return { text: cutAt(text, JOBS_START), jobs: [], error: null }
+  const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
+  try {
+    const parsed = JSON.parse(match[1] ?? '[]') as unknown
+    const list = Array.isArray(parsed) ? parsed : [parsed]
+    return { text: clean, jobs: list.filter((j): j is Json => !!j && typeof j === 'object'), error: null }
+  } catch {
+    return { text: clean, jobs: [], error: 'The agent tried to update the job tracker but its format was invalid, so it was ignored.' }
   }
 }
 

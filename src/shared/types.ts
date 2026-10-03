@@ -153,6 +153,31 @@ export interface Reminder {
   status: ReminderStatus
 }
 
+export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
+export const JOB_STATUSES: { id: JobStatus; label: string }[] = [
+  { id: 'saved', label: 'To apply' },
+  { id: 'applied', label: 'Applied' },
+  { id: 'interview', label: 'Interviewing' },
+  { id: 'offer', label: 'Offer' },
+  { id: 'rejected', label: 'Closed' }
+]
+
+/** A job or internship in the tracker, filled in by agents (```jobs blocks) or by hand. */
+export interface Job {
+  id: string
+  company: string
+  role: string
+  status: JobStatus
+  /** YYYY-MM-DD, or null. */
+  deadline: string | null
+  link: string | null
+  notes: string
+  /** The agent that added it (deadline reminders appear in its chat). */
+  agentId: string
+  createdAt: number
+  updatedAt: number
+}
+
 export type MessageRole = 'user' | 'agent' | 'system' | 'error'
 
 export interface ChatMessage {

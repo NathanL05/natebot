@@ -2,7 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
-import type { AgentUsage, ChatMessage, Folder, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
+import type { AgentUsage, ChatMessage, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -42,6 +42,34 @@ export interface RunRecord {
 
 /** Marks a trigger as started (kept forever, unlike the per-message rows). */
 export const TRIGGER_START = '__start__'
+
+interface JobRow {
+  id: string
+  company: string
+  role: string
+  status: string
+  deadline: string | null
+  link: string | null
+  notes: string
+  agent_id: string
+  created_at: number
+  updated_at: number
+}
+
+function toJob(r: JobRow): Job {
+  return {
+    id: r.id,
+    company: r.company,
+    role: r.role,
+    status: r.status as JobStatus,
+    deadline: r.deadline,
+    link: r.link,
+    notes: r.notes,
+    agentId: r.agent_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  }
+}
 
 interface ReminderRow {
   id: string
@@ -138,6 +166,20 @@ export class Db {
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, at);
+      CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        key TEXT NOT NULL UNIQUE,
+        company TEXT NOT NULL,
+        role TEXT NOT NULL,
+        status TEXT NOT NULL,
+        deadline TEXT,
+        link TEXT,
+        notes TEXT NOT NULL DEFAULT '',
+        agent_id TEXT NOT NULL,
+        reminder_ids TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS trigger_seen (
         trigger_key TEXT NOT NULL,
         message_id TEXT NOT NULL,
@@ -397,6 +439,51 @@ export class Db {
       ok: row.ok === null ? null : row.ok === 1,
       summary: row.summary
     }
+  }
+
+  // ---- job tracker ----
+
+  listJobs(): Job[] {
+    const rows = this.db.prepare('SELECT * FROM jobs ORDER BY updated_at DESC').all() as unknown as JobRow[]
+    return rows.map(toJob)
+  }
+
+  job(id: string): Job | null {
+    const row = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as JobRow | undefined
+    return row ? toJob(row) : null
+  }
+
+  jobByKey(key: string): Job | null {
+    const row = this.db.prepare('SELECT * FROM jobs WHERE key = ?').get(key) as JobRow | undefined
+    return row ? toJob(row) : null
+  }
+
+  saveJob(j: Job, key: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO jobs (id, key, company, role, status, deadline, link, notes, agent_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET key = excluded.key, company = excluded.company, role = excluded.role, status = excluded.status,
+           deadline = excluded.deadline, link = excluded.link, notes = excluded.notes, updated_at = excluded.updated_at`
+      )
+      .run(j.id, key, j.company, j.role, j.status, j.deadline, j.link, j.notes, j.agentId, j.createdAt, j.updatedAt)
+  }
+
+  jobReminders(id: string): string[] {
+    const row = this.db.prepare('SELECT reminder_ids FROM jobs WHERE id = ?').get(id) as { reminder_ids: string } | undefined
+    try {
+      return row ? (JSON.parse(row.reminder_ids) as string[]) : []
+    } catch {
+      return []
+    }
+  }
+
+  setJobReminders(id: string, ids: string[]): void {
+    this.db.prepare('UPDATE jobs SET reminder_ids = ? WHERE id = ?').run(JSON.stringify(ids), id)
+  }
+
+  deleteJob(id: string): void {
+    this.db.prepare('DELETE FROM jobs WHERE id = ?').run(id)
   }
 
   // ---- email triggers ----

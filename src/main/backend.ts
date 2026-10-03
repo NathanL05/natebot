@@ -16,6 +16,7 @@ import type {
   Folder,
   GmailStatus,
   EmailTrigger,
+  Job,
   MarketplaceData,
   MessageHit,
   Reminder,
@@ -44,6 +45,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { dueAction, ReminderClock } from './reminders'
+import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
 import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
@@ -112,7 +114,8 @@ export class Backend implements NateBotApi {
       emitMessage: (m) => emit('message', m),
       emitAgents: () => this.emitAgents(),
       lightRuns: () => this.settings.get().lightRuns,
-      user: () => ({ name: this.settings.get().userName, about: this.settings.get().aboutMe })
+      user: () => ({ name: this.settings.get().userName, about: this.settings.get().aboutMe }),
+      onJobs: (agentId, items) => this.applyJobs(agentId, items)
     })
     this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
     this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {
@@ -459,6 +462,45 @@ export class Backend implements NateBotApi {
     this.emitAgents()
   }
 
+  /** Adds or updates tracker entries from an agent's ```jobs block. Returns the chat line. */
+  private applyJobs(agentId: string, items: Record<string, unknown>[]): string | null {
+    let added = 0
+    let updated = 0
+    const now = Date.now()
+    for (const raw of items.slice(0, 20)) {
+      const p = parseJob(raw)
+      if (!p) continue
+      const key = jobKey(p.company, p.role)
+      const old = this.db.jobByKey(key)
+      const job: Job = old
+        ? { ...old, ...p, notes: p.notes ?? old.notes, updatedAt: now }
+        : { id: randomUUID(), status: 'saved', deadline: null, link: null, notes: '', agentId, createdAt: now, updatedAt: now, ...p }
+      this.db.saveJob(job, key)
+      this.syncJobReminders(job)
+      if (old) updated++
+      else added++
+    }
+    if (!added && !updated) return null
+    this.emitAgents()
+    return `Job tracker: ${[added && `${added} added`, updated && `${updated} updated`].filter(Boolean).join(', ')}`
+  }
+
+  /** Replaces a job's deadline reminders (free message reminders in the agent's chat). */
+  private syncJobReminders(job: Job): void {
+    for (const id of this.db.jobReminders(job.id)) if (this.db.reminder(id)?.status === 'scheduled') this.db.setReminderStatus(id, 'cancelled')
+    const agentId = this.store.get(job.agentId) ? job.agentId : null
+    const ids: string[] = []
+    if (agentId) {
+      for (const r of deadlineReminders(job, Date.now())) {
+        const id = randomUUID()
+        this.db.saveReminder({ id, agentId, messageId: '', at: r.at, kind: 'message', text: r.text, status: 'scheduled' })
+        ids.push(id)
+      }
+    }
+    this.db.setJobReminders(job.id, ids)
+    this.reminderClock.arm()
+  }
+
   /** New email matched one of an agent's triggers: run it (unless the week's usage says not to). */
   private fireTrigger(agentId: string, trigger: EmailTrigger, hits: EmailHit[]): void {
     const what = hits.length === 1 ? `“${hits[0]?.subject || '(no subject)'}” from ${hits[0]?.from}` : `${hits.length} new emails`
@@ -571,6 +613,36 @@ export class Backend implements NateBotApi {
 
   async pendingMessages(): Promise<ChatMessage[]> {
     return this.db.pendingMessages().filter((m) => this.store.get(m.agentId))
+  }
+
+  async listJobs(): Promise<Job[]> {
+    return this.db.listJobs()
+  }
+
+  async updateJob(next: Job): Promise<void> {
+    const old = this.db.job(String(next?.id))
+    if (!old) return
+    const p = parseJob({ ...old, ...next })
+    if (!p) return
+    const job: Job = { ...old, ...p, status: p.status ?? old.status, deadline: typeof next.deadline === 'string' ? (p.deadline ?? null) : null, link: p.link ?? null, notes: p.notes ?? '', updatedAt: Date.now() }
+    this.db.saveJob(job, jobKey(job.company, job.role))
+    this.syncJobReminders(job)
+    this.emitAgents()
+  }
+
+  async deleteJob(jobId: string): Promise<void> {
+    const job = this.db.job(String(jobId))
+    if (!job) return
+    this.syncJobReminders({ ...job, status: 'rejected' })
+    this.db.deleteJob(job.id)
+    this.emitAgents()
+  }
+
+  async createJobHunter(): Promise<string> {
+    const existing = this.store.get(JOB_HUNTER_ID)
+    if (existing) return existing.id
+    const agent = await this.createAgent(JOB_HUNTER)
+    return agent.id
   }
 
   async searchMessages(query: string): Promise<MessageHit[]> {

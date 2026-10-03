@@ -342,6 +342,14 @@ asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, 
 at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A new or changed schedule
 starts counting from when you save it.
 
+## Jobs
+
+**Jobs** (sidebar, ⇧⌘J) tracks roles and applications: to apply, applied, interviewing, offer, closed. Click
+**Create Job Hunter** to add an agent on Haiku that checks Gmail each weekday at 8:30 and straight away when an
+interview or assessment email arrives (an email trigger). It adds or updates entries with a ` ```jobs ` block, which
+any agent can use. You can change a status or deadline, or remove an entry, on the Jobs screen. Roles still "to apply"
+with a deadline get message reminders 2 days before and on the day at 9:00, which cost nothing.
+
 ## Email triggers
 
 An agent with Gmail can react to new email instead of waiting for its routine. In its settings, under **Email

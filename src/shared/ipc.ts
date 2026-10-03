@@ -11,6 +11,7 @@ import type {
   Folder,
   GmailProgress,
   GmailStatus,
+  Job,
   MarketplaceData,
   McpServerInfo,
   MessageHit,
@@ -32,6 +33,13 @@ export interface NateBotApi {
   markRead(chatId: string): Promise<void>
   /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
   pendingMessages(): Promise<ChatMessage[]>
+  /** The job tracker, most recently changed first. */
+  listJobs(): Promise<Job[]>
+  /** Edits a job from the tracker screen (status, deadline, notes…). */
+  updateJob(job: Job): Promise<void>
+  deleteJob(jobId: string): Promise<void>
+  /** Creates the Job Hunter agent (Haiku, Gmail, daily routine and an interview trigger). Returns its id. */
+  createJobHunter(): Promise<string>
   /** Message text search across every chat (at least 2 characters). */
   searchMessages(query: string): Promise<MessageHit[]>
   /** Native file picker (multiple files). Returns absolute paths. */
@@ -109,6 +117,10 @@ export const API_METHODS = [
   'stop',
   'markRead',
   'searchMessages',
+  'listJobs',
+  'updateJob',
+  'deleteJob',
+  'createJobHunter',
   'pendingMessages',
   'pickAttachments',
   'createAgent',
@@ -170,7 +182,7 @@ export interface NateBotEvents {
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
-  navigate: 'settings' | 'routines' | 'today' | 'newAgent' | 'newRoom'
+  navigate: 'settings' | 'routines' | 'today' | 'jobs' | 'newAgent' | 'newRoom'
   /** The quick-capture box was opened (a timestamp, so every opening is a new event). */
   captureShown: number
 }
