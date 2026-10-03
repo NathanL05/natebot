@@ -15,6 +15,7 @@ import type {
   EnvStatus,
   Folder,
   GmailStatus,
+  EmailTrigger,
   MarketplaceData,
   MessageHit,
   Reminder,
@@ -36,7 +37,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, gmailStatus, googleReady, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, gmailStatus, gmailTokenPath, googleReady, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -44,6 +45,7 @@ import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { dueAction, ReminderClock } from './reminders'
 import { Rooms } from './rooms'
+import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
 import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
@@ -70,6 +72,7 @@ export class Backend implements NateBotApi {
   private engine: Engine
   private scheduler: Scheduler
   private reminderClock: ReminderClock
+  private emailWatcher: EmailWatcher
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
   private envOverride: EnvStatus | null = null
@@ -137,6 +140,13 @@ export class Backend implements NateBotApi {
       () => this.fireReminders()
     )
     this.engine.on('remindersChanged', () => this.fireReminders())
+    this.emailWatcher = new EmailWatcher({
+      db: this.db,
+      agents: () => this.store.list(),
+      tokenPath: gmailTokenPath,
+      onMatch: (agentId, trigger, hits) => this.fireTrigger(agentId, trigger, hits),
+      log
+    })
 
     this.usage.on('changed', () => {
       const info = this.usage.get()
@@ -177,6 +187,7 @@ export class Backend implements NateBotApi {
     // Routines only fire while the Mac is awake and NateBot is open: run what was missed.
     this.catchUpRoutines()
     this.fireReminders()
+    this.emailWatcher.start()
     powerMonitor.on('resume', this.onResume)
   }
 
@@ -191,6 +202,7 @@ export class Backend implements NateBotApi {
     unwatchFile(MCP_FILE)
     this.scheduler.stopAll()
     this.reminderClock.stop()
+    this.emailWatcher.stop()
     this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
@@ -326,6 +338,7 @@ export class Backend implements NateBotApi {
     else if (r.quiet) log(`run: agent=${r.agentId} had nothing to report, no notification`)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
     else if (r.source === 'reminder') this.notify(r.agentId, 'Reminder', r.summary)
+    else if (r.source === 'trigger') this.notify(r.agentId, 'New email', r.summary)
     else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
 
@@ -444,6 +457,21 @@ export class Backend implements NateBotApi {
     }
     this.reminderClock.arm()
     this.emitAgents()
+  }
+
+  /** New email matched one of an agent's triggers: run it (unless the week's usage says not to). */
+  private fireTrigger(agentId: string, trigger: EmailTrigger, hits: EmailHit[]): void {
+    const what = hits.length === 1 ? `“${hits[0]?.subject || '(no subject)'}” from ${hits[0]?.from}` : `${hits.length} new emails`
+    log(`email trigger: agent=${agentId} trigger=${trigger.id} matches=${hits.length}`)
+    const paused = this.weekPaused()
+    if (paused) {
+      this.engine.system(agentId, `Email trigger matched ${what}, but the agent didn't run: ${paused}`)
+      this.notify(agentId, 'New email', what)
+      this.emitAgents()
+      return
+    }
+    this.engine.system(agentId, `Email trigger: ${what} (search: ${trigger.query})`)
+    this.engine.enqueue(agentId, { source: 'trigger', prompt: triggerPrompt(trigger, hits), attachments: [] })
   }
 
   /** Why unattended runs are paused this week (Settings → Usage), or null if they aren't. */

@@ -4,8 +4,8 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_EFFORT, EFFORTS, MAX_QUICK_PROMPTS, MAX_ROUTINES } from '@shared/types'
-import type { AgentConfig, AgentDraft, EffortLevel, MascotShape, ModelId, Routine } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_ROUTINES } from '@shared/types'
+import type { AgentConfig, AgentDraft, EffortLevel, EmailTrigger, MascotShape, ModelId, Routine } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
 
@@ -62,6 +62,20 @@ function normalizeQuickPrompts(v: unknown, id: string): string[] {
   return [...new Set(list)].slice(0, MAX_QUICK_PROMPTS)
 }
 
+export function normalizeTriggers(v: unknown): EmailTrigger[] {
+  const out: EmailTrigger[] = []
+  for (const [i, t] of (Array.isArray(v) ? v : []).entries()) {
+    if (!t || typeof t !== 'object' || out.length >= MAX_EMAIL_TRIGGERS) continue
+    const r = t as Record<string, unknown>
+    const query = str(r['query']).replace(/\s+/g, ' ').trim().slice(0, 300)
+    if (!query) continue
+    let id = typeof r['id'] === 'string' && ROUTINE_ID_RE.test(r['id']) ? r['id'] : `t${i + 1}`
+    while (out.some((o) => o.id === id)) id = `${id}-2`
+    out.push({ id, enabled: r['enabled'] === true, query, prompt: str(r['prompt']).trim().slice(0, 2000) })
+  }
+  return out
+}
+
 function normalizeShape(v: unknown, id: string): MascotShape | null {
   if (MASCOT_SHAPES.includes(v as MascotShape)) return v as MascotShape
   // Starter agents created before shapes existed keep their designed look.
@@ -85,6 +99,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     disallowed_tools: strList(r['disallowed_tools']),
     quick_prompts: normalizeQuickPrompts(r['quick_prompts'], id),
     routines: normalizeRoutines(r['routines'], r['routine']),
+    email_triggers: normalizeTriggers(r['email_triggers']),
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
 }
@@ -104,6 +119,7 @@ function serialize(a: AgentConfig): string {
     disallowed_tools: a.disallowed_tools,
     quick_prompts: a.quick_prompts,
     routines: a.routines,
+    email_triggers: a.email_triggers,
     session_id: a.session_id
   }
   return HEADER + stringify(doc, { lineWidth: 0, blockQuote: 'literal' })
