@@ -14,7 +14,7 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, stripBlocks, StreamState, type RunTokens } from './claude/stream'
+import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
 import { resolveReminders } from './reminders'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
@@ -59,6 +59,8 @@ export interface RunFinished {
   messageId: string
   /** Who the run suggests handing a task to, waiting for the user's OK. */
   handoffTo?: string
+  /** A routine or reminder run that found nothing needing the user: no notification. */
+  quiet?: boolean
 }
 
 /** One agent's turn in a group chat. */
@@ -97,6 +99,9 @@ class UserFacingError extends Error {}
 
 const firstLine = (text: string): string =>
   (text.split('\n').find((l) => l.trim()) ?? '').replace(/[*_`#>]/g, '').trim().slice(0, 200)
+
+const QUIET_RULE =
+  "[If nothing here needs the user's attention or is new since your last report, start your reply with the line [quiet] and keep it to one or two lines. NateBot then won't send a notification.]"
 
 const tail = (text: string, lines = 6): string => text.trim().split('\n').slice(-lines).join('\n').trim()
 
@@ -219,6 +224,8 @@ export class Engine extends EventEmitter {
       )
     }
     parts.push(job.prompt || 'Please look at the attached file(s).')
+    // Unattended runs can say there's nothing to report, so the user isn't notified for nothing.
+    if (job.source !== 'chat') parts.push(QUIET_RULE)
     if (job.attachments.length) {
       parts.push(`[Attached files, saved in your working folder]\n${job.attachments.map((a) => `- ${a}`).join('\n')}`)
     }
@@ -291,6 +298,7 @@ export class Engine extends EventEmitter {
     let mcp: ReturnType<typeof writeRunConfig> | null = null
     let tokens: RunTokens | null = null
     let remindersSet = false
+    let quiet = false
 
     try {
       const bin = this.deps.claudePath()
@@ -308,9 +316,11 @@ export class Engine extends EventEmitter {
       const state = new StreamState()
 
       let emitTimer: NodeJS.Timeout | undefined
+      // Unattended runs may start with the [quiet] marker: never show it.
+      const visible = (text: string): string => (job.source === 'chat' ? text : quietMarker(text).text)
       const flush = (): void => {
         emitTimer = undefined
-        msg.text = hideActionsBlock(state.text)
+        msg.text = visible(hideActionsBlock(state.text))
         msg.tools = state.tools.map((t) => ({ ...t }))
         this.deps.emitMessage({ ...msg })
       }
@@ -342,19 +352,21 @@ export class Engine extends EventEmitter {
       if (exit.reason === 'spawn-error') throw new UserFacingError(`Couldn't start Claude Code: ${exit.error ?? 'unknown error'}`)
 
       if (exit.reason === 'stopped') {
-        msg.text = hideActionsBlock(state.text)
+        msg.text = visible(hideActionsBlock(state.text))
         summary = 'Stopped'
         const note = r.dropped ? `Stopped · ${r.dropped} queued message${r.dropped > 1 ? 's' : ''} cancelled` : 'Stopped'
         extraLines.push({ role: 'system', text: note })
       } else if (exit.reason === 'timeout') {
-        msg.text = hideActionsBlock(state.text)
+        msg.text = visible(hideActionsBlock(state.text))
         summary = 'Timed out'
         extraLines.push({ role: 'error', text: 'This took longer than 15 minutes, so NateBot stopped it.' })
       } else if (state.result && !state.result.isError) {
         const parsed = extractActions(state.text || state.result.text)
         const handed = extractHandoffs(parsed.text)
         const { handoffs, problems } = resolveHandoffs(handed.handoffs, agent, this.deps.store.list())
-        const timed = extractReminders(handed.text)
+        const marked = job.source === 'chat' ? { quiet: false, text: handed.text } : quietMarker(handed.text)
+        quiet = marked.quiet
+        const timed = extractReminders(marked.text)
         const set = resolveReminders(timed.reminders, agentId, msg.id, Date.now(), this.deps.db.scheduledCount(agentId))
         msg.text = timed.text
         if (parsed.actions.length) msg.actions = parsed.actions
@@ -407,7 +419,9 @@ export class Engine extends EventEmitter {
     const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length)
     if (hasContent) {
       this.save(msg)
-      if (msg.text || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length) this.deps.db.bumpUnread(agentId)
+      // A quiet report is in the chat, but doesn't count as something new to read.
+      const quietOnly = quiet && !msg.actions?.length && !msg.handoffs?.length
+      if (!quietOnly && (msg.text || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length)) this.deps.db.bumpUnread(agentId)
     } else {
       // Nothing was produced: turn the placeholder into the status line.
       const first = extraLines.shift()
@@ -425,7 +439,16 @@ export class Engine extends EventEmitter {
       this.queues.set(agentId, q)
     }
     this.deps.emitAgents()
-    const finished: RunFinished = { agentId, source: job.source, ok, summary, needsApproval: !!msg.actions?.length, messageId: msg.id, handoffTo: msg.handoffs?.[0]?.toName }
+    const finished: RunFinished = {
+      agentId,
+      source: job.source,
+      ok,
+      summary,
+      needsApproval: !!msg.actions?.length,
+      messageId: msg.id,
+      handoffTo: msg.handoffs?.[0]?.toName,
+      quiet: ok && quiet
+    }
     this.emit('runFinished', finished)
     this.pump()
   }

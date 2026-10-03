@@ -189,6 +189,19 @@ export function hideActionsBlock(text: string): string {
   return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START)
 }
 
+const QUIET = '[quiet]'
+
+/**
+ * Routine and reminder runs start their reply with "[quiet]" when nothing needs the user,
+ * so NateBot can skip the notification. Also hides a half-written marker while streaming.
+ */
+export function quietMarker(text: string): { quiet: boolean; text: string } {
+  const lead = text.trimStart()
+  if (lead.toLowerCase().startsWith(QUIET)) return { quiet: true, text: lead.slice(QUIET.length).trimStart() }
+  if (lead && QUIET.startsWith(lead.toLowerCase())) return { quiet: false, text: '' }
+  return { quiet: false, text }
+}
+
 /** Removes every NateBot block from a finished reply (group chats, which use none of them). */
 export function stripBlocks(text: string): string {
   return extractReminders(extractHandoffs(extractActions(text).text).text).text
