@@ -1,8 +1,8 @@
 // The real NateBot backend: implements the renderer API on top of the agent
 // store (YAML), the database (SQLite), the claude engine and the scheduler.
-import { app, BrowserWindow, dialog, Notification, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, Notification, powerMonitor, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { NateBotApi } from '@shared/ipc'
 import type {
@@ -40,7 +40,7 @@ import { log } from './log'
 import * as skills from './skills'
 import { calendarStatus, connectCalendar, connectGmail, gmailStatus, gmailTokenPath, googleReady, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
-import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
+import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
@@ -940,6 +940,24 @@ export class Backend implements NateBotApi {
     const accel = this.settings.get().quickCapture
     this.captureOk = this.onCaptureShortcut(accel)
     if (!this.captureOk) log(`quick capture: couldn't register ${accel}`)
+  }
+
+  async readClipboard(): Promise<{ text: string | null; imagePath: string | null }> {
+    const text = (await clipboard.readText().catch(() => '')).trim()
+    let imagePath: string | null = null
+    try {
+      // The async clipboard API: a copied screenshot shows up as an image/png item.
+      const item = (await clipboard.read()).find((i) => i.types.includes('image/png'))
+      const blob = item ? ((await item.getType('image/png')) as Blob) : null
+      if (blob && blob.size > 0 && blob.size < 20 * 1024 * 1024) {
+        mkdirSync(TMP_DIR, { recursive: true, mode: 0o700 })
+        imagePath = join(TMP_DIR, `clipboard-${Date.now()}.png`)
+        writeFileSync(imagePath, Buffer.from(await blob.arrayBuffer()))
+      }
+    } catch {
+      // No image, or the clipboard couldn't be read: text only.
+    }
+    return { text: text ? text.slice(0, 8000) : null, imagePath }
   }
 
   async hideCapture(): Promise<void> {

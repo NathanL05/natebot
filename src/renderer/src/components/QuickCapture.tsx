@@ -39,6 +39,8 @@ export function QuickCapture() {
   const [agents, setAgents] = useState<AgentSummary[]>([])
   const [agentId, setAgentId] = useState<string | null>(remembered())
   const [text, setText] = useState('')
+  const [clip, setClip] = useState<{ text: string | null; imagePath: string | null }>({ text: null, imagePath: null })
+  const [withClip, setWithClip] = useState(false)
   const box = useRef<HTMLTextAreaElement>(null)
 
   const load = async (): Promise<void> => {
@@ -61,6 +63,8 @@ export function QuickCapture() {
     const offShown = api.on('captureShown', () => {
       void load()
       setText('')
+      setWithClip(false)
+      void api.readClipboard().then(setClip)
       requestAnimationFrame(() => box.current?.focus())
     })
     const offAgents = api.on('agents', (list) => setAgents([...list].sort((a, b) => b.lastActivity - a.lastActivity)))
@@ -81,9 +85,11 @@ export function QuickCapture() {
 
   const send = (): void => {
     if (!target) return
-    const body = (picked ? text.replace(/^@\S+\s*/, '') : text).trim()
-    if (!body) return
-    void api.sendMessage(target.id, body)
+    const typed = (picked ? text.replace(/^@\S+\s*/, '') : text).trim()
+    const pasted = withClip && clip.text ? `\n\n[From my clipboard]\n${clip.text}` : ''
+    const files = withClip && clip.imagePath ? [clip.imagePath] : undefined
+    if (!typed && !pasted && !files) return
+    void api.sendMessage(target.id, `${typed}${pasted}`.trim(), files)
     remember(target.id)
     setAgentId(target.id)
     setText('')
@@ -125,7 +131,7 @@ export function QuickCapture() {
           <button
             type="button"
             onClick={send}
-            disabled={!target || !text.trim()}
+            disabled={!target || (!text.trim() && !withClip)}
             aria-label="Send"
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-me text-me-fg transition hover:opacity-85 disabled:opacity-30"
           >
@@ -147,7 +153,21 @@ export function QuickCapture() {
               {a.name}
             </button>
           ))}
-          <span className="ml-auto shrink-0 text-[11px] text-muted">Tab switches · Enter sends · Esc closes</span>
+          {(clip.text || clip.imagePath) && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setWithClip(!withClip)}
+              title={clip.text ? clip.text.slice(0, 300) : 'The copied image'}
+              className={`ml-auto flex max-w-[200px] shrink-0 items-center gap-1 truncate rounded-full border px-2 py-1 text-[12px] transition ${
+                withClip ? 'border-accent bg-selected text-fg' : 'border-line-strong text-muted hover:text-fg'
+              }`}
+            >
+              {withClip ? '✓ ' : '+ '}
+              {clip.imagePath ? 'Clipboard image' : `Clipboard: “${(clip.text ?? '').replace(/\s+/g, ' ').slice(0, 24)}…”`}
+            </button>
+          )}
+          <span className={`${clip.text || clip.imagePath ? '' : 'ml-auto'} shrink-0 text-[11px] text-muted`}>Tab switches · Enter sends · Esc closes</span>
         </div>
       </div>
     </div>
