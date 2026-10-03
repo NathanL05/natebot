@@ -12,6 +12,8 @@ export function createTray(opts: {
   onRoutines: () => void
   /** Sends one of an agent's quick prompts without opening the window. */
   onQuickPrompt: (agentId: string, prompt: string) => void
+  /** Opens the quick-capture box. */
+  onCapture: () => void
 }): { update: (agents: AgentSummary[]) => void } {
   const icon = nativeImage.createFromPath(join(opts.resourcesDir, 'trayTemplate.png'))
   icon.setTemplateImage(true)
@@ -31,6 +33,7 @@ export function createTray(opts: {
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: 'Open NateBot', click: opts.onOpen },
+        { label: 'Message an agent…', click: opts.onCapture },
         { type: 'separator' },
         ...(busy ? [{ label: `${busy} agent${busy > 1 ? 's' : ''} working…`, enabled: false }] : []),
         ...(unread ? [{ label: `${unread} unread`, enabled: false }] : []),

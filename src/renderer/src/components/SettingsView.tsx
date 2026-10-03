@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { EFFORTS, MODELS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { EFFORTS, MODELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
 import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
@@ -270,6 +270,7 @@ export function SettingsView() {
                 onBlur={(e) => e.target.value.trim() && void patch({ userName: e.target.value.trim() })}
               />
             </Row>
+            <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />
             </Row>
@@ -281,5 +282,34 @@ export function SettingsView() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** The global shortcut that opens the quick-capture box from any app. */
+function QuickCaptureRow({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const [ok, setOk] = useState(true)
+  useEffect(() => {
+    void api.captureShortcutOk().then(setOk)
+  }, [value])
+  const label = QUICK_CAPTURE_SHORTCUTS.find((s) => s.id === value)?.label
+  return (
+    <Row
+      label="Quick capture"
+      hint={
+        !value ? (
+          'Off. Turn on a shortcut to message an agent from any app.'
+        ) : ok ? (
+          `Press ${label} in any app to message an agent. The reply arrives as a notification.`
+        ) : (
+          <span className="text-warn">Another app already uses {label}. Pick a different shortcut.</span>
+        )
+      }
+    >
+      <Segmented<string>
+        value={value ?? 'off'}
+        onChange={(v) => onChange(v === 'off' ? null : v)}
+        options={[{ value: 'off', label: 'Off' }, ...QUICK_CAPTURE_SHORTCUTS.map((s) => ({ value: s.id, label: s.label }))]}
+      />
+    </Row>
   )
 }

@@ -10,7 +10,8 @@ const defaults: AppSettings = {
   theme: 'dark',
   accent: DEFAULT_ACCENT,
   launchAtLogin: false,
-  userName: 'Nathan'
+  userName: 'Nathan',
+  quickCapture: 'Alt+Space'
 }
 
 describe('settings sanitising', () => {
@@ -41,8 +42,14 @@ describe('settings sanitising', () => {
       theme: 'sepia',
       accent: 'not-a-colour',
       launchAtLogin: 'yes',
-      userName: ''
+      userName: '',
+      quickCapture: 'F13'
     } as unknown as Partial<AppSettings>
     expect(sanitize(raw, defaults)).toEqual(defaults)
+  })
+
+  it('keeps a known quick-capture shortcut, or off', () => {
+    expect(sanitize({ quickCapture: 'Control+Alt+Space' }, defaults).quickCapture).toBe('Control+Alt+Space')
+    expect(sanitize({ quickCapture: null }, defaults).quickCapture).toBeNull()
   })
 })
