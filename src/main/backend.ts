@@ -16,6 +16,8 @@ import type {
   Folder,
   GmailStatus,
   MarketplaceData,
+  Reminder,
+  ReminderStatus,
   RoomConfig,
   RoomDraft,
   RoutineInfo,
@@ -38,6 +40,7 @@ import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
+import { dueAction, ReminderClock } from './reminders'
 import { Rooms } from './rooms'
 import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
 import { SettingsStore } from './settings'
@@ -64,6 +67,7 @@ export class Backend implements NateBotApi {
   private db: Db
   private engine: Engine
   private scheduler: Scheduler
+  private reminderClock: ReminderClock
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
   private envOverride: EnvStatus | null = null
@@ -74,7 +78,10 @@ export class Backend implements NateBotApi {
   private approvalNotices = new Map<string, Notification>()
   private onResume = (): void => {
     clearTimeout(this.wakeTimer)
-    this.wakeTimer = setTimeout(() => this.catchUpRoutines(), WAKE_DELAY_MS)
+    this.wakeTimer = setTimeout(() => {
+      this.catchUpRoutines()
+      this.fireReminders()
+    }, WAKE_DELAY_MS)
   }
   /** Called whenever the agent list changes (tray menu). */
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
@@ -117,6 +124,11 @@ export class Backend implements NateBotApi {
     })
 
     this.scheduler = new Scheduler((id) => this.fireRoutine(id, 'tick'))
+    this.reminderClock = new ReminderClock(
+      () => this.db.nextReminderAt(),
+      () => this.fireReminders()
+    )
+    this.engine.on('remindersChanged', () => this.fireReminders())
 
     this.usage.on('changed', () => {
       const info = this.usage.get()
@@ -156,6 +168,7 @@ export class Backend implements NateBotApi {
     this.usage.startPolling()
     // Routines only fire while the Mac is awake and NateBot is open: run what was missed.
     this.catchUpRoutines()
+    this.fireReminders()
     powerMonitor.on('resume', this.onResume)
   }
 
@@ -169,6 +182,7 @@ export class Backend implements NateBotApi {
     stopGmailConnect()
     unwatchFile(MCP_FILE)
     this.scheduler.stopAll()
+    this.reminderClock.stop()
     this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
@@ -295,6 +309,7 @@ export class Backend implements NateBotApi {
     if (r.needsApproval) this.notifyApproval(r)
     else if (r.handoffTo) this.notify(r.agentId, 'Suggests a handoff', `Pass a task to ${r.handoffTo}? Open NateBot to review and confirm.`)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
+    else if (r.source === 'reminder') this.notify(r.agentId, 'Reminder', r.summary)
     else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
 
@@ -348,6 +363,51 @@ export class Backend implements NateBotApi {
     }
     this.engine.system(agentId, `Routine ran at ${time}${dueText}`)
     this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
+  }
+
+  /** Sets a reminder's status, and the copy on the message that set it. */
+  private setReminderStatus(r: Reminder, status: ReminderStatus): void {
+    this.db.setReminderStatus(r.id, status)
+    const msg = this.db.getMessage(r.messageId)
+    const copy = msg?.reminders?.find((x) => x.id === r.id)
+    if (msg && copy) {
+      copy.status = status
+      this.db.saveMessage(msg)
+      emit('message', msg)
+    }
+  }
+
+  /** Runs every reminder that's due (late ones too, after sleep or a restart), then waits for the next. */
+  private fireReminders(): void {
+    const now = Date.now()
+    for (const r of this.db.scheduledReminders(now)) {
+      const what = dueAction(r, now)
+      if (!what) continue
+      if (!this.store.get(r.agentId)) {
+        this.db.setReminderStatus(r.id, 'cancelled')
+        continue
+      }
+      // A task can't run without a working claude: keep it until there is one.
+      const env = this.envOverride ?? this.env
+      if (what === 'run' && r.kind === 'task' && (!env.claudeFound || !env.loggedIn)) continue
+      const due = new Date(r.at).toDateString() === new Date(now).toDateString() ? clock(r.at) : new Date(r.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
+      if (what === 'miss') {
+        this.setReminderStatus(r, 'missed')
+        this.engine.system(r.agentId, `Missed reminder (due ${due}, while the Mac was asleep or NateBot was closed): ${r.text}`)
+        continue
+      }
+      this.setReminderStatus(r, 'done')
+      log(`reminder: agent=${r.agentId} kind=${r.kind} late=${now - r.at > LATE_AFTER_MS}`)
+      if (r.kind === 'message') {
+        this.engine.say(r.agentId, `⏰ ${r.text}`)
+        this.notify(r.agentId, 'Reminder', r.text)
+      } else {
+        this.engine.system(r.agentId, `Reminder ran at ${clock(now)}${now - r.at > LATE_AFTER_MS ? ` (it was due at ${due})` : ''}`)
+        this.engine.enqueue(r.agentId, { source: 'reminder', prompt: r.text, attachments: [], dueAt: r.at })
+      }
+    }
+    this.reminderClock.arm()
+    this.emitAgents()
   }
 
   private requireAgent(agentId: unknown): AgentConfig {
@@ -476,6 +536,7 @@ export class Backend implements NateBotApi {
     removeAvatar(`agent:${agentId}`)
     this.db.deleteAgent(agentId)
     this.rooms.removeMember(agentId)
+    this.reminderClock.arm()
     // The workspace may hold the user's attachments: move it to the Trash (recoverable).
     const dir = workspaceOf(agentId)
     if (existsSync(dir)) await shell.trashItem(dir).catch(() => undefined)
@@ -608,6 +669,20 @@ export class Backend implements NateBotApi {
           lastRun: last?.endedAt ? { at: last.endedAt, ok: last.ok === true, summary: last.summary ?? '' } : null
         }
       })
+  }
+
+  async listReminders(): Promise<Reminder[]> {
+    return this.db.scheduledReminders().filter((r) => this.store.get(r.agentId))
+  }
+
+  async cancelReminder(reminderId: string): Promise<void> {
+    const r = typeof reminderId === 'string' ? this.db.reminder(reminderId) : null
+    if (!r || r.status !== 'scheduled') return
+    this.setReminderStatus(r, 'cancelled')
+    this.db.addNote(r.agentId, `The user cancelled your reminder "${r.text.slice(0, 120)}".`)
+    this.engine.system(r.agentId, 'Reminder cancelled')
+    this.reminderClock.arm()
+    this.emitAgents()
   }
 
   async setRoutineEnabled(agentId: string, enabled: boolean): Promise<void> {

@@ -13,6 +13,7 @@ import type {
   GmailStatus,
   MarketplaceData,
   McpServerInfo,
+  Reminder,
   RoomConfig,
   RoomDraft,
   RoomSummary,
@@ -61,6 +62,9 @@ export interface NateBotApi {
   listRoutines(): Promise<RoutineInfo[]>
   setRoutineEnabled(agentId: string, enabled: boolean): Promise<void>
   runRoutineNow(agentId: string): Promise<void>
+  /** Reminders still waiting to go off, soonest first. */
+  listReminders(): Promise<Reminder[]>
+  cancelReminder(reminderId: string): Promise<void>
 
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>
   recheckEnv(): Promise<EnvStatus>
@@ -109,6 +113,8 @@ export const API_METHODS = [
   'listRoutines',
   'setRoutineEnabled',
   'runRoutineNow',
+  'listReminders',
+  'cancelReminder',
   'updateSettings',
   'recheckEnv',
   'refreshUsage',

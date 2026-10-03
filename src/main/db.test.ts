@@ -50,3 +50,24 @@ describe('usageByAgent', () => {
     db.close()
   })
 })
+
+describe('reminders', () => {
+  const reminder = (id: string, at: number, agentId = 'planner') => ({ id, agentId, messageId: 'm1', at, kind: 'message' as const, text: id, status: 'scheduled' as const })
+
+  it('lists what is due soonest first and finds the next time', () => {
+    const db = new Db(':memory:')
+    db.saveReminder(reminder('later', 3000))
+    db.saveReminder(reminder('soon', 1000))
+    db.saveReminder(reminder('other', 2000, 'email'))
+    expect(db.nextReminderAt()).toBe(1000)
+    expect(db.scheduledReminders(2000).map((r) => r.id)).toEqual(['soon', 'other'])
+    expect(db.scheduledCount('planner')).toBe(2)
+
+    db.setReminderStatus('soon', 'done')
+    expect(db.nextReminderAt()).toBe(2000)
+    expect(db.reminder('soon')?.status).toBe('done')
+
+    db.deleteAgent('email')
+    expect(db.scheduledReminders().map((r) => r.id)).toEqual(['later'])
+  })
+})

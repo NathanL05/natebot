@@ -2,7 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
-import type { AgentUsage, ChatMessage, Folder, MessageRole, RoomConfig } from '@shared/types'
+import type { AgentUsage, ChatMessage, Folder, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -33,11 +33,33 @@ interface RoomRow {
 export interface RunRecord {
   id: string
   agentId: string
-  source: 'chat' | 'routine' | 'action' | 'room'
+  source: 'chat' | 'routine' | 'action' | 'room' | 'reminder'
   startedAt: number
   endedAt: number | null
   ok: boolean | null
   summary: string | null
+}
+
+interface ReminderRow {
+  id: string
+  agent_id: string
+  message_id: string
+  at: number
+  kind: string
+  text: string
+  status: string
+}
+
+function toReminder(row: ReminderRow): Reminder {
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    messageId: row.message_id,
+    at: row.at,
+    kind: row.kind === 'task' ? 'task' : 'message',
+    text: row.text,
+    status: row.status as ReminderStatus
+  }
 }
 
 function toMessage(row: MessageRow): ChatMessage {
@@ -92,6 +114,17 @@ export class Db {
         seats TEXT NOT NULL DEFAULT '{}',
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS reminders (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        message_id TEXT NOT NULL,
+        at INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        text TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(status, at);
       CREATE TABLE IF NOT EXISTS folders (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -287,8 +320,47 @@ export class Db {
     }
   }
 
+  // ---- reminders ----
+
+  saveReminder(r: Reminder): void {
+    this.db
+      .prepare(
+        `INSERT INTO reminders (id, agent_id, message_id, at, kind, text, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET status = excluded.status`
+      )
+      .run(r.id, r.agentId, r.messageId, r.at, r.kind, r.text, r.status, Date.now())
+  }
+
+  reminder(id: string): Reminder | null {
+    const row = this.db.prepare('SELECT * FROM reminders WHERE id = ?').get(id) as ReminderRow | undefined
+    return row ? toReminder(row) : null
+  }
+
+  setReminderStatus(id: string, status: ReminderStatus): void {
+    this.db.prepare('UPDATE reminders SET status = ? WHERE id = ?').run(status, id)
+  }
+
+  /** Scheduled reminders, soonest first; only those due by `until` when given. */
+  scheduledReminders(until = Number.MAX_SAFE_INTEGER): Reminder[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM reminders WHERE status = 'scheduled' AND at <= ? ORDER BY at`)
+      .all(until) as unknown as ReminderRow[]
+    return rows.map(toReminder)
+  }
+
+  nextReminderAt(): number | null {
+    const row = this.db.prepare(`SELECT MIN(at) AS at FROM reminders WHERE status = 'scheduled'`).get() as { at: number | null }
+    return row.at ?? null
+  }
+
+  scheduledCount(agentId: string): number {
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM reminders WHERE status = 'scheduled' AND agent_id = ?`).get(agentId) as { n: number }
+    return row.n
+  }
+
   deleteAgent(agentId: string): void {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
+    this.db.prepare('DELETE FROM reminders WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
     // Keep what the agent used, so usage totals don't shift onto the others.
     this.db.prepare('UPDATE runs SET agent_id = ? WHERE agent_id = ?').run(DELETED_AGENT_ID, agentId)

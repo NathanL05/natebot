@@ -50,3 +50,13 @@ export { describeTool } from '@shared/tools'
 export function basename(path: string): string {
   return path.split('/').pop() ?? path
 }
+
+/** When something is due: "Today 7:00 PM", "Tomorrow 8:30 AM", "Mon 5 Oct 9:00 AM". */
+export function dueTime(ts: number): string {
+  const days = Math.round((startOfDay(ts) - startOfDay(Date.now())) / DAY)
+  const time = clockTime(ts)
+  if (days === 0) return `Today ${time}`
+  if (days === 1) return `Tomorrow ${time}`
+  if (days === -1) return `Yesterday ${time}`
+  return `${new Date(ts).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} ${time}`
+}

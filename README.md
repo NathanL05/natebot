@@ -21,6 +21,7 @@ and logged in on your Mac. There is **no API key and no API billing**.
 - [Group chats](#group-chats)
 - [Approvals](#approvals)
 - [Routines](#routines)
+- [Reminders](#reminders)
 - [Avatars](#avatars)
 - [Skills marketplace](#skills-marketplace)
 - [Usage widget](#usage-widget)
@@ -292,6 +293,24 @@ Routines fire while NateBot is running and the Mac is awake. If one was missed i
 asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, and the chat says so: *Routine ran
 at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A new or changed schedule
 starts counting from when you save it.
+
+## Reminders
+
+Ask any agent to remind you about something: *"remind me at 7pm to call Mum"*, *"tomorrow at 8:30 check
+whether Sarah replied"*. The agent confirms in a sentence and its reply shows a **reminder card** with the time.
+Reminders are set straight away. Click **Cancel** on the card (or in **Routines & reminders**) to stop one.
+
+- **Message reminders** post the agent's text in the chat at that time, with a notification. They don't run
+  Claude, so they cost nothing.
+- **Task reminders** run the agent at that time with the task as its prompt (for example checking your inbox),
+  using the same tools and approvals as any other message. The agent picks this kind only when the moment needs
+  fresh work.
+- Reminders are one-off. For something that repeats, use a routine.
+- Like routines, they go off while NateBot is running and the Mac is awake. A message reminder that was missed
+  shows up as soon as NateBot starts or the Mac wakes. A task more than 12 hours late is skipped and the chat says so.
+- Limits: 5 per reply, 20 waiting per agent, up to a year ahead. Group chats can't set reminders.
+
+Reminders are stored in `~/NateBot/data.db` (table `reminders`). The logic is in `src/main/reminders.ts`.
 
 ## Avatars
 

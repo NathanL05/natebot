@@ -14,8 +14,9 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, extractHandoffs, hideActionsBlock, StreamState, type RunTokens } from './claude/stream'
+import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
+import { resolveReminders } from './reminders'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
 const RUN_TIMEOUT = 15 * 60_000
@@ -29,12 +30,12 @@ const EMIT_EVERY_MS = 70
 const BASE_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch']
 
 export interface Job {
-  source: 'chat' | 'routine'
+  source: 'chat' | 'routine' | 'reminder'
   prompt: string
   /** Paths relative to the agent's workspace. */
   attachments: string[]
   retried?: boolean
-  /** Routines running late (the Mac was asleep or NateBot closed): when they were due. */
+  /** Routines and reminders: when they were due (routines only set it when running late). */
   dueAt?: number
 }
 
@@ -192,6 +193,12 @@ export class Engine extends EventEmitter {
     this.save({ id: randomUUID(), agentId, role: 'system', text, createdAt: Date.now() })
   }
 
+  /** A message from the agent that needed no run (e.g. a reminder going off). */
+  say(agentId: string, text: string): void {
+    this.save({ id: randomUUID(), agentId, role: 'agent', text, createdAt: Date.now() })
+    this.deps.db.bumpUnread(agentId)
+  }
+
   private buildInput(job: Job, notes: string[]): string {
     const parts: string[] = [currentTimeLine()]
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
@@ -200,6 +207,13 @@ export class Engine extends EventEmitter {
         job.dueAt
           ? `[Scheduled routine run, due at ${new Date(job.dueAt).toLocaleString('en-GB', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}. It's running late because the Mac was asleep or NateBot was closed.]`
           : '[Scheduled routine run]'
+      )
+    }
+    if (job.source === 'reminder') {
+      const due = job.dueAt ?? Date.now()
+      const late = Date.now() - due > 2 * 60_000
+      parts.push(
+        `[A reminder you set earlier is due now${late ? ` (it was due at ${new Date(due).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}, but the Mac was asleep or NateBot was closed)` : ''}. Do the task below and reply to the user.]`
       )
     }
     parts.push(job.prompt || 'Please look at the attached file(s).')
@@ -215,7 +229,7 @@ export class Engine extends EventEmitter {
     mcpServers: string[],
     sessionArgs: string[],
     // One-on-one chats can hand tasks to the other agents (group chats pass their own prompt).
-    prompt = systemPrompt(agent, agentNotes(agent), rosterFor(agent, this.deps.store.list()))
+    prompt = systemPrompt(agent, agentNotes(agent), { roster: rosterFor(agent, this.deps.store.list()) })
   ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
     // Tools marked require_approval in mcp.json are never available in normal runs.
@@ -274,6 +288,7 @@ export class Engine extends EventEmitter {
     let summary = ''
     let mcp: ReturnType<typeof writeRunConfig> | null = null
     let tokens: RunTokens | null = null
+    let remindersSet = false
 
     try {
       const bin = this.deps.claudePath()
@@ -337,14 +352,27 @@ export class Engine extends EventEmitter {
         const parsed = extractActions(state.text || state.result.text)
         const handed = extractHandoffs(parsed.text)
         const { handoffs, problems } = resolveHandoffs(handed.handoffs, agent, this.deps.store.list())
-        msg.text = handed.text
+        const timed = extractReminders(handed.text)
+        const set = resolveReminders(timed.reminders, agentId, msg.id, Date.now(), this.deps.db.scheduledCount(agentId))
+        msg.text = timed.text
         if (parsed.actions.length) msg.actions = parsed.actions
         if (handoffs.length) msg.handoffs = handoffs
-        for (const text of [parsed.error, handed.error, ...problems]) if (text) extraLines.push({ role: 'error', text })
+        if (set.reminders.length) {
+          msg.reminders = set.reminders
+          for (const rem of set.reminders) this.deps.db.saveReminder(rem)
+          remindersSet = true
+        }
+        for (const text of [parsed.error, handed.error, timed.error, ...problems, ...set.problems]) if (text) extraLines.push({ role: 'error', text })
         ok = true
         summary =
-          firstLine(handed.text) ||
-          (parsed.actions.length ? `${parsed.actions.length} action(s) to approve` : handoffs.length ? `Suggests handing off to ${handoffs[0]?.toName}` : 'Done')
+          firstLine(timed.text) ||
+          (parsed.actions.length
+            ? `${parsed.actions.length} action(s) to approve`
+            : handoffs.length
+              ? `Suggests handing off to ${handoffs[0]?.toName}`
+              : set.reminders.length
+                ? 'Reminder set'
+                : 'Done')
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
         if (looksLikeUsageLimit(detail) || state.rateLimit?.status === 'rejected') {
@@ -374,10 +402,10 @@ export class Engine extends EventEmitter {
     if (!ok) for (const n of notes) this.deps.db.addNote(agentId, n)
 
     msg.streaming = false
-    const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length || msg.handoffs?.length)
+    const hasContent = !!(msg.text || msg.tools?.length || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length)
     if (hasContent) {
       this.save(msg)
-      if (msg.text || msg.actions?.length || msg.handoffs?.length) this.deps.db.bumpUnread(agentId)
+      if (msg.text || msg.actions?.length || msg.handoffs?.length || msg.reminders?.length) this.deps.db.bumpUnread(agentId)
     } else {
       // Nothing was produced: turn the placeholder into the status line.
       const first = extraLines.shift()
@@ -387,6 +415,7 @@ export class Engine extends EventEmitter {
     for (const line of extraLines) this.save({ id: randomUUID(), agentId, role: line.role, text: line.text, createdAt: Date.now() })
 
     this.deps.db.finishRun(runId, ok, summary, tokens)
+    if (remindersSet) this.emit('remindersChanged')
     this.running.delete(agentId)
     if (requeue) {
       const q = this.queues.get(agentId) ?? []
@@ -409,7 +438,7 @@ export class Engine extends EventEmitter {
   /**
    * Runs one agent's reply in a group chat. The reply streams into the room as
    * a message with speakerId set; nothing is shown if the agent passes.
-   * Proposed actions are not supported in rooms and are stripped.
+   * Proposed actions, handoffs and reminders are not supported in rooms and are stripped.
    */
   async roomTurn(t: RoomTurn): Promise<RoomTurnResult> {
     const { agent, roomId } = t
@@ -467,7 +496,7 @@ export class Engine extends EventEmitter {
       } else if (exit.reason === 'timeout') {
         result = { status: 'error', text: hideActionsBlock(state.text).trim(), detail: `${agent.name} took longer than 5 minutes, so NateBot stopped it.` }
       } else if (state.result && !state.result.isError) {
-        const text = extractHandoffs(extractActions(state.text || state.result.text).text).text.trim()
+        const text = stripBlocks(state.text || state.result.text).trim()
         result = { status: 'ok', text: PASS_RE.test(text) ? '' : text, detail: '' }
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
