@@ -30,6 +30,8 @@ export interface NateBotApi {
   sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
+  /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
+  pendingMessages(): Promise<ChatMessage[]>
   /** Message text search across every chat (at least 2 characters). */
   searchMessages(query: string): Promise<MessageHit[]>
   /** Native file picker (multiple files). Returns absolute paths. */
@@ -107,6 +109,7 @@ export const API_METHODS = [
   'stop',
   'markRead',
   'searchMessages',
+  'pendingMessages',
   'pickAttachments',
   'createAgent',
   'updateAgent',
@@ -167,7 +170,7 @@ export interface NateBotEvents {
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
-  navigate: 'settings' | 'routines' | 'newAgent' | 'newRoom'
+  navigate: 'settings' | 'routines' | 'today' | 'newAgent' | 'newRoom'
   /** The quick-capture box was opened (a timestamp, so every opening is a new event). */
   captureShown: number
 }

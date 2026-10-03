@@ -209,6 +209,14 @@ export class Db {
     })
   }
 
+  /** Agent messages with a proposed action or handoff still waiting for the user, newest first. */
+  pendingMessages(): ChatMessage[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM messages WHERE role = 'agent' AND data LIKE '%"status":"pending"%' ORDER BY created_at DESC LIMIT 100`)
+      .all() as unknown as MessageRow[]
+    return rows.map(toMessage).filter((m) => m.actions?.some((a) => a.status === 'pending') || m.handoffs?.some((h) => h.status === 'pending'))
+  }
+
   /** The agent's latest non-empty reply, for runs that start without the chat's session. */
   lastAgentText(agentId: string): string | null {
     const row = this.db

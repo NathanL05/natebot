@@ -9,6 +9,7 @@ import { MarketplaceModal } from './components/MarketplaceModal'
 import { RoomModal } from './components/RoomModal'
 import { RoomView } from './components/RoomView'
 import { RoutinesView } from './components/RoutinesView'
+import { TodayView } from './components/TodayView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
 import { Sidebar } from './components/Sidebar'
@@ -47,6 +48,7 @@ export function App() {
       <Sidebar />
       <main className="flex min-w-0 flex-1">
         {view === 'chat' && (room ? <RoomView room={room} /> : <ChatView />)}
+        {view === 'today' && <TodayView />}
         {view === 'routines' && <RoutinesView />}
         {view === 'settings' && <SettingsView />}
       </main>

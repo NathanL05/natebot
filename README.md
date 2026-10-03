@@ -248,6 +248,13 @@ irreversible actions without approval.
 - **Stop:** ends the current run and cancels anything queued.
 - **Timeout:** runs time out after 15 minutes.
 
+## Today
+
+**Today** (in the sidebar above Marketplace, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
+proposed actions and handoffs waiting for your OK (with **Approve all** when there are several, after a confirmation
+listing each one), reminders and routines due in the next day, and what routines found in the last day. A badge
+shows how many approvals are waiting. It's built from what NateBot already stores, so opening it uses no tokens.
+
 ## Group chats
 
 Put several agents in one room and let them talk to each other. Create one with the people button at the top of

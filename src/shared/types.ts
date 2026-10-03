@@ -72,6 +72,8 @@ export interface AgentSummary extends AgentConfig {
   avatarVersion: number | null
   /** Sidebar folder, or null for "No folder". */
   folderId: string | null
+  /** Proposed actions and handoffs waiting for the user's OK. */
+  pending: number
 }
 
 /** A sidebar folder grouping agents and group chats. Stored in data.db. */
