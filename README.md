@@ -192,7 +192,9 @@ Deleting an agent moves its workspace to the Trash.
 
 ## Agents
 
-Add agents with **+** in the sidebar. Edit one with the sliders button in the chat header. Each agent is a YAML
+Add agents with **+** in the sidebar. You can start from a template (Study Buddy, Weekly Review, Budget Buddy, Fitness
+Coach, Travel Planner), each set up to be light on your limit (Haiku or low effort, only the tools it needs), or from
+blank. Edit one with the sliders button in the chat header. Each agent is a YAML
 file:
 
 ```yaml
