@@ -91,6 +91,8 @@ export interface NateBotApi {
   openExternal(url: string): Promise<void>
   /** Sends a test phone notification to the saved ntfy topic. */
   testPush(): Promise<{ ok: boolean; error?: string }>
+  /** What's on the clipboard for the quick-capture box: text (cut short), and a copied image saved as a temporary PNG. */
+  readClipboard(): Promise<{ text: string | null; imagePath: string | null }>
   /** Closes the quick-capture box. */
   hideCapture(): Promise<void>
   /** False when the quick-capture shortcut couldn't be registered (another app has it). */
@@ -152,6 +154,7 @@ export const API_METHODS = [
   'openExternal',
   'testPush',
   'hideCapture',
+  'readClipboard',
   'captureShortcutOk',
   'setAvatar',
   'marketplace',

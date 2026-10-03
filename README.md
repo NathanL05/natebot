@@ -240,7 +240,8 @@ irreversible actions without approval.
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
 - **Quick capture:** press **⌥ Space** in any app (or choose **Message an agent…** in the menu-bar menu) to open a
   small box over what you're doing. Type and press Enter to send it to the agent shown. **Tab** switches agent, or
-  start with `@planner`. Esc closes the box, and you're back in the app you were using. The reply arrives as a
+  start with `@planner`. If you've copied text or an image (like a screenshot), click **+ Clipboard** to send it along. Esc closes the box,
+and you're back in the app you were using. The reply arrives as a
   notification. Change or turn off the shortcut in **Settings → General → Quick capture**. If another app already
   uses the shortcut, Settings says so.
 - **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every
