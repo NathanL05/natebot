@@ -210,7 +210,18 @@ export interface AppSettings {
   accent: AccentId
   launchAtLogin: boolean
   userName: string
+  /** Global shortcut for the quick-capture box (an Electron accelerator), or null for off. */
+  quickCapture: string | null
 }
+
+/** The shortcuts offered for quick capture. */
+export const QUICK_CAPTURE_SHORTCUTS: { id: string; label: string }[] = [
+  { id: 'Alt+Space', label: '⌥ Space' },
+  { id: 'Alt+Shift+Space', label: '⌥⇧ Space' },
+  { id: 'Control+Alt+Space', label: '⌃⌥ Space' },
+  { id: 'Command+Shift+Space', label: '⌘⇧ Space' }
+]
+export const DEFAULT_QUICK_CAPTURE = 'Alt+Space'
 
 export interface UsageWindow {
   /** 0–1, or null before the first report. */

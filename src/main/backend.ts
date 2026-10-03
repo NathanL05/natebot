@@ -89,6 +89,10 @@ export class Backend implements NateBotApi {
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
   /** Called when a notification is clicked. */
   onOpenAgent: (agentId: string) => void = () => undefined
+  /** Registers the quick-capture shortcut; false if another app has it. */
+  onCaptureShortcut: (accelerator: string | null) => boolean = () => true
+  onHideCapture: () => void = () => undefined
+  private captureOk = true
 
   constructor() {
     mkdirSync(ROOT, { recursive: true })
@@ -733,6 +737,7 @@ export class Backend implements NateBotApi {
       app.setLoginItemSettings({ openAtLogin: next.launchAtLogin })
     }
     if (next.claudePath !== before.claudePath) void this.recheckEnv()
+    if (next.quickCapture !== before.quickCapture) this.applyCaptureShortcut()
     if (next.theme !== before.theme) {
       for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#0E0E13' : '#FFFFFF')
     }
@@ -764,6 +769,21 @@ export class Backend implements NateBotApi {
   async refreshUsage(): Promise<UsageInfo | null> {
     await this.usage.refresh()
     return this.usage.get()
+  }
+
+  /** Registers the quick-capture shortcut from the settings (at startup and when it changes). */
+  applyCaptureShortcut(): void {
+    const accel = this.settings.get().quickCapture
+    this.captureOk = this.onCaptureShortcut(accel)
+    if (!this.captureOk) log(`quick capture: couldn't register ${accel}`)
+  }
+
+  async hideCapture(): Promise<void> {
+    this.onHideCapture()
+  }
+
+  async captureShortcutOk(): Promise<boolean> {
+    return this.captureOk
   }
 
   async openExternal(url: string): Promise<void> {

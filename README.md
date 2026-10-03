@@ -221,6 +221,11 @@ irreversible actions without approval.
 - **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
   drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
+- **Quick capture:** press **⌥ Space** in any app (or choose **Message an agent…** in the menu-bar menu) to open a
+  small box over what you're doing. Type and press Enter to send it to the agent shown. **Tab** switches agent, or
+  start with `@planner`. Esc closes the box, and you're back in the app you were using. The reply arrives as a
+  notification. Change or turn off the shortcut in **Settings → General → Quick capture**. If another app already
+  uses the shortcut, Settings says so.
 - **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every
   message (yours and the agents', at least 2 characters). Click a result to open that chat at the message.
 - **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,

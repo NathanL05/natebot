@@ -5,6 +5,7 @@ import { handleAvatarProtocol, registerAvatarScheme } from './avatars'
 import { Backend } from './backend'
 import type { NateBotEvents } from '@shared/ipc'
 import { emit, registerApi } from './ipc'
+import { createCapture } from './capture'
 import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
 
@@ -171,6 +172,16 @@ app.whenReady().then(async () => {
   registerApi(backend, devServerUrl)
   buildMenu()
 
+  const capture = createCapture({
+    load: (win, hash) => {
+      if (devServerUrl) void win.loadURL(`${devServerUrl}#${hash}`)
+      else void win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
+    }
+  })
+  backend.onCaptureShortcut = capture.setShortcut
+  backend.onHideCapture = capture.hide
+  backend.applyCaptureShortcut()
+
   const tray = createTray({
     resourcesDir,
     onOpen: showWindow,
@@ -179,7 +190,8 @@ app.whenReady().then(async () => {
       showWindow()
       emit('navigate', 'routines')
     },
-    onQuickPrompt: (agentId, prompt) => void backend.sendMessage(agentId, prompt)
+    onQuickPrompt: (agentId, prompt) => void backend.sendMessage(agentId, prompt),
+    onCapture: () => capture.show()
   })
   backend.onAgentsChanged = tray.update
   backend.onOpenAgent = openAgent

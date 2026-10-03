@@ -79,6 +79,10 @@ export interface NateBotApi {
   /** Which agents used what in the current session window and week. */
   usageBreakdown(): Promise<UsageBreakdown>
   openExternal(url: string): Promise<void>
+  /** Closes the quick-capture box. */
+  hideCapture(): Promise<void>
+  /** False when the quick-capture shortcut couldn't be registered (another app has it). */
+  captureShortcutOk(): Promise<boolean>
 
   /** target: 'user' or 'agent:<id>'. dataUrl null resets to the default. Returns the new version. */
   setAvatar(target: string, dataUrl: string | null): Promise<number | null>
@@ -129,6 +133,8 @@ export const API_METHODS = [
   'refreshUsage',
   'usageBreakdown',
   'openExternal',
+  'hideCapture',
+  'captureShortcutOk',
   'setAvatar',
   'marketplace',
   'installSkill',
@@ -162,6 +168,8 @@ export interface NateBotEvents {
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
   navigate: 'settings' | 'routines' | 'newAgent' | 'newRoom'
+  /** The quick-capture box was opened (a timestamp, so every opening is a new event). */
+  captureShown: number
 }
 
 export const EVENT_NAMES = [
@@ -174,7 +182,8 @@ export const EVENT_NAMES = [
   'mcpServers',
   'gmailProgress',
   'focusAgent',
-  'navigate'
+  'navigate',
+  'captureShown'
 ] as const satisfies readonly (keyof NateBotEvents)[]
 
 export type Unsubscribe = () => void

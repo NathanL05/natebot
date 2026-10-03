@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
-import { DEFAULT_EFFORT, EFFORTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
+import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
 import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
@@ -24,7 +24,13 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
     theme: THEMES.includes(raw.theme as Theme) ? (raw.theme as Theme) : fallback.theme,
     accent: isAccentId(raw.accent) ? raw.accent : fallback.accent,
     launchAtLogin: typeof raw.launchAtLogin === 'boolean' ? raw.launchAtLogin : fallback.launchAtLogin,
-    userName: typeof raw.userName === 'string' && raw.userName.trim() ? raw.userName.trim() : fallback.userName
+    userName: typeof raw.userName === 'string' && raw.userName.trim() ? raw.userName.trim() : fallback.userName,
+    quickCapture:
+      raw.quickCapture === null
+        ? null
+        : QUICK_CAPTURE_SHORTCUTS.some((s) => s.id === raw.quickCapture)
+          ? (raw.quickCapture as string)
+          : fallback.quickCapture
   }
 }
 
@@ -39,7 +45,8 @@ export class SettingsStore {
       theme: 'dark',
       accent: DEFAULT_ACCENT,
       launchAtLogin: false,
-      userName: fullName()
+      userName: fullName(),
+      quickCapture: DEFAULT_QUICK_CAPTURE
     }
     let raw: Partial<AppSettings> = {}
     try {

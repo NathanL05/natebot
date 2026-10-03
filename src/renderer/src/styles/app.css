@@ -223,3 +223,9 @@ select:focus-visible {
 .nb-flash {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
+
+/* The quick-capture window is transparent around its rounded box. */
+html.capture,
+html.capture body {
+  background: transparent;
+}
