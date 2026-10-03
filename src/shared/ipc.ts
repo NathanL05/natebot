@@ -60,8 +60,8 @@ export interface NateBotApi {
   resolveHandoff(messageId: string, handoffId: string, decision: 'send' | 'dismiss'): Promise<void>
 
   listRoutines(): Promise<RoutineInfo[]>
-  setRoutineEnabled(agentId: string, enabled: boolean): Promise<void>
-  runRoutineNow(agentId: string): Promise<void>
+  setRoutineEnabled(agentId: string, routineId: string, enabled: boolean): Promise<void>
+  runRoutineNow(agentId: string, routineId: string): Promise<void>
   /** Reminders still waiting to go off, soonest first. */
   listReminders(): Promise<Reminder[]>
   cancelReminder(reminderId: string): Promise<void>

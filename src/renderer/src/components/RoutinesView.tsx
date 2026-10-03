@@ -35,13 +35,13 @@ export function RoutinesView() {
 
           {routines && routines.length === 0 && (
             <div className="rounded-2xl border border-dashed border-line p-8 text-center text-[13px] text-muted">
-              No routines yet. Open an agent's settings and switch on “Routine”.
+              No routines yet. Open an agent's settings and add one under “Routines”.
             </div>
           )}
 
           <div className="space-y-2">
             {routines?.map((r) => (
-              <div key={r.agentId} className="flex items-center gap-4 rounded-2xl bg-elev/60 px-4 py-3.5">
+              <div key={`${r.agentId}#${r.routine.id}`} className="flex items-center gap-4 rounded-2xl bg-elev/60 px-4 py-3.5">
                 <Avatar seed={r.agentName} shape={r.shape} color={r.color} picture={agentPicture(r.agentId, r.avatarVersion)} size={40} />
                 <div className="min-w-0 flex-1">
                   <button
@@ -63,13 +63,13 @@ export function RoutinesView() {
                     </div>
                   )}
                 </div>
-                <Button onClick={() => void api.runRoutineNow(r.agentId)} title="Run now">
+                <Button onClick={() => void api.runRoutineNow(r.agentId, r.routine.id)} title="Run now">
                   <PlayIcon size={12} /> Run now
                 </Button>
                 <Toggle
                   label={`${r.agentName} routine`}
                   checked={r.routine.enabled}
-                  onChange={(v) => void api.setRoutineEnabled(r.agentId, v)}
+                  onChange={(v) => void api.setRoutineEnabled(r.agentId, r.routine.id, v)}
                 />
               </div>
             ))}

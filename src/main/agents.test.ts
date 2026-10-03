@@ -16,7 +16,7 @@ describe('agent YAML normalisation', () => {
         mcp_servers: [],
         allowed_tools: [],
         disallowed_tools: [],
-        routine: null,
+        routines: [],
         session_id: null
       })
     }
@@ -47,7 +47,7 @@ describe('agent YAML normalisation', () => {
       effort: 'high',
       instructions: 'Plan my week.',
       mcp_servers: ['gmail'],
-      routine: { enabled: true, cron: '0 8 * * 1-5', prompt: 'Plan today' },
+      routines: [{ id: 'main', enabled: true, cron: '0 8 * * 1-5', prompt: 'Plan today' }],
       session_id: 'abc'
     })
   })
@@ -68,12 +68,30 @@ describe('agent YAML normalisation', () => {
   })
 
   it('only enables a routine that says enabled: true and has a cron', () => {
-    expect(normalize({ routine: { enabled: 'yes', cron: '0 8 * * *' } }, 'x').routine).toEqual({
-      enabled: false,
-      cron: '0 8 * * *',
-      prompt: ''
-    })
-    expect(normalize({ routine: { enabled: true, cron: '  ' } }, 'x').routine).toBeNull()
+    expect(normalize({ routine: { enabled: 'yes', cron: '0 8 * * *' } }, 'x').routines).toEqual([
+      { id: 'main', enabled: false, cron: '0 8 * * *', prompt: '' }
+    ])
+    expect(normalize({ routine: { enabled: true, cron: '  ' } }, 'x').routines).toEqual([])
+  })
+
+  it('reads a list of routines, giving each a unique id and capping the count', () => {
+    const routines = normalize(
+      {
+        routines: [
+          { cron: '0 8 * * *', prompt: 'Morning' },
+          { id: 'evening', enabled: true, cron: '0 19 * * *', prompt: 'Evening' },
+          { id: 'evening', cron: '0 12 * * *' },
+          { id: 'Bad Id!', cron: '0 13 * * *' },
+          { cron: '' },
+          { cron: '0 14 * * *' },
+          { cron: '0 15 * * *' },
+          { cron: '0 16 * * *' }
+        ]
+      },
+      'x'
+    ).routines
+    expect(routines.map((r) => r.id)).toEqual(['main', 'evening', 'evening-2', 'r4', 'r6'])
+    expect(routines[1]).toEqual({ id: 'evening', enabled: true, cron: '0 19 * * *', prompt: 'Evening' })
   })
 
   it('keeps the designed shape of starter agents created before shapes existed', () => {

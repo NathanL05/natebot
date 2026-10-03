@@ -17,7 +17,7 @@ const agent = (id: string, name: string): AgentConfig => ({
   mcp_servers: [],
   allowed_tools: [],
   disallowed_tools: [],
-  routine: null,
+  routines: [],
   session_id: null
 })
 

@@ -71,3 +71,25 @@ describe('reminders', () => {
     expect(db.scheduledReminders().map((r) => r.id)).toEqual(['later'])
   })
 })
+
+describe('routine checkpoints and runs', () => {
+  it('reads an older single checkpoint as the main routine', () => {
+    const db = new Db(':memory:')
+    db.setRoutineCheckpoints('email', { main: { cron: '0 8 * * *', at: 1 } })
+    expect(db.routineCheckpoints('email')).toEqual({ main: { cron: '0 8 * * *', at: 1 } })
+    // What older versions stored: one checkpoint, not a map.
+    ;(db as unknown as { db: DatabaseSync }).db.prepare(`UPDATE agent_state SET routine_checkpoint = ? WHERE agent_id = 'email'`).run('{"cron":"0 7 * * *","at":5}')
+    expect(db.routineCheckpoints('email')).toEqual({ main: { cron: '0 7 * * *', at: 5 } })
+  })
+
+  it("finds each routine's last run, counting older untagged runs as the main one", () => {
+    const db = new Db(':memory:')
+    db.startRun('old', 'email', 'routine')
+    db.finishRun('old', true, 'old main run')
+    db.startRun('eve', 'email', 'routine', 'r2')
+    db.finishRun('eve', true, 'evening run')
+    expect(db.lastRun('email', 'routine', 'main')?.summary).toBe('old main run')
+    expect(db.lastRun('email', 'routine', 'r2')?.summary).toBe('evening run')
+    expect(db.lastRun('email', 'routine', 'r3')).toBeNull()
+  })
+})

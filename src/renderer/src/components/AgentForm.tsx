@@ -1,11 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { EFFORTS, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId } from '@shared/types'
+import { EFFORTS, MAX_ROUTINES, MODELS, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { Avatar } from './Avatar'
-import { ChevronIcon } from './icons'
+import { ChevronIcon, PlusIcon, TrashIcon } from './icons'
 import { isValidCron, SchedulePicker } from './SchedulePicker'
-import { Field, inputBase, inputClass, Segmented, Toggle } from './ui'
+import { Button, Field, IconButton, inputBase, inputClass, Segmented, Toggle } from './ui'
 
 export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
   return {
@@ -18,7 +18,7 @@ export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
     mcp_servers: [],
     allowed_tools: [],
     disallowed_tools: [],
-    routine: null
+    routines: []
   }
 }
 
@@ -26,10 +26,9 @@ export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
 export function validateDraft(d: AgentDraft): string[] {
   const problems: string[] = []
   if (!d.name.trim()) problems.push('Give the agent a name.')
-  if (d.routine?.enabled) {
-    if (!isValidCron(d.routine.cron)) problems.push('The routine schedule is not valid.')
-    if (!d.routine.prompt.trim()) problems.push('Tell the routine what to do.')
-  }
+  const on = d.routines.filter((r) => r.enabled)
+  if (on.some((r) => !isValidCron(r.cron))) problems.push('A routine schedule is not valid.')
+  if (on.some((r) => !r.prompt.trim())) problems.push('Tell each routine what to do.')
   return problems
 }
 
@@ -49,7 +48,6 @@ export function AgentForm({
   const [advanced, setAdvanced] = useState(draft.allowed_tools.length > 0 || draft.disallowed_tools.length > 0)
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]): void => onChange({ ...draft, [key]: value })
 
-  const routine = draft.routine ?? { enabled: false, cron: '0 8 * * 1-5', prompt: '' }
   const unconfigured = draft.mcp_servers.filter((name) => !mcpServers.find((s) => s.name === name)?.configured)
   const knownNames = new Set(mcpServers.map((s) => s.name))
   const allServers: McpServerInfo[] = [
@@ -146,33 +144,7 @@ export function AgentForm({
         )}
       </Field>
 
-      {/* Routine */}
-      <div className="rounded-xl border border-line p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex-1">
-            <div className="text-[14px] font-medium">Routine</div>
-            <div className="text-[12px] text-muted">Run this agent automatically on a schedule.</div>
-          </div>
-          <Toggle
-            label="Routine enabled"
-            checked={routine.enabled}
-            onChange={(enabled) => set('routine', { ...routine, enabled })}
-          />
-        </div>
-        {routine.enabled && (
-          <div className="mt-4 space-y-3">
-            <SchedulePicker cron={routine.cron} onChange={(cron) => set('routine', { ...routine, cron })} />
-            <Field label="What should it do each time?">
-              <textarea
-                className={`${inputClass} min-h-[70px] resize-y`}
-                value={routine.prompt}
-                onChange={(e) => set('routine', { ...routine, prompt: e.target.value })}
-                placeholder="Do my morning inbox sweep."
-              />
-            </Field>
-          </div>
-        )}
-      </div>
+      <RoutinesEditor routines={draft.routines} onChange={(routines) => set('routines', routines)} />
 
       {/* Advanced */}
       <div>
@@ -240,6 +212,58 @@ function ShapePicker({ draft, onPick }: { draft: AgentDraft; onPick: (shape: Age
         >
           <img src={src} alt={shape} className="h-7 w-7" draggable={false} />
         </button>
+      ))}
+    </div>
+  )
+}
+
+/** A fresh id, never reused, so a new routine doesn't inherit a removed one's run history. */
+function newRoutineId(routines: Routine[]): string {
+  for (;;) {
+    const id = `r${Math.random().toString(36).slice(2, 8)}`
+    if (!routines.some((r) => r.id === id)) return id
+  }
+}
+
+/** An agent's scheduled runs: several are fine, e.g. a morning and an evening inbox sweep. */
+function RoutinesEditor({ routines, onChange }: { routines: Routine[]; onChange: (routines: Routine[]) => void }) {
+  const update = (id: string, patch: Partial<Routine>): void => onChange(routines.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const add = (): void => onChange([...routines, { id: newRoutineId(routines), enabled: true, cron: '0 8 * * 1-5', prompt: '' }])
+
+  return (
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <div className="text-[14px] font-medium">Routines</div>
+          <div className="text-[12px] text-muted">Run this agent automatically on a schedule. Add several for different times.</div>
+        </div>
+        {routines.length < MAX_ROUTINES && (
+          <Button variant="ghost" onClick={add}>
+            <PlusIcon size={13} /> Add
+          </Button>
+        )}
+      </div>
+      {routines.map((r, i) => (
+        <div key={r.id} className={`mt-4 space-y-3 ${i > 0 ? 'border-t border-line pt-4' : ''}`}>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-[13px] font-medium">{routines.length > 1 ? `Routine ${i + 1}` : 'Routine'}</div>
+            <Toggle label={`Routine ${i + 1} enabled`} checked={r.enabled} onChange={(enabled) => update(r.id, { enabled })} />
+            <IconButton label={`Remove routine ${i + 1}`} onClick={() => onChange(routines.filter((x) => x.id !== r.id))}>
+              <TrashIcon size={14} />
+            </IconButton>
+          </div>
+          <div className={r.enabled ? 'space-y-3' : 'space-y-3 opacity-60'}>
+            <SchedulePicker cron={r.cron} onChange={(cron) => update(r.id, { cron })} />
+            <Field label="What should it do each time?">
+              <textarea
+                className={`${inputClass} min-h-[70px] resize-y`}
+                value={r.prompt}
+                onChange={(e) => update(r.id, { prompt: e.target.value })}
+                placeholder="Do my morning inbox sweep."
+              />
+            </Field>
+          </div>
+        </div>
       ))}
     </div>
   )

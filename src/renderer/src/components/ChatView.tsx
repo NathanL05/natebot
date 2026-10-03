@@ -1,4 +1,4 @@
-import { MODELS } from '@shared/types'
+import { MODELS, type Routine } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { useSelectedAgent, useStore } from '../lib/store'
 import { clockTime } from '../lib/format'
@@ -36,6 +36,13 @@ export function UsageBanner() {
   return null
 }
 
+/** "Weekdays at 8:00 AM", or "Weekdays at 8:00 AM +1" with more routines on. */
+function routineLabel(routines: Routine[]): string | null {
+  const on = routines.filter((r) => r.enabled)
+  if (!on[0]) return null
+  return `${describeCron(on[0].cron)}${on.length > 1 ? ` +${on.length - 1}` : ''}`
+}
+
 export function ChatView() {
   const agent = useSelectedAgent()
   const messages = useStore((s) => (s.selectedId ? s.messages[s.selectedId] : undefined))
@@ -57,7 +64,7 @@ export function ChatView() {
   const subtitle =
     agent.status === 'running'
       ? 'Working…'
-      : [model, agent.routine?.enabled ? describeCron(agent.routine.cron) : null].filter(Boolean).join(' · ')
+      : [model, routineLabel(agent.routines)].filter(Boolean).join(' · ')
   const missing = agent.mcp_servers.filter((n) => !mcpServers.find((s) => s.name === n)?.configured)
 
   return (

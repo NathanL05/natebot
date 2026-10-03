@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_EFFORT, EFFORTS } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS, MAX_ROUTINES } from '@shared/types'
 import type { AgentConfig, AgentDraft, EffortLevel, MascotShape, ModelId, Routine } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
@@ -15,7 +15,7 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
   '# model: sonnet | haiku | opus   effort: low | medium | high | xhigh | max\n' +
-  '# routine.cron: minute hour day month weekday\n' +
+  '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 5\n' +
   '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 
 export function slugify(name: string): string {
@@ -33,12 +33,26 @@ const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : 
 const strList = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim()) : []
 
-function normalizeRoutine(v: unknown): Routine | null {
-  if (!v || typeof v !== 'object') return null
-  const r = v as Record<string, unknown>
-  const cron = str(r['cron']).trim()
-  if (!cron) return null
-  return { enabled: r['enabled'] === true, cron, prompt: str(r['prompt']) }
+const ROUTINE_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/
+
+/**
+ * `routines` (a list), or the single `routine` older files have. Routines without a
+ * usable id get one from their position, and the first is "main", so an older file's
+ * routine keeps its catch-up checkpoint and run history.
+ */
+export function normalizeRoutines(list: unknown, legacy: unknown): Routine[] {
+  const raw: unknown[] = Array.isArray(list) ? list : legacy ? [legacy] : []
+  const out: Routine[] = []
+  raw.forEach((v, i) => {
+    if (!v || typeof v !== 'object' || out.length >= MAX_ROUTINES) return
+    const r = v as Record<string, unknown>
+    const cron = str(r['cron']).trim()
+    if (!cron) return
+    let id = typeof r['id'] === 'string' && ROUTINE_ID_RE.test(r['id']) ? r['id'] : i === 0 ? 'main' : `r${i + 1}`
+    while (out.some((o) => o.id === id)) id = `${id}-2`
+    out.push({ id, enabled: r['enabled'] === true, cron, prompt: str(r['prompt']) })
+  })
+  return out
 }
 
 function normalizeShape(v: unknown, id: string): MascotShape | null {
@@ -62,7 +76,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     mcp_servers: strList(r['mcp_servers']),
     allowed_tools: strList(r['allowed_tools']),
     disallowed_tools: strList(r['disallowed_tools']),
-    routine: normalizeRoutine(r['routine']),
+    routines: normalizeRoutines(r['routines'], r['routine']),
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
 }
@@ -80,7 +94,7 @@ function serialize(a: AgentConfig): string {
     mcp_servers: a.mcp_servers,
     allowed_tools: a.allowed_tools,
     disallowed_tools: a.disallowed_tools,
-    routine: a.routine,
+    routines: a.routines,
     session_id: a.session_id
   }
   return HEADER + stringify(doc, { lineWidth: 0, blockQuote: 'literal' })
