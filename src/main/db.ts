@@ -2,7 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
-import type { AgentUsage, ChatMessage, Folder, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
+import type { AgentUsage, ChatMessage, Folder, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -60,6 +60,16 @@ function toReminder(row: ReminderRow): Reminder {
     text: row.text,
     status: row.status as ReminderStatus
   }
+}
+
+/** About a line of text around the first match, without Markdown symbols. */
+export function snippetOf(text: string, query: string): string {
+  const flat = text.replace(/[*_`#>]/g, '').replace(/\s+/g, ' ').trim()
+  const at = flat.toLowerCase().indexOf(query.toLowerCase())
+  if (at === -1) return flat.slice(0, 120)
+  const start = Math.max(0, at - 40)
+  const end = Math.min(flat.length, at + query.length + 80)
+  return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`
 }
 
 function toMessage(row: MessageRow): ChatMessage {
@@ -180,6 +190,23 @@ export class Db {
       .prepare(`SELECT * FROM messages WHERE agent_id = ? AND text != '' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
       .get(agentId) as MessageRow | undefined
     return row ? toMessage(row) : null
+  }
+
+  /** Your messages and agents' replies containing `query` (case-insensitive), newest first. */
+  searchMessages(query: string, limit = 40): MessageHit[] {
+    const q = query.trim()
+    if (!q) return []
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM messages WHERE role IN ('user', 'agent') AND text LIKE ? ESCAPE '\\'
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`
+      )
+      .all(like, limit) as unknown as MessageRow[]
+    return rows.map((row) => {
+      const m = toMessage(row)
+      return { messageId: m.id, chatId: m.agentId, role: m.role as 'user' | 'agent', speakerId: m.speakerId, snippet: snippetOf(m.text, q), createdAt: m.createdAt }
+    })
   }
 
   /** Messages left mid-stream by a crash or force-quit. */

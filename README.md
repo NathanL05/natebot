@@ -221,6 +221,8 @@ irreversible actions without approval.
 - **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
   drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
+- **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every
+  message (yours and the agents', at least 2 characters). Click a result to open that chat at the message.
 - **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,
   documents (copied into the agent's workspace).
 - **Quick prompts:** messages you send often (*"Give me a summary of my emails"*) can be saved in the agent's

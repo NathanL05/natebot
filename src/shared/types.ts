@@ -180,6 +180,19 @@ export interface RoomSummary extends RoomConfig {
   folderId: string | null
 }
 
+/** A message matching a sidebar search. */
+export interface MessageHit {
+  messageId: string
+  /** An agent or group chat id. */
+  chatId: string
+  role: 'user' | 'agent'
+  /** Group chats: the agent who wrote it. */
+  speakerId?: string
+  /** The matching part of the text, about a line long. */
+  snippet: string
+  createdAt: number
+}
+
 export interface McpServerInfo {
   name: string
   configured: boolean

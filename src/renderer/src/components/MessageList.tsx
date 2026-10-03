@@ -8,6 +8,7 @@ import { HandoffCard } from './HandoffCard'
 import { ReminderCard } from './ReminderCard'
 import { AlertIcon, PaperclipIcon } from './icons'
 import { Markdown } from './Markdown'
+import { useStore } from '../lib/store'
 import { ToolLines } from './ToolLines'
 
 const GAP = 30 * 60_000
@@ -156,6 +157,20 @@ export function MessageList({
     if (el && pinned.current) el.scrollTop = el.scrollHeight
   }, [messages, typing])
 
+  // Jump to a message opened from search, once it has loaded, and flash it.
+  const focusId = useStore((s) => s.focusMessageId)
+  useEffect(() => {
+    if (!focusId) return
+    const el = scroller.current?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(focusId)}"]`)
+    if (!el) return
+    pinned.current = false
+    el.scrollIntoView({ block: 'center' })
+    el.classList.add('nb-flash')
+    const t = setTimeout(() => el.classList.remove('nb-flash'), 1800)
+    useStore.setState({ focusMessageId: null })
+    return () => clearTimeout(t)
+  }, [focusId, messages])
+
   const memberNames = useMemo(() => Object.values(speakers ?? {}).map((a) => a.name), [speakers])
 
   const onScroll = (): void => {
@@ -177,7 +192,9 @@ export function MessageList({
               {showTime && (
                 <div className="mt-4 mb-1 text-center text-[11px] font-medium text-muted">{separatorTime(msg.createdAt)}</div>
               )}
-              <Message msg={msg} speaker={msg.speakerId ? speakers?.[msg.speakerId] : undefined} showName={showName} spaced={spaced} memberNames={memberNames} />
+              <div data-mid={msg.id} className="rounded-2xl transition-colors duration-700">
+                <Message msg={msg} speaker={msg.speakerId ? speakers?.[msg.speakerId] : undefined} showName={showName} spaced={spaced} memberNames={memberNames} />
+              </div>
             </Fragment>
           )
         })}
