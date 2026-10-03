@@ -14,7 +14,7 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
+import { extractActions, extractHandoffs, extractJobs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
 import { memoryBlock } from './memory'
 import { resolveReminders } from './reminders'
@@ -101,6 +101,8 @@ export interface EngineDeps {
   lightRuns?: () => boolean
   /** The user's name and "About me" profile for system prompts. */
   user?: () => { name: string; about: string }
+  /** Job-tracker entries from a reply's ```jobs block. Returns a chat line describing what changed. */
+  onJobs?: (agentId: string, jobs: Record<string, unknown>[]) => string | null
 }
 
 class UserFacingError extends Error {}
@@ -384,7 +386,11 @@ export class Engine extends EventEmitter {
         const { handoffs, problems } = resolveHandoffs(handed.handoffs, agent, this.deps.store.list())
         const marked = job.source === 'chat' ? { quiet: false, text: handed.text } : quietMarker(handed.text)
         quiet = marked.quiet
-        const timed = extractReminders(marked.text)
+        const jobBlock = extractJobs(marked.text)
+        const jobsLine = jobBlock.jobs.length ? (this.deps.onJobs?.(agentId, jobBlock.jobs) ?? null) : null
+        if (jobsLine) extraLines.push({ role: 'system', text: jobsLine })
+        if (jobBlock.error) extraLines.push({ role: 'error', text: jobBlock.error })
+        const timed = extractReminders(jobBlock.text)
         const set = resolveReminders(timed.reminders, agentId, msg.id, Date.now(), this.deps.db.scheduledCount(agentId))
         msg.text = timed.text
         if (parsed.actions.length) msg.actions = parsed.actions

@@ -75,6 +75,16 @@ export function Sidebar() {
             </span>
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setView('jobs')}
+          className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover ${view === 'jobs' ? 'bg-selected' : ''}`}
+        >
+          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
+            <FolderPlusIcon size={19} />
+          </span>
+          Jobs
+        </button>
       </div>
 
       <div className="flex items-center gap-3 px-2 pt-1 pb-2.5 pl-4.5">

@@ -120,6 +120,7 @@ function buildMenu(): void {
         { label: 'New Agent…', accelerator: 'Cmd+N', click: nav('newAgent') },
         { label: 'New Group Chat…', accelerator: 'Cmd+Shift+N', click: nav('newRoom') },
         { label: 'Today', accelerator: 'Cmd+Shift+T', click: nav('today') },
+        { label: 'Jobs', accelerator: 'Cmd+Shift+J', click: nav('jobs') },
         { label: 'Routines', accelerator: 'Cmd+Shift+R', click: nav('routines') },
         { type: 'separator' },
         { label: 'Show Data Folder', click: () => void shell.openPath(join(app.getPath('home'), 'NateBot')) },
