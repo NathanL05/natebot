@@ -2,7 +2,7 @@
 // each scheduled time runs at most once, whether node-cron or the catch-up
 // gets there first.
 import { describe, expect, it } from 'vitest'
-import { dueRun, syncedCheckpoint, type Checkpoint } from './scheduler'
+import { dueRun, routineChanges, syncedCheckpoint, type Checkpoint } from './scheduler'
 
 // Local time, like node-cron. 2 Oct 2026 is a Friday.
 const at = (day: number, h: number, m: number): number => new Date(2026, 9, day, h, m).getTime()
@@ -41,7 +41,7 @@ describe('dueRun', () => {
 })
 
 describe('syncedCheckpoint', () => {
-  const on = { enabled: true, cron: DAILY, prompt: 'Sweep' }
+  const on = { id: 'main', enabled: true, cron: DAILY, prompt: 'Sweep' }
 
   it('keeps the checkpoint while the schedule is unchanged', () => {
     expect(syncedCheckpoint(on, yesterday, at(2, 15, 0))).toBe(yesterday)
@@ -58,5 +58,20 @@ describe('syncedCheckpoint', () => {
   it('starts a changed schedule counting from now', () => {
     const changed = syncedCheckpoint({ ...on, cron: '0 7 * * *' }, yesterday, at(2, 15, 0))
     expect(changed).toEqual({ cron: '0 7 * * *', at: at(2, 15, 0) })
+  })
+})
+
+describe('routineChanges', () => {
+  const morning = { id: 'main', enabled: true, cron: '0 8 * * *', prompt: 'Morning sweep' }
+  const evening = { id: 'r2', enabled: true, cron: '0 19 * * *', prompt: 'Evening sweep' }
+
+  it('describes added, changed, turned-off and removed routines', () => {
+    expect(routineChanges([morning], [morning, evening])).toEqual(['Created routine: Every day at 7:00 PM'])
+    expect(routineChanges([morning], [{ ...morning, prompt: 'Sweep' }])).toEqual(['Routine updated: Every day at 8:00 AM'])
+    expect(routineChanges([morning, evening], [{ ...morning, enabled: false }])).toEqual([
+      'Routine turned off: Every day at 8:00 AM',
+      'Routine removed: Every day at 7:00 PM'
+    ])
+    expect(routineChanges([morning], [morning])).toEqual([])
   })
 })

@@ -29,6 +29,8 @@ export const EFFORTS: { id: EffortLevel; label: string; hint: string }[] = [
 ]
 
 export interface Routine {
+  /** Stable within its agent (checkpoints and run history use it). The first routine is "main". */
+  id: string
   enabled: boolean
   cron: string
   prompt: string
@@ -47,9 +49,12 @@ export interface AgentConfig {
   mcp_servers: string[]
   allowed_tools: string[]
   disallowed_tools: string[]
-  routine: Routine | null
+  /** Scheduled runs, up to MAX_ROUTINES. */
+  routines: Routine[]
   session_id: string | null
 }
+
+export const MAX_ROUTINES = 5
 
 export type AgentStatus = 'idle' | 'running'
 
@@ -241,6 +246,7 @@ export interface EnvStatus {
   error: string | null
 }
 
+/** One routine, for the Routines view. */
 export interface RoutineInfo {
   agentId: string
   agentName: string

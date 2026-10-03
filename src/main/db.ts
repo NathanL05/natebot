@@ -143,6 +143,8 @@ export class Db {
       if (!runCols.some((c) => c.name === col)) this.db.exec(`ALTER TABLE runs ADD COLUMN ${col} INTEGER`)
     }
     if (!runCols.some((c) => c.name === 'cost_usd')) this.db.exec('ALTER TABLE runs ADD COLUMN cost_usd REAL')
+    // Added later: which of the agent's routines a routine run was (null before: the "main" one).
+    if (!runCols.some((c) => c.name === 'routine_id')) this.db.exec('ALTER TABLE runs ADD COLUMN routine_id TEXT')
   }
 
   close(): void {
@@ -238,27 +240,35 @@ export class Db {
 
   // ---- routine checkpoints ----
 
-  routineCheckpoint(agentId: string): Checkpoint | null {
+  /** By routine id. Older databases hold a single checkpoint, which belonged to the "main" routine. */
+  routineCheckpoints(agentId: string): Record<string, Checkpoint> {
     const row = this.db.prepare('SELECT routine_checkpoint FROM agent_state WHERE agent_id = ?').get(agentId) as
       | { routine_checkpoint: string | null }
       | undefined
+    const valid = (cp: unknown): cp is Checkpoint =>
+      !!cp && typeof (cp as Checkpoint).cron === 'string' && typeof (cp as Checkpoint).at === 'number'
     try {
-      const cp = row?.routine_checkpoint ? (JSON.parse(row.routine_checkpoint) as Checkpoint) : null
-      return cp && typeof cp.cron === 'string' && typeof cp.at === 'number' ? cp : null
+      const raw = row?.routine_checkpoint ? (JSON.parse(row.routine_checkpoint) as unknown) : null
+      if (valid(raw)) return { main: raw }
+      if (!raw || typeof raw !== 'object') return {}
+      return Object.fromEntries(Object.entries(raw).filter(([, cp]) => valid(cp))) as Record<string, Checkpoint>
     } catch {
-      return null
+      return {}
     }
   }
 
-  setRoutineCheckpoint(agentId: string, cp: Checkpoint | null): void {
+  setRoutineCheckpoints(agentId: string, cps: Record<string, Checkpoint>): void {
     this.ensureState(agentId)
-    this.db.prepare('UPDATE agent_state SET routine_checkpoint = ? WHERE agent_id = ?').run(cp ? JSON.stringify(cp) : null, agentId)
+    const json = Object.keys(cps).length ? JSON.stringify(cps) : null
+    this.db.prepare('UPDATE agent_state SET routine_checkpoint = ? WHERE agent_id = ?').run(json, agentId)
   }
 
   // ---- runs ----
 
-  startRun(id: string, agentId: string, source: RunRecord['source']): void {
-    this.db.prepare('INSERT INTO runs (id, agent_id, source, started_at) VALUES (?, ?, ?, ?)').run(id, agentId, source, Date.now())
+  startRun(id: string, agentId: string, source: RunRecord['source'], routineId: string | null = null): void {
+    this.db
+      .prepare('INSERT INTO runs (id, agent_id, source, started_at, routine_id) VALUES (?, ?, ?, ?, ?)')
+      .run(id, agentId, source, Date.now(), routineId)
   }
 
   finishRun(id: string, ok: boolean, summary: string, tokens: RunTokens | null = null): void {
@@ -302,10 +312,20 @@ export class Db {
     }))
   }
 
-  lastRun(agentId: string, source: RunRecord['source']): RunRecord | null {
-    const row = this.db
-      .prepare('SELECT * FROM runs WHERE agent_id = ? AND source = ? AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 1')
-      .get(agentId, source) as
+  /** The latest finished run of a kind; for routines, of one routine. */
+  lastRun(agentId: string, source: RunRecord['source'], routineId?: string): RunRecord | null {
+    const row = (
+      routineId === undefined
+        ? this.db
+            .prepare('SELECT * FROM runs WHERE agent_id = ? AND source = ? AND ended_at IS NOT NULL ORDER BY started_at DESC LIMIT 1')
+            .get(agentId, source)
+        : this.db
+            .prepare(
+              `SELECT * FROM runs WHERE agent_id = ? AND source = ? AND ended_at IS NOT NULL
+               AND (routine_id = ? OR (routine_id IS NULL AND ? = 'main')) ORDER BY started_at DESC LIMIT 1`
+            )
+            .get(agentId, source, routineId, routineId)
+    ) as
       | { id: string; agent_id: string; source: string; started_at: number; ended_at: number | null; ok: number | null; summary: string | null }
       | undefined
     if (!row) return null

@@ -18,7 +18,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     allowed_tools: [],
     disallowed_tools: [],
     // Off until the user opts in: it needs Gmail, which isn't connected on first launch.
-    routine: { enabled: false, cron: '0 8 * * 1-5', prompt: 'Do my morning inbox sweep.' },
+    routines: [{ id: 'main', enabled: false, cron: '0 8 * * 1-5', prompt: 'Do my morning inbox sweep.' }],
     session_id: null
   },
   {
@@ -36,7 +36,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     mcp_servers: [],
     allowed_tools: [],
     disallowed_tools: [],
-    routine: { enabled: false, cron: '0 18 * * 0', prompt: 'Help me plan the week ahead.' },
+    routines: [{ id: 'main', enabled: false, cron: '0 18 * * 0', prompt: 'Help me plan the week ahead.' }],
     session_id: null
   },
   {
@@ -53,7 +53,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     mcp_servers: [],
     allowed_tools: ['WebSearch', 'WebFetch'],
     disallowed_tools: [],
-    routine: null,
+    routines: [],
     session_id: null
   }
 ]

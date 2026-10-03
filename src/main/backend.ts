@@ -42,7 +42,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { dueAction, ReminderClock } from './reminders'
 import { Rooms } from './rooms'
-import { dueRun, Scheduler, syncedCheckpoint } from './scheduler'
+import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
 
@@ -123,7 +123,7 @@ export class Backend implements NateBotApi {
       }
     })
 
-    this.scheduler = new Scheduler((id) => this.fireRoutine(id, 'tick'))
+    this.scheduler = new Scheduler((id, routineId) => this.fireRoutine(id, routineId, 'tick'))
     this.reminderClock = new ReminderClock(
       () => this.db.nextReminderAt(),
       () => this.fireReminders()
@@ -141,7 +141,7 @@ export class Backend implements NateBotApi {
       for (const a of this.store.list()) {
         ensureWorkspace(a.id)
         this.engine.system(a.id, `Created agent: ${a.name}`)
-        if (a.routine?.enabled) this.engine.system(a.id, `Created routine: ${describeCron(a.routine.cron)}`)
+        for (const r of a.routines) if (r.enabled) this.engine.system(a.id, `Created routine: ${describeCron(r.cron)}`)
       }
     }
     this.store.on('changed', () => {
@@ -321,9 +321,13 @@ export class Backend implements NateBotApi {
     const agents = this.store.list()
     const now = Date.now()
     for (const a of agents) {
-      const cp = this.db.routineCheckpoint(a.id)
-      const next = syncedCheckpoint(a.routine, cp, now)
-      if (next !== cp) this.db.setRoutineCheckpoint(a.id, next)
+      const cps = this.db.routineCheckpoints(a.id)
+      const next: Record<string, Checkpoint> = {}
+      for (const r of a.routines) {
+        const cp = syncedCheckpoint(r, cps[r.id] ?? null, now)
+        if (cp) next[r.id] = cp
+      }
+      if (JSON.stringify(next) !== JSON.stringify(cps)) this.db.setRoutineCheckpoints(a.id, next)
     }
     this.scheduler.sync(agents)
   }
@@ -332,37 +336,41 @@ export class Backend implements NateBotApi {
     // A run that can't start would still use up the missed time: wait for a working claude.
     const env = this.envOverride ?? this.env
     if (!env.claudeFound || !env.loggedIn) return
-    for (const a of this.store.list()) if (a.routine?.enabled) this.fireRoutine(a.id, 'catch-up')
+    for (const a of this.store.list()) for (const r of a.routines) if (r.enabled) this.fireRoutine(a.id, r.id, 'catch-up')
   }
 
-  private fireRoutine(agentId: string, trigger: 'tick' | 'catch-up'): void {
+  private fireRoutine(agentId: string, routineId: string, trigger: 'tick' | 'catch-up'): void {
     const agent = this.store.get(agentId)
-    if (!agent?.routine?.enabled) return
+    const routine = agent?.routines.find((r) => r.id === routineId)
+    if (!agent || !routine?.enabled) return
     const now = Date.now()
-    const due = dueRun(agent.routine.cron, this.db.routineCheckpoint(agentId), now, trigger)
+    const cps = this.db.routineCheckpoints(agentId)
+    const due = dueRun(routine.cron, cps[routineId] ?? null, now, trigger)
     if (due === null) return
     // From here this scheduled time counts as dealt with, whether it runs or is skipped.
-    this.db.setRoutineCheckpoint(agentId, { cron: agent.routine.cron, at: now })
+    this.db.setRoutineCheckpoints(agentId, { ...cps, [routineId]: { cron: routine.cron, at: now } })
     const late = now - due > LATE_AFTER_MS
-    if (late) log(`routine: agent=${agentId} catching up on ${new Date(due).toISOString()} (${trigger})`)
+    if (late) log(`routine: agent=${agentId} routine=${routineId} catching up on ${new Date(due).toISOString()} (${trigger})`)
     const time = clock(now)
+    // With several routines, say which one.
+    const which = agent.routines.length > 1 ? ` (${describeCron(routine.cron)})` : ''
     const dueText = late ? ` (it was due at ${new Date(due).toDateString() === new Date(now).toDateString() ? '' : 'yesterday at '}${clock(due)})` : ''
     // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
     const ready = configuredServersFor(agent).filter((n) => googleReady(n))
     const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
     if (missing.length) {
-      this.engine.system(agentId, `Routine skipped at ${time}${dueText}: ${missing.join(', ')} isn't set up yet`)
+      this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: ${missing.join(', ')} isn't set up yet`)
       this.emitAgents()
       return
     }
     const wait = this.usage.waitMs()
     if (wait > 0) {
-      this.engine.system(agentId, `Routine skipped at ${time}${dueText}: usage limit reached (resets at ${clock(now + wait)})`)
+      this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: usage limit reached (resets at ${clock(now + wait)})`)
       this.emitAgents()
       return
     }
-    this.engine.system(agentId, `Routine ran at ${time}${dueText}`)
-    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
+    this.engine.system(agentId, `Routine${which} ran at ${time}${dueText}`)
+    this.engine.enqueue(agentId, { source: 'routine', routineId, prompt: routine.prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
   }
 
   /** Sets a reminder's status, and the copy on the message that set it. */
@@ -508,7 +516,7 @@ export class Backend implements NateBotApi {
     const agent = this.store.create(draft)
     ensureWorkspace(agent.id)
     this.engine.system(agent.id, `Created agent: ${agent.name}`)
-    if (agent.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(agent.routine.cron)}`)
+    for (const r of agent.routines) if (r.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(r.cron)}`)
     this.syncRoutines()
     this.emitAgents()
     return agent
@@ -517,12 +525,7 @@ export class Backend implements NateBotApi {
   async updateAgent(next: AgentConfig): Promise<AgentConfig> {
     const before = this.requireAgent(next?.id)
     const agent = this.store.update(next)
-    const r = agent.routine
-    if (JSON.stringify(before.routine) !== JSON.stringify(r)) {
-      if (r?.enabled && !before.routine?.enabled) this.engine.system(agent.id, `Created routine: ${describeCron(r.cron)}`)
-      else if (r?.enabled) this.engine.system(agent.id, `Routine updated: ${describeCron(r.cron)}`)
-      else if (before.routine?.enabled) this.engine.system(agent.id, 'Routine turned off')
-    }
+    for (const line of routineChanges(before.routines, agent.routines)) this.engine.system(agent.id, line)
     if (before.model !== agent.model) this.engine.system(agent.id, `Model changed to ${agent.model}`)
     this.syncRoutines()
     this.emitAgents()
@@ -653,22 +656,21 @@ export class Backend implements NateBotApi {
   }
 
   async listRoutines(): Promise<RoutineInfo[]> {
-    return this.store
-      .list()
-      .filter((a) => a.routine)
-      .map((a) => {
-        const last = this.db.lastRun(a.id, 'routine')
+    return this.store.list().flatMap((a) =>
+      a.routines.map((routine) => {
+        const last = this.db.lastRun(a.id, 'routine', routine.id)
         return {
           agentId: a.id,
           agentName: a.name,
           shape: a.shape,
           avatarVersion: avatarVersion(`agent:${a.id}`),
           color: a.color,
-          routine: a.routine as NonNullable<AgentConfig['routine']>,
-          nextRun: a.routine?.enabled ? this.scheduler.nextRun(a.id) : null,
+          routine,
+          nextRun: routine.enabled ? this.scheduler.nextRun(a.id, routine.id) : null,
           lastRun: last?.endedAt ? { at: last.endedAt, ok: last.ok === true, summary: last.summary ?? '' } : null
         }
       })
+    )
   }
 
   async listReminders(): Promise<Reminder[]> {
@@ -685,17 +687,19 @@ export class Backend implements NateBotApi {
     this.emitAgents()
   }
 
-  async setRoutineEnabled(agentId: string, enabled: boolean): Promise<void> {
+  async setRoutineEnabled(agentId: string, routineId: string, enabled: boolean): Promise<void> {
     const agent = this.requireAgent(agentId)
-    if (!agent.routine) return
-    await this.updateAgent({ ...agent, routine: { ...agent.routine, enabled: enabled === true } })
+    if (!agent.routines.some((r) => r.id === routineId)) return
+    const routines = agent.routines.map((r) => (r.id === routineId ? { ...r, enabled: enabled === true } : r))
+    await this.updateAgent({ ...agent, routines })
   }
 
-  async runRoutineNow(agentId: string): Promise<void> {
+  async runRoutineNow(agentId: string, routineId: string): Promise<void> {
     const agent = this.requireAgent(agentId)
-    if (!agent.routine) return
+    const routine = agent.routines.find((r) => r.id === routineId)
+    if (!routine) return
     this.engine.system(agentId, 'Routine started manually')
-    this.engine.enqueue(agentId, { source: 'routine', prompt: agent.routine.prompt, attachments: [] })
+    this.engine.enqueue(agentId, { source: 'routine', routineId, prompt: routine.prompt, attachments: [] })
   }
 
   async updateSettings(patch: Partial<AppSettings>): Promise<AppSettings> {

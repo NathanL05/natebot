@@ -192,10 +192,15 @@ instructions: |
 mcp_servers: [gmail]   # names from ~/NateBot/mcp.json
 allowed_tools: []      # extra tools, e.g. WebSearch WebFetch, or mcp__server__tool
 disallowed_tools: []   # tools this agent may never use
-routine:
-  enabled: true
-  cron: "0 8 * * 1-5"
-  prompt: "Do my morning inbox sweep."
+routines:              # up to 5, each with its own schedule
+  - id: main
+    enabled: true
+    cron: "0 8 * * 1-5"
+    prompt: "Do my morning inbox sweep."
+  - id: evening
+    enabled: true
+    cron: "0 19 * * 1-5"
+    prompt: "Anything new since this morning that needs me?"
 session_id: null       # managed by NateBot (memory)
 ```
 
@@ -285,9 +290,11 @@ handoffs.
 
 ## Routines
 
-Turn on a routine in an agent's settings. Pick "Weekdays at 8:00 AM" (or write your own cron) and say what it
-should do. The **Routines** view (clock icon, ⇧⌘R) lists every routine with its next run, last result, an on/off
-toggle and **Run now**. You get a macOS notification when a routine finishes or an agent needs your approval.
+Add a routine under **Routines** in an agent's settings. Pick "Weekdays at 8:00 AM" (or write your own cron) and
+say what it should do. An agent can have up to 5, for example a morning and an evening inbox sweep. The
+**Routines & reminders** view (clock icon, ⇧⌘R) lists every routine with its next run, last result, an on/off
+toggle and **Run now**. Older agent files with a single `routine:` key still work and are rewritten as
+`routines:` the next time NateBot saves them. You get a macOS notification when a routine finishes or an agent needs your approval.
 
 Routines fire while NateBot is running and the Mac is awake. If one was missed in the last 12 hours (the Mac was
 asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, and the chat says so: *Routine ran

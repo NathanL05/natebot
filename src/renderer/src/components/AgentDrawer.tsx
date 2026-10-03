@@ -19,7 +19,7 @@ function toDraft(a: AgentSummary): AgentDraft {
     mcp_servers: [...a.mcp_servers],
     allowed_tools: [...a.allowed_tools],
     disallowed_tools: [...a.disallowed_tools],
-    routine: a.routine ? { ...a.routine } : null
+    routines: a.routines.map((r) => ({ ...r }))
   }
 }
 
@@ -101,7 +101,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
             <div className="flex items-center gap-3 rounded-xl bg-elev px-3 py-2.5">
               <div className="flex-1">
                 <div className="text-[13px] font-medium">Delete agent</div>
-                <div className="text-[12px] text-muted">Removes its settings, routine and chat history.</div>
+                <div className="text-[12px] text-muted">Removes its settings, routines and chat history.</div>
               </div>
               <Button variant="danger" onClick={() => setConfirm('delete')}>
                 <TrashIcon size={13} /> Delete
@@ -136,7 +136,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
       {confirm === 'delete' && (
         <ConfirmDialog
           title={`Delete ${agent.name}?`}
-          body="This removes the agent, its routine and its chat history. This can't be undone."
+          body="This removes the agent, its routines and its chat history. This can't be undone."
           confirmLabel="Delete agent"
           danger
           onCancel={() => setConfirm(null)}

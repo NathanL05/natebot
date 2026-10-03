@@ -1,9 +1,9 @@
-// Routines: one node-cron task per agent with an enabled routine. Runs only
+// Routines: one node-cron task per enabled routine (an agent can have several). Runs only
 // while NateBot is running (window or menu bar) and the Mac is awake, so on
 // launch and on wake the backend catches up on a recently missed run.
 import cron, { type ScheduledTask } from 'node-cron'
 import type { AgentConfig, Routine } from '@shared/types'
-import { lastOccurrence } from '@shared/schedule'
+import { describeCron, lastOccurrence } from '@shared/schedule'
 
 /** How long a missed routine is still worth running late. */
 export const CATCH_UP_WINDOW = 12 * 60 * 60_000
@@ -40,32 +40,49 @@ export function dueRun(cronExpr: string, checkpoint: Checkpoint | null, now: num
   return due
 }
 
+/** Chat lines for what changed in an agent's routines when its settings are saved. */
+export function routineChanges(before: Routine[], after: Routine[]): string[] {
+  const lines: string[] = []
+  for (const r of after) {
+    const old = before.find((b) => b.id === r.id)
+    if (r.enabled && !old?.enabled) lines.push(`Created routine: ${describeCron(r.cron)}`)
+    else if (r.enabled && (old?.cron !== r.cron || old?.prompt !== r.prompt)) lines.push(`Routine updated: ${describeCron(r.cron)}`)
+    else if (!r.enabled && old?.enabled) lines.push(`Routine turned off: ${describeCron(r.cron)}`)
+  }
+  for (const b of before) if (b.enabled && !after.some((r) => r.id === b.id)) lines.push(`Routine removed: ${describeCron(b.cron)}`)
+  return lines
+}
+
+const key = (agentId: string, routineId: string): string => `${agentId}#${routineId}`
+
 export class Scheduler {
   private tasks = new Map<string, { cron: string; task: ScheduledTask }>()
 
-  constructor(private onFire: (agentId: string) => void) {}
+  constructor(private onFire: (agentId: string, routineId: string) => void) {}
 
   /** Makes the scheduled tasks match the agents' current routines. */
   sync(agents: AgentConfig[]): void {
-    const wanted = new Map<string, string>()
+    const wanted = new Map<string, { agentId: string; routineId: string; cron: string }>()
     for (const a of agents) {
-      if (a.routine?.enabled && cron.validate(a.routine.cron)) wanted.set(a.id, a.routine.cron)
-    }
-    for (const [id, entry] of this.tasks) {
-      if (wanted.get(id) !== entry.cron) {
-        void entry.task.destroy()
-        this.tasks.delete(id)
+      for (const r of a.routines) {
+        if (r.enabled && cron.validate(r.cron)) wanted.set(key(a.id, r.id), { agentId: a.id, routineId: r.id, cron: r.cron })
       }
     }
-    for (const [id, expr] of wanted) {
-      if (this.tasks.has(id)) continue
-      const task = cron.schedule(expr, () => this.onFire(id), { name: `routine:${id}`, noOverlap: true })
-      this.tasks.set(id, { cron: expr, task })
+    for (const [k, entry] of this.tasks) {
+      if (wanted.get(k)?.cron !== entry.cron) {
+        void entry.task.destroy()
+        this.tasks.delete(k)
+      }
+    }
+    for (const [k, w] of wanted) {
+      if (this.tasks.has(k)) continue
+      const task = cron.schedule(w.cron, () => this.onFire(w.agentId, w.routineId), { name: `routine:${k}`, noOverlap: true })
+      this.tasks.set(k, { cron: w.cron, task })
     }
   }
 
-  nextRun(agentId: string): number | null {
-    return this.tasks.get(agentId)?.task.getNextRun()?.getTime() ?? null
+  nextRun(agentId: string, routineId: string): number | null {
+    return this.tasks.get(key(agentId, routineId))?.task.getNextRun()?.getTime() ?? null
   }
 
   stopAll(): void {

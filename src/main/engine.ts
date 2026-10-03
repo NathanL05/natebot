@@ -35,6 +35,8 @@ export interface Job {
   /** Paths relative to the agent's workspace. */
   attachments: string[]
   retried?: boolean
+  /** Routine runs: which of the agent's routines. */
+  routineId?: string
   /** Routines and reminders: when they were due (routines only set it when running late). */
   dueAt?: number
 }
@@ -280,7 +282,7 @@ export class Engine extends EventEmitter {
     this.save(msg)
 
     const runId = randomUUID()
-    this.deps.db.startRun(runId, agentId, job.source)
+    this.deps.db.startRun(runId, agentId, job.source, job.routineId ?? null)
     const notes = this.deps.db.takeNotes(agentId)
     const extraLines: { role: 'system' | 'error'; text: string }[] = []
     let ok = false
