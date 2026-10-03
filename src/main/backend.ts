@@ -308,6 +308,8 @@ export class Backend implements NateBotApi {
     void this.usage.refresh()
     if (r.needsApproval) this.notifyApproval(r)
     else if (r.handoffTo) this.notify(r.agentId, 'Suggests a handoff', `Pass a task to ${r.handoffTo}? Open NateBot to review and confirm.`)
+    // A routine or reminder with nothing to report stays in the chat, without a notification.
+    else if (r.quiet) log(`run: agent=${r.agentId} had nothing to report, no notification`)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
     else if (r.source === 'reminder') this.notify(r.agentId, 'Reminder', r.summary)
     else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)

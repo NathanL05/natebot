@@ -299,7 +299,9 @@ Add a routine under **Routines** in an agent's settings. Pick "Weekdays at 8:00 
 say what it should do. An agent can have up to 5, for example a morning and an evening inbox sweep. The
 **Routines & reminders** view (clock icon, ⇧⌘R) lists every routine with its next run, last result, an on/off
 toggle and **Run now**. Older agent files with a single `routine:` key still work and are rewritten as
-`routines:` the next time NateBot saves them. You get a macOS notification when a routine finishes or an agent needs your approval.
+`routines:` the next time NateBot saves them. You get a macOS notification when a routine finishes or an agent needs your approval. When a routine (or a task
+reminder) finds nothing that needs you, like an inbox sweep with nothing new, the agent marks its reply quiet: it
+still appears in the chat, but there's no notification and no unread badge.
 
 Routines fire while NateBot is running and the Mac is awake. If one was missed in the last 12 hours (the Mac was
 asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, and the chat says so: *Routine ran

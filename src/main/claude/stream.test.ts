@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, stripBlocks, StreamState } from './stream'
+import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState } from './stream'
 
 const block = (json: string): string => `Here's a draft.\n\n\`\`\`proposed_actions\n${json}\n\`\`\``
 
@@ -203,5 +203,15 @@ describe('reminders blocks', () => {
     expect(hideActionsBlock('Sure.\n\n```reminders\n[{"at":"20')).toBe('Sure.')
     const handoff = '```handoff\n[{"to":"Planner","task":"Plan Friday"}]\n```'
     expect(stripBlocks(`Sure.\n\n${block}\n\n${handoff}`)).toBe('Sure.')
+  })
+})
+
+describe('quiet marker', () => {
+  it('spots and removes it, and hides it while half-written', () => {
+    expect(quietMarker('[quiet]\nNothing new since 8am.')).toEqual({ quiet: true, text: 'Nothing new since 8am.' })
+    expect(quietMarker('  [QUIET] Nothing new.')).toEqual({ quiet: true, text: 'Nothing new.' })
+    expect(quietMarker('[qui')).toEqual({ quiet: false, text: '' })
+    expect(quietMarker('3 urgent emails. [quiet]')).toEqual({ quiet: false, text: '3 urgent emails. [quiet]' })
+    expect(quietMarker('')).toEqual({ quiet: false, text: '' })
   })
 })

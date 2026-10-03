@@ -278,3 +278,29 @@ describe('reminders', () => {
     expect(h.spawns[0]?.input).toContain('Check for Sarah')
   })
 })
+
+describe('quiet routine runs', () => {
+  const runAs = (engine: ReturnType<typeof setup>['engine'], source: 'chat' | 'routine'): Promise<RunFinished> =>
+    new Promise((resolve) => {
+      engine.once('runFinished', resolve)
+      engine.enqueue(emailAgent.id, { source, prompt: 'Sweep', attachments: [] })
+    })
+
+  it('lets a routine with nothing to report skip the notification', async () => {
+    const { engine, saved } = setup()
+    h.events.push(...reply('[quiet]\nNothing new since this morning.'))
+    const done = await runAs(engine, 'routine')
+    expect(h.spawns[0]?.input).toContain('start your reply with the line [quiet]')
+    expect(done.quiet).toBe(true)
+    expect(saved.at(-1)?.text).toBe('Nothing new since this morning.')
+  })
+
+  it('never treats a chat reply as quiet, nor tells chats about it', async () => {
+    const { engine, saved } = setup()
+    h.events.push(...reply('[quiet] hi'))
+    const done = await runAs(engine, 'chat')
+    expect(h.spawns[0]?.input).not.toContain('[quiet]')
+    expect(done.quiet).toBe(false)
+    expect(saved.at(-1)?.text).toBe('[quiet] hi')
+  })
+})
