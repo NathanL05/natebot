@@ -23,7 +23,13 @@ const FENCE = '```'
  * Must stay byte-identical across turns for a given agent so the prompt cache
  * is reused: nothing time- or message-dependent belongs here.
  */
-export function systemPrompt(agent: AgentConfig, toolNotes: string[] = [], roster: { name: string; role: string }[] = []): string {
+export function systemPrompt(
+  agent: AgentConfig,
+  toolNotes: string[] = [],
+  /** One-on-one chats: the other agents (for handoffs), and whether reminders can be set. */
+  chat: { roster: { name: string; role: string }[] } | null = null
+): string {
+  const roster = chat?.roster ?? []
   return `You are "${agent.name}", one of the user's personal agents inside NateBot, a Mac chat app. Each agent has its own job; yours is described below.
 
 NateBot house style:
@@ -36,7 +42,7 @@ ${FENCE}proposed_actions
 [{"type": "send_email", "summary": "Reply to Sarah re: deadline", "tool": "mcp__gmail__send_message", "details": {"to": "sarah@example.com", "subject": "Re: Deadline", "body": "Hi Sarah, ..."}}]
 ${FENCE}
   "type" is a short snake_case verb. "summary" is one line the user sees. "tool" is the exact name of the tool that would carry it out. "details" must contain everything needed to do it exactly as approved. The user gets Approve / Edit / Reject buttons, and approved actions are carried out separately. Only include the block when something needs approval, and don't describe the block in your text.
-${roster.length ? handoffRules(roster) : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
+${roster.length ? handoffRules(roster) : ''}${chat ? REMINDER_RULES : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
 - Each message starts with a [Current time: …] line; use it for dates and scheduling.
 ${toolNotes.length ? `\nNotes about your connected tools:\n${toolNotes.map((n) => `- ${n}`).join('\n')}\n` : ''}
 Your instructions from the user:
@@ -53,6 +59,14 @@ ${FENCE}
 ${roster.map((r) => `  - ${r.name}: ${r.role}`).join('\n')}
 `
 }
+
+/** Setting reminders. Only in one-on-one chats. */
+const REMINDER_RULES = `- To remind the user later, or to do something at a set time, end your reply with a fenced block (after any other block):
+${FENCE}reminders
+[{"at": "2026-10-03T19:00", "message": "Time to leave for the gym"}, {"at": "2026-10-04T08:30", "task": "Check whether Sarah replied about the deadline and tell me"}]
+${FENCE}
+  "at" is the local time (work it out from the [Current time] line). A "message" is shown to the user as written at that time, with a notification, and costs nothing. A "task" instead runs you at that time with its text as your prompt: use it only when the moment needs fresh work, like checking email or the web or writing something new. Reminders are one-off and set as soon as you reply, so just confirm them in a few words and don't describe the block. You can't change or cancel one; the user cancels them in NateBot. For something that repeats, suggest a routine instead.
+`
 
 /** One-off prompt used after the user approves a proposed action. */
 export function executePrompt(action: ProposedAction): string {

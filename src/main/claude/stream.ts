@@ -175,6 +175,8 @@ const ACTIONS_START = '```proposed_actions'
 // so a code fence written inside a task never ends the block early. The loose form is a fallback.
 const HANDOFF_BLOCKS = [/```handoff\s*([\s\S]*?)\n[ \t]*```/, /```handoff\s*([\s\S]*?)```/]
 const HANDOFF_START = '```handoff'
+const REMINDER_BLOCKS = [/```reminders\s*([\s\S]*?)\n[ \t]*```/, /```reminders\s*([\s\S]*?)```/]
+const REMINDER_START = '```reminders'
 
 /** Cuts the text at a block's opening fence, even a half-written one. */
 function cutAt(text: string, ...starts: string[]): string {
@@ -182,9 +184,14 @@ function cutAt(text: string, ...starts: string[]): string {
   return found.length ? text.slice(0, Math.min(...found)).trimEnd() : text
 }
 
-/** While streaming, hide proposed_actions and handoff blocks (even half-written ones). */
+/** While streaming, hide proposed_actions, handoff and reminders blocks (even half-written ones). */
 export function hideActionsBlock(text: string): string {
-  return cutAt(text, ACTIONS_START, HANDOFF_START)
+  return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START)
+}
+
+/** Removes every NateBot block from a finished reply (group chats, which use none of them). */
+export function stripBlocks(text: string): string {
+  return extractReminders(extractHandoffs(extractActions(text).text).text).text
 }
 
 /** A handoff block as written by the agent. Targets are looked up by the caller. */
@@ -207,6 +214,34 @@ export function extractHandoffs(text: string): { text: string; handoffs: ParsedH
     return { text: clean, handoffs, error: null }
   } catch {
     return { text: clean, handoffs: [], error: 'The agent proposed a handoff but its format was invalid, so it was ignored.' }
+  }
+}
+
+/** A reminders block entry as written by the agent. Times are checked by the caller. */
+export interface ParsedReminder {
+  at: string
+  kind: 'message' | 'task'
+  text: string
+}
+
+export function extractReminders(text: string): { text: string; reminders: ParsedReminder[]; error: string | null } {
+  const match = REMINDER_BLOCKS.map((re) => re.exec(text)).find((m) => m !== null)
+  if (!match) return { text: cutAt(text, REMINDER_START), reminders: [], error: null }
+  const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
+  try {
+    const parsed = JSON.parse(match[1] ?? '[]') as unknown
+    const list = Array.isArray(parsed) ? parsed : [parsed]
+    const reminders = list
+      .filter((r): r is Json => !!r && typeof r === 'object' && typeof r['at'] === 'string')
+      .flatMap((r): ParsedReminder[] => {
+        const at = String(r['at'])
+        if (typeof r['task'] === 'string' && r['task'].trim()) return [{ at, kind: 'task', text: r['task'].trim() }]
+        if (typeof r['message'] === 'string' && r['message'].trim()) return [{ at, kind: 'message', text: r['message'].trim() }]
+        return []
+      })
+    return { text: clean, reminders, error: null }
+  } catch {
+    return { text: clean, reminders: [], error: 'The agent tried to set a reminder but its format was invalid, so it was ignored.' }
   }
 }
 

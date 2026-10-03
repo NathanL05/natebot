@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractActions, extractHandoffs, hideActionsBlock, StreamState } from './stream'
+import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, stripBlocks, StreamState } from './stream'
 
 const block = (json: string): string => `Here's a draft.\n\n\`\`\`proposed_actions\n${json}\n\`\`\``
 
@@ -176,5 +176,32 @@ describe('handoff blocks', () => {
 
   it('does not lose a handoff when extracting actions from a reply that has none', () => {
     expect(extractActions(`Hi\n\n${handoff}`).text).toContain('```handoff')
+  })
+})
+
+describe('reminders blocks', () => {
+  const block = '```reminders\n[{"at":"2026-10-03T19:00","message":"Gym time"},{"at":"2026-10-04T08:30","task":"Check for Sarah\'s reply"}]\n```'
+
+  it('parses messages and tasks and removes the block', () => {
+    const r = extractReminders(`Done, I'll remind you.\n\n${block}`)
+    expect(r.text).toBe("Done, I'll remind you.")
+    expect(r.reminders).toEqual([
+      { at: '2026-10-03T19:00', kind: 'message', text: 'Gym time' },
+      { at: '2026-10-04T08:30', kind: 'task', text: "Check for Sarah's reply" }
+    ])
+    expect(r.error).toBeNull()
+  })
+
+  it('skips entries with no time or no text, and reports unreadable blocks', () => {
+    expect(extractReminders('```reminders\n[{"message":"x"},{"at":"2026-10-03T19:00"},{"at":"2026-10-03T19:00","message":"  "}]\n```').reminders).toEqual([])
+    const bad = extractReminders('Ok\n\n```reminders\nnope\n```')
+    expect(bad.text).toBe('Ok')
+    expect(bad.error).toContain('invalid')
+  })
+
+  it('hides a half-written block while streaming and strips every block for group chats', () => {
+    expect(hideActionsBlock('Sure.\n\n```reminders\n[{"at":"20')).toBe('Sure.')
+    const handoff = '```handoff\n[{"to":"Planner","task":"Plan Friday"}]\n```'
+    expect(stripBlocks(`Sure.\n\n${block}\n\n${handoff}`)).toBe('Sure.')
   })
 })

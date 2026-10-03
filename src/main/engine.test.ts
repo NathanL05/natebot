@@ -76,6 +76,7 @@ const reply = (text: string, tools: { id: string; name: string; ok: boolean }[] 
 function setup(agent: AgentConfig = emailAgent) {
   const saved: ChatMessage[] = []
   const notes: string[] = []
+  const reminders: unknown[] = []
   const engine = new Engine({
     store: { get: () => agent, require: () => agent, list: () => [agent, helper], setSession: vi.fn() } as unknown as AgentStore,
     db: {
@@ -84,7 +85,9 @@ function setup(agent: AgentConfig = emailAgent) {
       finishRun: vi.fn(),
       takeNotes: () => [],
       addNote: (_id: string, n: string) => notes.push(n),
-      bumpUnread: vi.fn()
+      bumpUnread: vi.fn(),
+      scheduledCount: () => 0,
+      saveReminder: (r: unknown) => reminders.push(r)
     } as unknown as Db,
     usage: { waitMs: () => 0, update: vi.fn(), markLimited: vi.fn() } as unknown as UsageTracker,
     claudePath: () => '/usr/local/bin/claude',
@@ -96,7 +99,7 @@ function setup(agent: AgentConfig = emailAgent) {
       engine.once('runFinished', resolve)
       engine.enqueue(agent.id, { source: 'chat', prompt, attachments: [] })
     })
-  return { engine, saved, notes, run }
+  return { engine, saved, notes, reminders, run }
 }
 
 const action = (over: Partial<ProposedAction> = {}): ProposedAction => ({
@@ -234,5 +237,43 @@ describe('handoffs', () => {
     expect(saved.at(-2)?.handoffs).toBeUndefined()
     expect(saved.at(-1)).toMatchObject({ role: 'error' })
     expect(saved.at(-1)?.text).toContain('"Accountant"')
+  })
+})
+
+describe('reminders', () => {
+  const at = new Date(Date.now() + 3_600_000)
+  const local = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}T${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+
+  it('schedules a reminder from a reply and shows it on the message', async () => {
+    const { run, saved, reminders, engine } = setup(helper)
+    const changed = vi.fn()
+    engine.on('remindersChanged', changed)
+    h.events.push(...reply(`Will do.\n\n\`\`\`reminders\n[{"at":"${local}","message":"Gym time"}]\n\`\`\``))
+    const done = await run('Remind me in an hour to go to the gym')
+    expect(done.ok).toBe(true)
+    const last = saved.at(-1)
+    expect(last?.text).toBe('Will do.')
+    expect(last?.reminders).toMatchObject([{ kind: 'message', text: 'Gym time', status: 'scheduled', messageId: last?.id }])
+    expect(reminders).toHaveLength(1)
+    expect(changed).toHaveBeenCalledOnce()
+  })
+
+  it('tells one-on-one chats how to set reminders', async () => {
+    const { run } = setup()
+    h.events.push(...reply('Hi'))
+    await run('Hi')
+    const prompt = h.spawns[0]?.args[h.spawns[0].args.indexOf('--append-system-prompt') + 1] ?? ''
+    expect(prompt).toContain('```reminders')
+  })
+
+  it('labels a reminder run in the prompt', async () => {
+    const { engine } = setup(helper)
+    h.events.push(...reply('Sarah replied.'))
+    await new Promise((resolve) => {
+      engine.once('runFinished', resolve)
+      engine.enqueue(helper.id, { source: 'reminder', prompt: 'Check for Sarah', attachments: [], dueAt: Date.now() })
+    })
+    expect(h.spawns[0]?.input).toMatch(/A reminder you set earlier is due now\. Do the task below/)
+    expect(h.spawns[0]?.input).toContain('Check for Sarah')
   })
 })

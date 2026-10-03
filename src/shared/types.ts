@@ -109,6 +109,23 @@ export interface Handoff {
   status: HandoffStatus
 }
 
+export type ReminderStatus = 'scheduled' | 'done' | 'cancelled' | 'missed'
+
+/**
+ * A one-off reminder an agent set from a chat. 'message' posts its text at that time
+ * (no Claude run); 'task' runs the agent then with the text as its prompt.
+ */
+export interface Reminder {
+  id: string
+  agentId: string
+  /** The agent message that set it. */
+  messageId: string
+  at: number
+  kind: 'message' | 'task'
+  text: string
+  status: ReminderStatus
+}
+
 export type MessageRole = 'user' | 'agent' | 'system' | 'error'
 
 export interface ChatMessage {
@@ -121,6 +138,8 @@ export interface ChatMessage {
   tools?: ToolUse[]
   actions?: ProposedAction[]
   handoffs?: Handoff[]
+  /** Reminders this message set (a copy kept in step with the reminders table, for display). */
+  reminders?: Reminder[]
   attachments?: string[]
   /** Group chats only: the agent who wrote this agent message. */
   speakerId?: string

@@ -5,6 +5,7 @@ import { basename, clockTime, separatorTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
+import { ReminderCard } from './ReminderCard'
 import { AlertIcon, PaperclipIcon } from './icons'
 import { Markdown } from './Markdown'
 import { ToolLines } from './ToolLines'
@@ -114,6 +115,7 @@ function Message({
       )}
       {msg.actions?.map((a) => <ActionCard key={a.id} messageId={msg.id} action={a} />)}
       {msg.handoffs?.map((h) => <HandoffCard key={h.id} messageId={msg.id} handoff={h} />)}
+      {msg.reminders?.map((r) => <ReminderCard key={r.id} reminder={r} />)}
     </div>
   )
   if (!msg.speakerId) return body
