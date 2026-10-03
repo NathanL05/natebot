@@ -99,6 +99,8 @@ export interface EngineDeps {
   emitAgents: () => void
   /** Unattended runs (routines, task reminders) use Haiku at low effort. */
   lightRuns?: () => boolean
+  /** The user's name and "About me" profile for system prompts. */
+  user?: () => { name: string; about: string }
 }
 
 class UserFacingError extends Error {}
@@ -246,7 +248,7 @@ export class Engine extends EventEmitter {
     mcpServers: string[],
     sessionArgs: string[],
     // One-on-one chats can hand tasks to the other agents (group chats pass their own prompt).
-    prompt = systemPrompt(agent, agentNotes(agent), { roster: rosterFor(agent, this.deps.store.list()) })
+    prompt = systemPrompt(agent, agentNotes(agent), { roster: rosterFor(agent, this.deps.store.list()) }, this.deps.user?.() ?? null)
   ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
     // Tools marked require_approval in mcp.json are never available in normal runs.
@@ -502,7 +504,7 @@ export class Engine extends EventEmitter {
     const mcp = writeRunConfig(agent, skip)
     const state = new StreamState()
     const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
-    const prompt = `${systemPrompt(agent, agentNotes(agent))}\n\n${t.roomPrompt}`
+    const prompt = `${systemPrompt(agent, agentNotes(agent), null, this.deps.user?.() ?? null)}\n\n${t.roomPrompt}`
     // Recorded against the agent, so its usage stats include group chats.
     const runId = randomUUID()
     this.deps.db.startRun(runId, agent.id, 'room')
@@ -628,7 +630,7 @@ export class Engine extends EventEmitter {
       '--verbose',
       '--model', MODEL_IDS[agent.model],
       '--effort', 'low', // carrying out an approved action needs no deep thinking
-      '--append-system-prompt', systemPrompt(agent, agentNotes(agent)),
+      '--append-system-prompt', systemPrompt(agent, agentNotes(agent), null, this.deps.user?.() ?? null),
       '--no-session-persistence',
       '--setting-sources', 'project,local',
       '--strict-mcp-config', '--mcp-config', mcp.path,

@@ -218,7 +218,11 @@ export interface AppSettings {
   lightRuns: boolean
   /** Skip routines and task reminders once the week's usage reaches this share (0–1), or null for never. */
   pauseRoutinesAt: number | null
+  /** A short profile every agent sees (studies, work, goals, preferences). */
+  aboutMe: string
 }
+
+export const MAX_ABOUT_ME = 1200
 
 export const PAUSE_LEVELS = [0.5, 0.7, 0.9]
 

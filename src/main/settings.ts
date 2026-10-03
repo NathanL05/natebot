@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
-import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
+import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, MAX_ABOUT_ME, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
 import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
@@ -33,7 +33,8 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
           : fallback.quickCapture,
     lightRuns: typeof raw.lightRuns === 'boolean' ? raw.lightRuns : fallback.lightRuns,
     pauseRoutinesAt:
-      raw.pauseRoutinesAt === null ? null : PAUSE_LEVELS.includes(raw.pauseRoutinesAt as number) ? (raw.pauseRoutinesAt as number) : fallback.pauseRoutinesAt
+      raw.pauseRoutinesAt === null ? null : PAUSE_LEVELS.includes(raw.pauseRoutinesAt as number) ? (raw.pauseRoutinesAt as number) : fallback.pauseRoutinesAt,
+    aboutMe: typeof raw.aboutMe === 'string' ? raw.aboutMe.trim().slice(0, MAX_ABOUT_ME) : fallback.aboutMe
   }
 }
 
@@ -51,7 +52,8 @@ export class SettingsStore {
       userName: fullName(),
       quickCapture: DEFAULT_QUICK_CAPTURE,
       lightRuns: true,
-      pauseRoutinesAt: 0.7
+      pauseRoutinesAt: 0.7,
+      aboutMe: ''
     }
     let raw: Partial<AppSettings> = {}
     try {

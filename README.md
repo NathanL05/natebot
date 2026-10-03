@@ -226,6 +226,10 @@ Models are pinned to full names (Sonnet 5.5, Opus 5.5, Haiku 4.5; see `MODEL_IDS
 agent doesn't change model when an alias moves on. Effort defaults to medium for new agents and can be changed
 per agent or in Settings → Defaults. Agents without an `effort` line in their YAML run at medium.
 
+**Settings → General → About you** is a short profile (up to 1,200 characters) every agent reads, along with your
+name: what you study or do, where you live, goals, how you like answers. It doesn't change between messages, so it
+stays in the prompt cache; editing it costs one cache miss per agent.
+
 Every agent also gets a shared NateBot house style: be concise, use ✓ checklists for status, and never take
 irreversible actions without approval.
 
