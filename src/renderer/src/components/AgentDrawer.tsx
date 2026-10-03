@@ -6,7 +6,7 @@ import { AgentForm, validateDraft } from './AgentForm'
 import { Avatar } from './Avatar'
 import { AvatarEditor } from './AvatarEditor'
 import { RefreshIcon, TrashIcon, XIcon } from './icons'
-import { Button, ConfirmDialog, IconButton } from './ui'
+import { Button, ConfirmDialog, IconButton, inputClass } from './ui'
 
 function toDraft(a: AgentSummary): AgentDraft {
   return {
@@ -91,10 +91,11 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
 
           <div className="mt-8 space-y-2 border-t border-line pt-5">
             <div className="text-[12px] font-medium tracking-wide text-muted uppercase">Memory & removal</div>
+            <LastingNotes agentId={agent.id} name={agent.name} />
             <div className="flex items-center gap-3 rounded-xl bg-elev px-3 py-2.5">
               <div className="flex-1">
                 <div className="text-[13px] font-medium">Reset memory</div>
-                <div className="text-[12px] text-muted">Start a fresh Claude session. Chat history stays visible.</div>
+                <div className="text-[12px] text-muted">Start a fresh Claude session. Chat history and lasting notes stay.</div>
               </div>
               <Button onClick={() => setConfirm('reset')}>
                 <RefreshIcon size={13} /> Reset
@@ -126,7 +127,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
       {confirm === 'reset' && (
         <ConfirmDialog
           title={`Reset ${agent.name}'s memory?`}
-          body="It will forget the conversation so far and start fresh next time. Your chat history stays on screen."
+          body="It will forget the conversation so far and start fresh next time, from its lasting notes. Your chat history stays on screen."
           confirmLabel="Reset memory"
           onCancel={() => setConfirm(null)}
           onConfirm={() => {
@@ -150,5 +151,60 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
         />
       )}
     </>
+  )
+}
+
+/** memory.md: what the agent has noted about you. Saved on its own, separate from the settings form. */
+function LastingNotes({ agentId, name }: { agentId: string; name: string }) {
+  const [saved, setSaved] = useState<string | null>(null)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let live = true
+    void api.getMemory(agentId).then((t) => {
+      if (!live) return
+      setSaved(t)
+      setText(t)
+    })
+    return () => {
+      live = false
+    }
+  }, [agentId])
+
+  const save = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      await api.setMemory(agentId, text)
+      setSaved(text.trim())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-xl bg-elev px-3 py-2.5">
+      <div className="text-[13px] font-medium">Lasting notes</div>
+      <div className="mb-2 text-[12px] text-muted">
+        What {name} remembers about you across conversations (memory.md). It adds to these itself; you can edit them too.
+      </div>
+      <textarea
+        className={`${inputClass} min-h-[90px] resize-y font-mono text-[12px] leading-relaxed`}
+        value={text}
+        disabled={saved === null}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Nothing yet. Tell the agent something to remember, or write notes here."
+      />
+      {saved !== null && text.trim() !== saved && (
+        <div className="mt-2 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setText(saved)}>
+            Undo
+          </Button>
+          <Button variant="primary" disabled={busy} onClick={() => void save()}>
+            Save notes
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

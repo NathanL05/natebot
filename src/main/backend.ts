@@ -40,6 +40,7 @@ import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
+import { readMemory, writeMemory } from './memory'
 import { dueAction, ReminderClock } from './reminders'
 import { Rooms } from './rooms'
 import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
@@ -553,8 +554,22 @@ export class Backend implements NateBotApi {
     this.requireAgent(agentId)
     this.store.setSession(agentId, null)
     this.db.takeNotes(agentId)
-    this.engine.system(agentId, 'Memory reset. Starting a fresh conversation.')
+    this.engine.system(agentId, 'Memory reset. Starting a fresh conversation (lasting notes are kept).')
     this.emitAgents()
+  }
+
+  async getMemory(agentId: string): Promise<string> {
+    this.requireAgent(agentId)
+    return readMemory(agentId)
+  }
+
+  async setMemory(agentId: string, text: string): Promise<void> {
+    const agent = this.requireAgent(agentId)
+    ensureWorkspace(agent.id)
+    writeMemory(agent.id, typeof text === 'string' ? text : '')
+    // A running session saw the old notes: point it at the new ones.
+    if (agent.session_id) this.db.addNote(agent.id, 'The user edited your memory.md. Read it again before relying on what it said.')
+    this.engine.system(agent.id, 'Lasting notes updated')
   }
 
   async createRoom(draft: RoomDraft): Promise<RoomConfig> {

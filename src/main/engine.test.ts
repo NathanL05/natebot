@@ -24,6 +24,7 @@ vi.mock(import('./paths'), async (importOriginal) => ({
   workspaceOf: (id: string) => join(tmpdir(), 'natebot-tests', id)
 }))
 vi.mock('./gmail', () => ({ googleReady: () => true }))
+vi.mock('./memory', () => ({ memoryBlock: () => '[Your lasting notes from memory.md]\n- Prefers short replies' }))
 vi.mock('./skills', () => ({ hasInstalledSkills: () => false, SKILLS_PLUGIN: '/skills' }))
 vi.mock('./mcp', () => ({
   agentNotes: () => [],
@@ -302,5 +303,19 @@ describe('quiet routine runs', () => {
     expect(h.spawns[0]?.input).not.toContain('[quiet]')
     expect(done.quiet).toBe(false)
     expect(saved.at(-1)?.text).toBe('[quiet] hi')
+  })
+})
+
+describe('lasting notes', () => {
+  it('shows them at the start of a fresh session only', async () => {
+    const fresh = setup()
+    h.events.push(...reply('Hi'))
+    await fresh.run('Hi')
+    expect(h.spawns[0]?.input).toContain('- Prefers short replies')
+
+    const resumed = setup({ ...emailAgent, session_id: 'sess-1' })
+    h.events.push(...reply('Hi again'))
+    await resumed.run('Hi again')
+    expect(h.spawns[1]?.input).not.toContain('Prefers short replies')
   })
 })

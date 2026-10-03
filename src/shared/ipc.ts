@@ -36,6 +36,9 @@ export interface NateBotApi {
   updateAgent(agent: AgentConfig): Promise<AgentConfig>
   deleteAgent(agentId: string): Promise<void>
   resetMemory(agentId: string): Promise<void>
+  /** The agent's lasting notes (memory.md in its workspace). */
+  getMemory(agentId: string): Promise<string>
+  setMemory(agentId: string, text: string): Promise<void>
 
   createRoom(draft: RoomDraft): Promise<RoomConfig>
   updateRoom(room: RoomConfig): Promise<RoomConfig>
@@ -101,6 +104,8 @@ export const API_METHODS = [
   'updateAgent',
   'deleteAgent',
   'resetMemory',
+  'getMemory',
+  'setMemory',
   'createRoom',
   'updateRoom',
   'deleteRoom',
