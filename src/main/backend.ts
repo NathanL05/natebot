@@ -148,6 +148,7 @@ export class Backend implements NateBotApi {
       agents: () => this.store.list(),
       tokenPath: gmailTokenPath,
       onMatch: (agentId, trigger, hits) => this.fireTrigger(agentId, trigger, hits),
+      onSignInExpired: () => this.signInExpired(),
       log
     })
 
@@ -286,7 +287,37 @@ export class Backend implements NateBotApi {
     n.on('click', () => this.onOpenAgent(chatId))
     if (buttons) n.on('action', (e) => buttons.onAction(e.actionIndex))
     n.show()
+    this.push(name ? `${name} · ${title}` : title, body)
     return n
+  }
+
+  /** Copies a notification to your phone through ntfy (Settings → General), if set up. Text only when you allow it. */
+  private push(title: string, body: string): Promise<{ ok: boolean; error?: string }> {
+    const { pushTopic, pushDetails } = this.settings.get()
+    if (!pushTopic) return Promise.resolve({ ok: false, error: 'No topic set.' })
+    // Header values must be plain ASCII; ntfy shows a fallback title otherwise.
+    const ascii = title.replace(/[^\x20-\x7E]/g, '').trim() || 'NateBot'
+    return fetch(`https://ntfy.sh/${encodeURIComponent(pushTopic)}`, {
+      method: 'POST',
+      headers: { Title: ascii, Tags: 'robot' },
+      body: pushDetails ? body.slice(0, 1000) : 'Open NateBot to see it.'
+    })
+      .then((r) => (r.ok ? { ok: true } : { ok: false, error: `ntfy returned ${r.status}` }))
+      .catch((e: Error) => {
+        log(`push failed: ${e.message}`)
+        return { ok: false, error: e.message }
+      })
+  }
+
+  private signInWarnedAt = 0
+
+  /** Gmail's sign-in expired: say so once a day, before routines start failing on it. */
+  private signInExpired(): void {
+    if (Date.now() - this.signInWarnedAt < 86_400_000) return
+    this.signInWarnedAt = Date.now()
+    const agent = this.store.list().find((a) => a.mcp_servers.includes('gmail'))
+    this.notify(agent?.id ?? '', 'Gmail needs reconnecting', 'The Gmail sign-in expired. Open Settings → Connected tools → Connect Gmail.')
+    if (agent) this.engine.system(agent.id, "Gmail's sign-in expired. Reconnect it in Settings → Connected tools (publishing your Google app stops the weekly expiry).")
   }
 
   /**
@@ -917,6 +948,10 @@ export class Backend implements NateBotApi {
 
   async captureShortcutOk(): Promise<boolean> {
     return this.captureOk
+  }
+
+  async testPush(): Promise<{ ok: boolean; error?: string }> {
+    return this.push('NateBot', 'Phone notifications work.')
   }
 
   async openExternal(url: string): Promise<void> {

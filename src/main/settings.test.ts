@@ -14,7 +14,9 @@ const defaults: AppSettings = {
   quickCapture: 'Alt+Space',
   lightRuns: true,
   pauseRoutinesAt: 0.7,
-  aboutMe: ''
+  aboutMe: '',
+  pushTopic: null,
+  pushDetails: false
 }
 
 describe('settings sanitising', () => {
@@ -48,7 +50,9 @@ describe('settings sanitising', () => {
       userName: '',
       quickCapture: 'F13',
       lightRuns: 'yes',
-      pauseRoutinesAt: 0.42
+      pauseRoutinesAt: 0.42,
+      pushTopic: 'short',
+      pushDetails: 1
     } as unknown as Partial<AppSettings>
     expect(sanitize(raw, defaults)).toEqual(defaults)
   })

@@ -89,6 +89,8 @@ export interface NateBotApi {
   /** Which agents used what in the current session window and week. */
   usageBreakdown(): Promise<UsageBreakdown>
   openExternal(url: string): Promise<void>
+  /** Sends a test phone notification to the saved ntfy topic. */
+  testPush(): Promise<{ ok: boolean; error?: string }>
   /** Closes the quick-capture box. */
   hideCapture(): Promise<void>
   /** False when the quick-capture shortcut couldn't be registered (another app has it). */
@@ -148,6 +150,7 @@ export const API_METHODS = [
   'refreshUsage',
   'usageBreakdown',
   'openExternal',
+  'testPush',
   'hideCapture',
   'captureShortcutOk',
   'setAvatar',

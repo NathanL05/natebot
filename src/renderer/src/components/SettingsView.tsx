@@ -294,6 +294,7 @@ export function SettingsView() {
                 placeholder="e.g. Final-year student in Galway, applying for 2027 software graduate roles. Gym Mon/Wed/Fri evenings. Prefer short, direct answers."
               />
             </div>
+            <PhoneRow topic={settings.pushTopic} details={settings.pushDetails} onChange={(p) => void patch(p)} />
             <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />
@@ -335,5 +336,46 @@ function QuickCaptureRow({ value, onChange }: { value: string | null; onChange: 
         options={[{ value: 'off', label: 'Off' }, ...QUICK_CAPTURE_SHORTCUTS.map((s) => ({ value: s.id, label: s.label }))]}
       />
     </Row>
+  )
+}
+
+/** Phone notifications through ntfy: the app subscribes to a private topic name. */
+function PhoneRow({ topic, details, onChange }: { topic: string | null; details: boolean; onChange: (p: { pushTopic?: string | null; pushDetails?: boolean }) => void }) {
+  const [result, setResult] = useState('')
+  const generate = (): void => onChange({ pushTopic: `natebot-${Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 16)}` })
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium">Phone notifications</div>
+          <div className="mt-0.5 text-[12px] text-muted">
+            Get NateBot's notifications on your phone with the free ntfy app: install it, then subscribe to this topic. The topic name is
+            the only key, so keep it private. They go through ntfy.sh; by default only titles are sent.
+          </div>
+        </div>
+        {topic ? (
+          <Button variant="ghost" onClick={() => onChange({ pushTopic: null })}>
+            Turn off
+          </Button>
+        ) : (
+          <Button onClick={generate}>Set up</Button>
+        )}
+      </div>
+      {topic && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <code className="selectable rounded-lg bg-elev px-2.5 py-1.5 text-[12px]">{topic}</code>
+          <Button
+            variant="ghost"
+            onClick={() => void api.testPush().then((r) => setResult(r.ok ? 'Sent. Check your phone.' : `Didn't send: ${r.error ?? 'unknown error'}`))}
+          >
+            Send test
+          </Button>
+          <label className="flex items-center gap-2 text-[12px] text-muted">
+            <Toggle label="Include message text" checked={details} onChange={(v) => onChange({ pushDetails: v })} /> Include message text
+          </label>
+          {result && <span className="text-[12px] text-muted">{result}</span>}
+        </div>
+      )}
+    </div>
   )
 }
