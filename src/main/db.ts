@@ -212,6 +212,11 @@ export class Db {
     this.db.close()
   }
 
+  /** The underlying database, for backups. */
+  get raw(): DatabaseSync {
+    return this.db
+  }
+
   // ---- messages ----
 
   saveMessage(m: ChatMessage): void {
