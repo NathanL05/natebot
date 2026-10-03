@@ -218,3 +218,8 @@ select:focus-visible {
 .md hr { border: 0; border-top: 1px solid var(--line); }
 .md .check { color: var(--success); font-weight: 700; }
 .md .cross { color: var(--danger); font-weight: 700; }
+
+/* A message opened from search. */
+.nb-flash {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}

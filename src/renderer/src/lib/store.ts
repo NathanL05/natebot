@@ -27,6 +27,8 @@ interface State {
   view: View
   selectedId: string | null
   search: string
+  /** A message to scroll to and highlight once its chat is showing (from search). */
+  focusMessageId: string | null
   drawerOpen: boolean
   addOpen: boolean
   /** Folder a new agent goes into (from a folder's + button). */
@@ -42,6 +44,8 @@ interface State {
   init(): Promise<void>
   /** Opens an agent's chat or a group chat. */
   select(chatId: string): void
+  /** Opens a chat at one message. */
+  openMessage(chatId: string, messageId: string): void
   setView(view: View): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
@@ -98,6 +102,7 @@ export const useStore = create<State>((set, get) => {
     view: 'chat',
     selectedId: null,
     search: '',
+    focusMessageId: null,
     drawerOpen: false,
     addOpen: false,
     addFolderId: null,
@@ -152,7 +157,7 @@ export const useStore = create<State>((set, get) => {
     },
 
     select(chatId) {
-      set({ selectedId: chatId, view: 'chat', drawerOpen: false })
+      set({ selectedId: chatId, view: 'chat', drawerOpen: false, focusMessageId: null })
       void api.markRead(chatId)
       if (!get().messages[chatId]) {
         // Start with an empty list so live events are captured while history loads.
@@ -163,6 +168,11 @@ export const useStore = create<State>((set, get) => {
           set({ messages: { ...get().messages, [chatId]: merged } })
         })
       }
+    },
+
+    openMessage(chatId, messageId) {
+      get().select(chatId)
+      set({ focusMessageId: messageId })
     },
 
     setView: (view) => set({ view, drawerOpen: false }),

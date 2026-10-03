@@ -2,7 +2,7 @@
 // Claude's projects. Chats move between folders by drag and drop or from the
 // right-click menu. Searching shows one flat list.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
-import type { AgentSummary, Folder, RoomSummary } from '@shared/types'
+import type { AgentSummary, Folder, MessageHit, RoomSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { listTime } from '../lib/format'
 import { agentPicture } from '../lib/avatars'
@@ -383,11 +383,81 @@ export function ChatList() {
         </>
       )}
 
-      {matches.length === 0 && (
-        <div className="px-3 py-8 text-center text-[13px] text-muted">{q ? 'No chats match.' : 'No agents yet. Click + to add one.'}</div>
+      {q && <MessageResults query={q} byId={byId} rooms={rooms} />}
+
+      {matches.length === 0 && !q && (
+        <div className="px-3 py-8 text-center text-[13px] text-muted">No agents yet. Click + to add one.</div>
       )}
 
       {menu && <Menu {...menu} onClose={closeMenu} />}
     </nav>
+  )
+}
+
+/** The search term in bold within a snippet. */
+function highlight(text: string, query: string): ReactNode {
+  const i = text.toLowerCase().indexOf(query.toLowerCase())
+  if (i === -1) return text
+  return (
+    <>
+      {text.slice(0, i)}
+      <strong className="font-semibold text-fg">{text.slice(i, i + query.length)}</strong>
+      {text.slice(i + query.length)}
+    </>
+  )
+}
+
+/** Searching also looks through every chat's messages; a click opens the chat at that message. */
+function MessageResults({ query, byId, rooms }: { query: string; byId: Record<string, AgentSummary>; rooms: RoomSummary[] }) {
+  const [hits, setHits] = useState<MessageHit[] | null>(null)
+
+  useEffect(() => {
+    if (query.length < 2) {
+      setHits([])
+      return
+    }
+    let live = true
+    const t = setTimeout(() => {
+      void api.searchMessages(query).then((h) => live && setHits(h))
+    }, 150)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [query])
+
+  if (query.length < 2 || hits === null) return null
+  return (
+    <section className="mt-2">
+      <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-muted uppercase">Messages</div>
+      {hits.length === 0 && <div className="px-2.5 py-2 text-[12px] text-muted">No messages match.</div>}
+      {hits.map((h) => {
+        const room = rooms.find((r) => r.id === h.chatId)
+        const agent = byId[h.speakerId ?? h.chatId]
+        const chatName = room?.name ?? byId[h.chatId]?.name ?? ''
+        const who = h.role === 'user' ? 'You' : (agent?.name ?? chatName)
+        return (
+          <button
+            key={h.messageId}
+            type="button"
+            onClick={() => useStore.getState().openMessage(h.chatId, h.messageId)}
+            className="flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left transition hover:bg-hover"
+          >
+            {room && !h.speakerId ? (
+              <GroupAvatar members={room.memberIds.map((id) => byId[id]).filter((a): a is AgentSummary => !!a)} size={28} backdrop="var(--sidebar)" />
+            ) : (
+              <Avatar seed={agent?.name ?? chatName} shape={agent?.shape} color={agent?.color} picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null} size={28} />
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline gap-2">
+                <span className="truncate text-[13px] font-medium">{room ? `${chatName} · ${who}` : `${chatName}${h.role === 'user' ? ' · You' : ''}`}</span>
+                <span className="ml-auto shrink-0 text-[11px] text-muted">{listTime(h.createdAt)}</span>
+              </span>
+              <span className="line-clamp-2 block text-[12px] leading-snug text-muted">{highlight(h.snippet, query)}</span>
+            </span>
+          </button>
+        )
+      })}
+    </section>
   )
 }

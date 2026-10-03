@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { mkdtempSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DELETED_AGENT_ID } from '@shared/usage'
-import { Db } from './db'
+import { Db, snippetOf } from './db'
 
 const tokens = (input: number, output: number, costUsd: number | null) => ({ input, cacheWrite: 0, cacheRead: 0, output, costUsd })
 
@@ -91,5 +91,37 @@ describe('routine checkpoints and runs', () => {
     expect(db.lastRun('email', 'routine', 'main')?.summary).toBe('old main run')
     expect(db.lastRun('email', 'routine', 'r2')?.summary).toBe('evening run')
     expect(db.lastRun('email', 'routine', 'r3')).toBeNull()
+  })
+})
+
+describe('message search', () => {
+  const msg = (id: string, agentId: string, role: 'user' | 'agent' | 'system', text: string, createdAt: number) => ({ id, agentId, role, text, createdAt })
+
+  it('finds your messages and replies case-insensitively, newest first, skipping system lines', () => {
+    const db = new Db(':memory:')
+    db.saveMessage(msg('a', 'email-agent', 'agent', 'Sarah needs the **report** by Friday.', 1))
+    db.saveMessage(msg('b', 'planner', 'user', 'Block time for the Report', 2))
+    db.saveMessage(msg('c', 'planner', 'system', 'Routine report ran', 3))
+    db.saveMessage({ ...msg('d', 'room:x', 'agent', 'I can draft the report', 4), speakerId: 'planner' })
+    expect(db.searchMessages('REPORT').map((h) => h.messageId)).toEqual(['d', 'b', 'a'])
+    expect(db.searchMessages('report')[0]).toMatchObject({ chatId: 'room:x', speakerId: 'planner', role: 'agent' })
+    expect(db.searchMessages('report').at(-1)?.snippet).toBe('Sarah needs the report by Friday.')
+  })
+
+  it('treats % and _ literally', () => {
+    const db = new Db(':memory:')
+    db.saveMessage(msg('a', 'planner', 'user', 'Save 20% this month', 1))
+    db.saveMessage(msg('b', 'planner', 'user', 'Save 200 this month', 2))
+    expect(db.searchMessages('20%').map((h) => h.messageId)).toEqual(['a'])
+    expect(db.searchMessages('_')).toEqual([])
+  })
+
+  it('cuts long text down to the part around the match', () => {
+    const text = `${'a '.repeat(100)}needle${' b'.repeat(100)}`
+    const snip = snippetOf(text, 'needle')
+    expect(snip.startsWith('…')).toBe(true)
+    expect(snip.endsWith('…')).toBe(true)
+    expect(snip).toContain('needle')
+    expect(snip.length).toBeLessThan(140)
   })
 })

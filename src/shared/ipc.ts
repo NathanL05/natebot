@@ -13,6 +13,7 @@ import type {
   GmailStatus,
   MarketplaceData,
   McpServerInfo,
+  MessageHit,
   Reminder,
   RoomConfig,
   RoomDraft,
@@ -29,6 +30,8 @@ export interface NateBotApi {
   sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
+  /** Message text search across every chat (at least 2 characters). */
+  searchMessages(query: string): Promise<MessageHit[]>
   /** Native file picker (multiple files). Returns absolute paths. */
   pickAttachments(): Promise<string[]>
 
@@ -99,6 +102,7 @@ export const API_METHODS = [
   'sendMessage',
   'stop',
   'markRead',
+  'searchMessages',
   'pickAttachments',
   'createAgent',
   'updateAgent',

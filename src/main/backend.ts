@@ -16,6 +16,7 @@ import type {
   Folder,
   GmailStatus,
   MarketplaceData,
+  MessageHit,
   Reminder,
   ReminderStatus,
   RoomConfig,
@@ -506,6 +507,12 @@ export class Backend implements NateBotApi {
       if (room) this.emitRooms()
       else this.emitAgents()
     }
+  }
+
+  async searchMessages(query: string): Promise<MessageHit[]> {
+    const q = typeof query === 'string' ? query.trim() : ''
+    if (q.length < 2) return []
+    return this.db.searchMessages(q.slice(0, 200)).filter((h) => (isRoomId(h.chatId) ? this.rooms.get(h.chatId) : this.store.get(h.chatId)))
   }
 
   async pickAttachments(): Promise<string[]> {
