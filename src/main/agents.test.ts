@@ -16,6 +16,7 @@ describe('agent YAML normalisation', () => {
         mcp_servers: [],
         allowed_tools: [],
         disallowed_tools: [],
+        quick_prompts: [],
         routines: [],
         session_id: null
       })
@@ -92,6 +93,19 @@ describe('agent YAML normalisation', () => {
     ).routines
     expect(routines.map((r) => r.id)).toEqual(['main', 'evening', 'evening-2', 'r4', 'r6'])
     expect(routines[1]).toEqual({ id: 'evening', enabled: true, cron: '0 19 * * *', prompt: 'Evening' })
+  })
+
+  it('cleans quick prompts, and gives starter agents from before they existed their defaults', () => {
+    expect(normalize({ quick_prompts: ['  Sum  up\n my inbox ', 'Sum up my inbox', '', 3, 'a', 'b', 'c', 'd', 'e', 'f'] }, 'x').quick_prompts).toEqual([
+      'Sum up my inbox',
+      'a',
+      'b',
+      'c',
+      'd',
+      'e'
+    ])
+    expect(normalize({}, 'email-agent').quick_prompts).toContain('Give me a summary of my emails')
+    expect(normalize({ quick_prompts: [] }, 'email-agent').quick_prompts).toEqual([])
   })
 
   it('keeps the designed shape of starter agents created before shapes existed', () => {

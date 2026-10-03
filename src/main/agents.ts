@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_EFFORT, EFFORTS, MAX_ROUTINES } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS, MAX_QUICK_PROMPTS, MAX_ROUTINES } from '@shared/types'
 import type { AgentConfig, AgentDraft, EffortLevel, MascotShape, ModelId, Routine } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
@@ -55,6 +55,13 @@ export function normalizeRoutines(list: unknown, legacy: unknown): Routine[] {
   return out
 }
 
+/** Up to MAX_QUICK_PROMPTS distinct one-line prompts. Starter agents from before this existed get their defaults. */
+function normalizeQuickPrompts(v: unknown, id: string): string[] {
+  if (v === undefined) return [...(STARTER_AGENTS.find((s) => s.id === id)?.quick_prompts ?? [])]
+  const list = strList(v).map((p) => p.replace(/\s+/g, ' ').slice(0, 300))
+  return [...new Set(list)].slice(0, MAX_QUICK_PROMPTS)
+}
+
 function normalizeShape(v: unknown, id: string): MascotShape | null {
   if (MASCOT_SHAPES.includes(v as MascotShape)) return v as MascotShape
   // Starter agents created before shapes existed keep their designed look.
@@ -76,6 +83,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     mcp_servers: strList(r['mcp_servers']),
     allowed_tools: strList(r['allowed_tools']),
     disallowed_tools: strList(r['disallowed_tools']),
+    quick_prompts: normalizeQuickPrompts(r['quick_prompts'], id),
     routines: normalizeRoutines(r['routines'], r['routine']),
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
@@ -94,6 +102,7 @@ function serialize(a: AgentConfig): string {
     mcp_servers: a.mcp_servers,
     allowed_tools: a.allowed_tools,
     disallowed_tools: a.disallowed_tools,
+    quick_prompts: a.quick_prompts,
     routines: a.routines,
     session_id: a.session_id
   }

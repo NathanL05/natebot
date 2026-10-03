@@ -10,6 +10,8 @@ export function createTray(opts: {
   onOpen: () => void
   onOpenAgent: (id: string) => void
   onRoutines: () => void
+  /** Sends one of an agent's quick prompts without opening the window. */
+  onQuickPrompt: (agentId: string, prompt: string) => void
 }): { update: (agents: AgentSummary[]) => void } {
   const icon = nativeImage.createFromPath(join(opts.resourcesDir, 'trayTemplate.png'))
   icon.setTemplateImage(true)
@@ -22,6 +24,10 @@ export function createTray(opts: {
     const unread = agents.reduce((n, a) => n + a.unread, 0)
     tray.setTitle(busy ? ` ${busy}` : '')
     const recent = [...agents].sort((a, b) => b.lastActivity - a.lastActivity).slice(0, 8)
+    const short = (s: string): string => (s.length > 48 ? `${s.slice(0, 47)}…` : s)
+    const quick = agents
+      .flatMap((a) => a.quick_prompts.map((p) => ({ label: `${a.name}: ${short(p)}`, click: () => opts.onQuickPrompt(a.id, p) })))
+      .slice(0, 10)
     tray.setContextMenu(
       Menu.buildFromTemplate([
         { label: 'Open NateBot', click: opts.onOpen },
@@ -32,8 +38,11 @@ export function createTray(opts: {
           label: `${a.name}${a.status === 'running' ? '  ·  working' : a.unread ? '  ·  new' : ''}`,
           click: () => opts.onOpenAgent(a.id)
         })),
+        ...(quick.length
+          ? [{ type: 'separator' as const }, { label: 'Quick prompts (reply comes as a notification)', enabled: false }, ...quick]
+          : []),
         { type: 'separator' },
-        { label: 'Routines', click: opts.onRoutines },
+        { label: 'Routines & reminders', click: opts.onRoutines },
         { type: 'separator' },
         { label: 'Quit NateBot', accelerator: 'Cmd+Q', click: () => app.quit() }
       ])

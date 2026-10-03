@@ -50,6 +50,7 @@ const emailAgent: AgentConfig = {
   mcp_servers: ['gmail'],
   allowed_tools: [],
   disallowed_tools: ['mcp__gmail__manage_gmail_filter'],
+  quick_prompts: [],
   routines: [],
   session_id: null
 }

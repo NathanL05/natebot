@@ -116,7 +116,14 @@ export function ChatView() {
         <MessageList messages={messages} agentId={agent.id} />
       )}
 
-      <Composer key={agent.id} chatId={agent.id} name={agent.name} running={agent.status === 'running'} queued={agent.queued} />
+      <Composer
+        key={agent.id}
+        chatId={agent.id}
+        name={agent.name}
+        running={agent.status === 'running'}
+        queued={agent.queued}
+        quickPrompts={agent.quick_prompts}
+      />
 
       {drawerOpen && <AgentDrawer agent={agent} />}
     </div>

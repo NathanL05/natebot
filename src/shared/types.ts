@@ -49,12 +49,15 @@ export interface AgentConfig {
   mcp_servers: string[]
   allowed_tools: string[]
   disallowed_tools: string[]
+  /** One-click messages shown above the composer and in the menu bar, up to MAX_QUICK_PROMPTS. */
+  quick_prompts: string[]
   /** Scheduled runs, up to MAX_ROUTINES. */
   routines: Routine[]
   session_id: string | null
 }
 
 export const MAX_ROUTINES = 5
+export const MAX_QUICK_PROMPTS = 6
 
 export type AgentStatus = 'idle' | 'running'
 
