@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
-import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
+import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
 import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
@@ -30,7 +30,10 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
         ? null
         : QUICK_CAPTURE_SHORTCUTS.some((s) => s.id === raw.quickCapture)
           ? (raw.quickCapture as string)
-          : fallback.quickCapture
+          : fallback.quickCapture,
+    lightRuns: typeof raw.lightRuns === 'boolean' ? raw.lightRuns : fallback.lightRuns,
+    pauseRoutinesAt:
+      raw.pauseRoutinesAt === null ? null : PAUSE_LEVELS.includes(raw.pauseRoutinesAt as number) ? (raw.pauseRoutinesAt as number) : fallback.pauseRoutinesAt
   }
 }
 
@@ -46,7 +49,9 @@ export class SettingsStore {
       accent: DEFAULT_ACCENT,
       launchAtLogin: false,
       userName: fullName(),
-      quickCapture: DEFAULT_QUICK_CAPTURE
+      quickCapture: DEFAULT_QUICK_CAPTURE,
+      lightRuns: true,
+      pauseRoutinesAt: 0.7
     }
     let raw: Partial<AppSettings> = {}
     try {

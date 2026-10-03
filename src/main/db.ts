@@ -209,6 +209,21 @@ export class Db {
     })
   }
 
+  /** The agent's latest non-empty reply, for runs that start without the chat's session. */
+  lastAgentText(agentId: string): string | null {
+    const row = this.db
+      .prepare(`SELECT text FROM messages WHERE agent_id = ? AND role = 'agent' AND text != '' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
+      .get(agentId) as { text: string } | undefined
+    return row?.text ?? null
+  }
+
+  /** The last few messages of a chat, oldest first, for carrying context into a fresh session. */
+  recentTurns(agentId: string, count = 6): ChatMessage[] {
+    return this.listMessages(agentId, 40)
+      .filter((m) => (m.role === 'user' || m.role === 'agent') && m.text)
+      .slice(-count)
+  }
+
   /** Messages left mid-stream by a crash or force-quit. */
   repairInterrupted(): void {
     const rows = this.db.prepare(`SELECT * FROM messages WHERE data LIKE '%"streaming":true%'`).all() as unknown as MessageRow[]
@@ -250,7 +265,7 @@ export class Db {
     this.db.prepare('UPDATE agent_state SET notes = ? WHERE agent_id = ?').run(JSON.stringify(notes.slice(-20)), agentId)
   }
 
-  private peekNotes(agentId: string): string[] {
+  peekNotes(agentId: string): string[] {
     const row = this.db.prepare('SELECT notes FROM agent_state WHERE agent_id = ?').get(agentId) as { notes: string } | undefined
     try {
       return row ? (JSON.parse(row.notes) as string[]) : []

@@ -11,7 +11,9 @@ const defaults: AppSettings = {
   accent: DEFAULT_ACCENT,
   launchAtLogin: false,
   userName: 'Nathan',
-  quickCapture: 'Alt+Space'
+  quickCapture: 'Alt+Space',
+  lightRuns: true,
+  pauseRoutinesAt: 0.7
 }
 
 describe('settings sanitising', () => {
@@ -43,7 +45,9 @@ describe('settings sanitising', () => {
       accent: 'not-a-colour',
       launchAtLogin: 'yes',
       userName: '',
-      quickCapture: 'F13'
+      quickCapture: 'F13',
+      lightRuns: 'yes',
+      pauseRoutinesAt: 0.42
     } as unknown as Partial<AppSettings>
     expect(sanitize(raw, defaults)).toEqual(defaults)
   })

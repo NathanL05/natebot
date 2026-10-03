@@ -107,7 +107,8 @@ export class Backend implements NateBotApi {
       usage: this.usage,
       claudePath: () => (this.env.claudeFound ? this.env.claudePath : null),
       emitMessage: (m) => emit('message', m),
-      emitAgents: () => this.emitAgents()
+      emitAgents: () => this.emitAgents(),
+      lightRuns: () => this.settings.get().lightRuns
     })
     this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
     this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {
@@ -371,6 +372,12 @@ export class Backend implements NateBotApi {
       this.emitAgents()
       return
     }
+    const paused = this.weekPaused()
+    if (paused) {
+      this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: ${paused}`)
+      this.emitAgents()
+      return
+    }
     const wait = this.usage.waitMs()
     if (wait > 0) {
       this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: usage limit reached (resets at ${clock(now + wait)})`)
@@ -414,7 +421,13 @@ export class Backend implements NateBotApi {
       }
       this.setReminderStatus(r, 'done')
       log(`reminder: agent=${r.agentId} kind=${r.kind} late=${now - r.at > LATE_AFTER_MS}`)
-      if (r.kind === 'message') {
+      const paused = r.kind === 'task' ? this.weekPaused() : null
+      if (paused) {
+        // Still remind, just without spending usage on the task.
+        this.engine.say(r.agentId, `⏰ ${r.text}`)
+        this.engine.system(r.agentId, `The agent didn't work on this reminder: ${paused}`)
+        this.notify(r.agentId, 'Reminder', r.text)
+      } else if (r.kind === 'message') {
         this.engine.say(r.agentId, `⏰ ${r.text}`)
         this.notify(r.agentId, 'Reminder', r.text)
       } else {
@@ -424,6 +437,14 @@ export class Backend implements NateBotApi {
     }
     this.reminderClock.arm()
     this.emitAgents()
+  }
+
+  /** Why unattended runs are paused this week (Settings → Usage), or null if they aren't. */
+  private weekPaused(): string | null {
+    const at = this.settings.get().pauseRoutinesAt
+    const used = this.usage.get()?.sevenDay.utilization ?? null
+    if (at === null || used === null || used < at) return null
+    return `this week's usage is at ${Math.round(used * 100)}%, and routines pause at ${Math.round(at * 100)}% (Settings → Usage)`
   }
 
   private requireAgent(agentId: unknown): AgentConfig {

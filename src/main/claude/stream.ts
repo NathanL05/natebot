@@ -68,6 +68,8 @@ export class StreamState {
   sessionId: string | null = null
   rateLimit: RateLimitInfo | null = null
   result: RunResult | null = null
+  /** How much the latest API call read (the conversation's current size), from its usage report. */
+  contextTokens = 0
 
   get text(): string {
     return join(this.committed, this.partial)
@@ -102,6 +104,8 @@ export class StreamState {
       }
 
       case 'assistant': {
+        const usage = ((ev['message'] ?? {}) as Json)['usage'] as Json | undefined
+        if (usage) this.contextTokens = count(usage['input_tokens']) + count(usage['cache_read_input_tokens']) + count(usage['cache_creation_input_tokens'])
         const content = (((ev['message'] ?? {}) as Json)['content'] ?? []) as Json[]
         let changed = false
         for (const block of content) {
