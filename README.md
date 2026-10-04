@@ -442,6 +442,12 @@ counts for more than Haiku and cached reads for less than fresh input. It covers
 won't add up to the rings above, which include Claude Code and claude.ai. Stopped or timed-out runs report no
 tokens and are counted separately; runs from before this was added have no numbers.
 
+## Quiet hours
+
+**Settings → General → Quiet hours** (for example 22:30–07:30) holds notifications overnight, phone ones included.
+When quiet hours end you get one **While you were away** summary ("2 replies · routine finished · 1 needs your
+approval"), and clicking it opens Today. Reminders you set still ring on time.
+
 ## Phone notifications
 
 **Settings → General → Phone notifications → Set up** makes a private topic name. Install the free

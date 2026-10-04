@@ -45,6 +45,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
+import { digest, inQuietHours } from './quiet'
 import { connectApple, refreshAppleEntry } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
@@ -97,6 +98,11 @@ export class Backend implements NateBotApi {
   onAgentsChanged: (agents: AgentSummary[]) => void = () => undefined
   /** Called when a notification is clicked. */
   onOpenAgent: (agentId: string) => void = () => undefined
+  /** Opens a screen (the quiet-hours summary opens Today). */
+  onShowView: (view: 'today') => void = () => undefined
+  /** Notification titles held during quiet hours, summed up when they end. */
+  private held: string[] = []
+  private quietTimer: NodeJS.Timeout | undefined
   /** Registers the quick-capture shortcut; false if another app has it. */
   onCaptureShortcut: (accelerator: string | null) => boolean = () => true
   onHideCapture: () => void = () => undefined
@@ -198,6 +204,7 @@ export class Backend implements NateBotApi {
     this.emailWatcher.start()
     this.backup()
     this.backupTimer = setInterval(() => this.backup(), 60 * 60_000)
+    this.quietTimer = setInterval(() => this.endQuiet(), 60_000)
     powerMonitor.on('resume', this.onResume)
   }
 
@@ -214,6 +221,7 @@ export class Backend implements NateBotApi {
     this.reminderClock.stop()
     this.emailWatcher.stop()
     clearInterval(this.backupTimer)
+    clearInterval(this.quietTimer)
     this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
@@ -282,8 +290,20 @@ export class Backend implements NateBotApi {
   }
 
   /** chatId: an agent or a group chat. `buttons` adds macOS action buttons (index of the one pressed). */
-  private notify(chatId: string, title: string, body: string, buttons?: { labels: string[]; onAction: (index: number) => void }): Notification | null {
+  /** chatId: an agent or a group chat. `urgent` rings even in quiet hours (reminders you set). */
+  private notify(
+    chatId: string,
+    title: string,
+    body: string,
+    buttons?: { labels: string[]; onAction: (index: number) => void },
+    urgent = false
+  ): Notification | null {
     if (!Notification.isSupported()) return null
+    const quiet = this.settings.get().quietHours
+    if (!urgent && quiet && inQuietHours(new Date(), quiet.start, quiet.end)) {
+      this.held.push(title)
+      return null
+    }
     const name = this.store.get(chatId)?.name ?? this.rooms.get(chatId)?.name
     const n = new Notification({
       title: name ? `${name} · ${title}` : title,
@@ -296,6 +316,20 @@ export class Backend implements NateBotApi {
     n.show()
     this.push(name ? `${name} · ${title}` : title, body)
     return n
+  }
+
+  /** When quiet hours are over, one notification sums up what was held. */
+  private endQuiet(): void {
+    if (!this.held.length) return
+    const quiet = this.settings.get().quietHours
+    if (quiet && inQuietHours(new Date(), quiet.start, quiet.end)) return
+    const body = digest(this.held)
+    this.held = []
+    if (!Notification.isSupported()) return
+    const n = new Notification({ title: 'While you were away', body, silent: false })
+    n.on('click', () => this.onShowView('today'))
+    n.show()
+    void this.push('While you were away', body)
   }
 
   /** Copies a notification to your phone through ntfy (Settings → General), if set up. Text only when you allow it. */
@@ -501,10 +535,10 @@ export class Backend implements NateBotApi {
         // Still remind, just without spending usage on the task.
         this.engine.say(r.agentId, `⏰ ${r.text}`)
         this.engine.system(r.agentId, `The agent didn't work on this reminder: ${paused}`)
-        this.notify(r.agentId, 'Reminder', r.text)
+        this.notify(r.agentId, 'Reminder', r.text, undefined, true)
       } else if (r.kind === 'message') {
         this.engine.say(r.agentId, `⏰ ${r.text}`)
-        this.notify(r.agentId, 'Reminder', r.text)
+        this.notify(r.agentId, 'Reminder', r.text, undefined, true)
       } else {
         this.engine.system(r.agentId, `Reminder ran at ${clock(now)}${now - r.at > LATE_AFTER_MS ? ` (it was due at ${due})` : ''}`)
         this.engine.enqueue(r.agentId, { source: 'reminder', prompt: r.text, attachments: [], dueAt: r.at })
