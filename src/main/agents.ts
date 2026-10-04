@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_ROUTINES } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES } from '@shared/types'
 import type { AgentConfig, AgentDraft, EffortLevel, EmailTrigger, MascotShape, ModelId, Routine } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
@@ -76,6 +76,15 @@ export function normalizeTriggers(v: unknown): EmailTrigger[] {
   return out
 }
 
+/** Absolute folder paths (~ expanded), without commas (they'd split a tool rule), deduplicated. */
+export function normalizeFolders(v: unknown): string[] {
+  const home = process.env['HOME'] ?? ''
+  const paths = strList(v)
+    .map((p) => (p.startsWith('~/') && home ? `${home}${p.slice(1)}` : p).replace(/\/+$/, ''))
+    .filter((p) => p.startsWith('/') && p.length > 1 && !p.includes(','))
+  return [...new Set(paths)].slice(0, MAX_READ_FOLDERS)
+}
+
 function normalizeShape(v: unknown, id: string): MascotShape | null {
   if (MASCOT_SHAPES.includes(v as MascotShape)) return v as MascotShape
   // Starter agents created before shapes existed keep their designed look.
@@ -100,6 +109,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     quick_prompts: normalizeQuickPrompts(r['quick_prompts'], id),
     routines: normalizeRoutines(r['routines'], r['routine']),
     email_triggers: normalizeTriggers(r['email_triggers']),
+    read_folders: normalizeFolders(r['read_folders']),
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
 }
@@ -120,6 +130,7 @@ function serialize(a: AgentConfig): string {
     quick_prompts: a.quick_prompts,
     routines: a.routines,
     email_triggers: a.email_triggers,
+    read_folders: a.read_folders,
     session_id: a.session_id
   }
   return HEADER + stringify(doc, { lineWidth: 0, blockQuote: 'literal' })

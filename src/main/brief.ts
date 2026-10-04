@@ -44,7 +44,7 @@ export function briefDraft(servers: string[]): AgentDraft {
       '1. The day at a glance, including the weather if you know my city (one web search at most).',
       '2. My schedule, tasks, reminders and deadlines from the [Today, from NateBot] block. Use it as given and do not fetch them again.',
       servers.includes('gmail') ? '3. Emails that need me: one Gmail search for unread mail from the last day, skipping promotions and newsletters.' : '',
-      '4. One concrete suggestion for the day (what to tackle first, or a gap to use).',
+      "4. One concrete suggestion for the day (what to tackle first, or a gap to use). If you can read my plan folders, base it on today's step there (read at most two files).",
       'Use ✓ checklists. Never send anything or change anything yourself.'
     ]
       .filter(Boolean)
@@ -54,6 +54,7 @@ export function briefDraft(servers: string[]): AgentDraft {
     disallowed_tools: [],
     quick_prompts: ['Write my morning brief'],
     routines: [{ id: 'main', enabled: true, cron: '30 7 * * *', prompt: `Write my morning brief.\n\n${TODAY_TOKEN}` }],
-    email_triggers: []
+    email_triggers: [],
+    read_folders: []
   }
 }

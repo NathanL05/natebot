@@ -21,7 +21,8 @@ function toDraft(a: AgentSummary): AgentDraft {
     disallowed_tools: [...a.disallowed_tools],
     quick_prompts: [...a.quick_prompts],
     routines: a.routines.map((r) => ({ ...r })),
-    email_triggers: a.email_triggers.map((t) => ({ ...t }))
+    email_triggers: a.email_triggers.map((t) => ({ ...t })),
+    read_folders: [...a.read_folders]
   }
 }
 

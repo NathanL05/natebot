@@ -50,6 +50,7 @@ export interface EmailTrigger {
 }
 
 export const MAX_EMAIL_TRIGGERS = 3
+export const MAX_READ_FOLDERS = 5
 
 /** Mirrors ~/NateBot/agents/<id>.yaml */
 export interface AgentConfig {
@@ -70,6 +71,8 @@ export interface AgentConfig {
   routines: Routine[]
   /** Runs when new email matches, up to MAX_EMAIL_TRIGGERS (needs Gmail). */
   email_triggers: EmailTrigger[]
+  /** Folders on this Mac the agent may read (never change), e.g. a career-plans folder. Absolute paths. */
+  read_folders: string[]
   session_id: string | null
 }
 

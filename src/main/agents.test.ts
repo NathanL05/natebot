@@ -19,6 +19,7 @@ describe('agent YAML normalisation', () => {
         quick_prompts: [],
         routines: [],
         email_triggers: [],
+        read_folders: [],
         session_id: null
       })
     }
@@ -107,6 +108,11 @@ describe('agent YAML normalisation', () => {
     ])
     expect(normalize({}, 'email-agent').quick_prompts).toContain('Give me a summary of my emails')
     expect(normalize({ quick_prompts: [] }, 'email-agent').quick_prompts).toEqual([])
+  })
+
+  it('keeps absolute, comma-free folder paths', () => {
+    process.env['HOME'] = '/Users/me'
+    expect(normalize({ read_folders: ['~/Desktop/Atlas/', 'relative/path', '/a,b', '/Users/me/Desktop/Atlas', 5] }, 'x').read_folders).toEqual(['/Users/me/Desktop/Atlas'])
   })
 
   it('keeps the designed shape of starter agents created before shapes existed', () => {
