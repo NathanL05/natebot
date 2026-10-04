@@ -39,6 +39,8 @@ interface State {
   marketplaceOpen: boolean
   /** Group chat editor: 'new', a room id to edit, or null when closed. */
   roomEditor: string | null
+  /** The ⌘K command palette. */
+  paletteOpen: boolean
   /** Sidebar folder whose name is being edited. */
   renamingFolderId: string | null
 
@@ -105,6 +107,7 @@ export const useStore = create<State>((set, get) => {
     selectedId: null,
     search: '',
     focusMessageId: null,
+    paletteOpen: false,
     drawerOpen: false,
     addOpen: false,
     addFolderId: null,

@@ -239,6 +239,8 @@ irreversible actions without approval.
 - **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
   drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
+- **Command palette:** press **⌘K** anywhere in the window to jump to a chat or screen, start a new agent or group
+  chat, or send any agent's quick prompt. Type to filter, use ↑/↓ and Enter, and Esc to close.
 - **Quick capture:** press **⌥ Space** in any app (or choose **Message an agent…** in the menu-bar menu) to open a
   small box over what you're doing. Type and press Enter to send it to the agent shown. **Tab** switches agent, or
   start with `@planner`. If you've copied text or an image (like a screenshot), click **+ Clipboard** to send it along. Esc closes the box,
