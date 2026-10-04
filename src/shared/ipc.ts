@@ -47,6 +47,8 @@ export interface NateBotApi {
   deleteJob(jobId: string): Promise<void>
   /** Creates the Job Hunter agent (Haiku, Gmail, daily routine and an interview trigger). Returns its id. */
   createJobHunter(): Promise<string>
+  /** Creates the Morning Brief agent (Haiku, daily 7:30, fed today's agenda). Returns its id. */
+  createMorningBrief(): Promise<string>
   /** Message text search across every chat (at least 2 characters). */
   searchMessages(query: string): Promise<MessageHit[]>
   /** Native file picker (multiple files). Returns absolute paths. */
@@ -140,6 +142,7 @@ export const API_METHODS = [
   'updateJob',
   'deleteJob',
   'createJobHunter',
+  'createMorningBrief',
   'pendingMessages',
   'pickAttachments',
   'createAgent',

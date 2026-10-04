@@ -47,6 +47,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
+import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
 import { appleConnected, connectApple, refreshAppleEntry } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
@@ -483,7 +484,9 @@ export class Backend implements NateBotApi {
       return
     }
     this.engine.system(agentId, `Routine${which} ran at ${time}${dueText}`)
-    this.engine.enqueue(agentId, { source: 'routine', routineId, prompt: routine.prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
+    void this.expandPrompt(routine.prompt).then((prompt) =>
+      this.engine.enqueue(agentId, { source: 'routine', routineId, prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
+    )
   }
 
   /** Sets a reminder's status, and the copy on the message that set it. */
@@ -613,6 +616,22 @@ export class Backend implements NateBotApi {
     } catch (e) {
       log(`backup failed: ${(e as Error).message}`)
     }
+  }
+
+  /** Fills {{today}} in a routine prompt with today's calendar, tasks, reminders and deadlines. */
+  private async expandPrompt(prompt: string): Promise<string> {
+    if (!prompt.includes(TODAY_TOKEN)) return prompt
+    const agenda = await this.agenda.today(true).catch(() => null)
+    const context = agenda
+      ? todayContext({
+          agenda,
+          reminders: this.db.scheduledReminders(),
+          jobs: this.db.listJobs(),
+          pending: this.summaries().reduce((n, a) => n + a.pending, 0),
+          now: Date.now()
+        })
+      : '[Today, from NateBot]\n(could not be read)'
+    return prompt.split(TODAY_TOKEN).join(context)
   }
 
   /** Why unattended runs are paused this week (Settings → Usage), or null if they aren't. */
@@ -752,6 +771,15 @@ export class Backend implements NateBotApi {
     this.syncJobReminders({ ...job, status: 'rejected' })
     this.db.deleteJob(job.id)
     this.emitAgents()
+  }
+
+  async createMorningBrief(): Promise<string> {
+    const existing = this.store.get(BRIEF_ID)
+    if (existing) return existing.id
+    // Only the tools that are actually connected (Calendar, Tasks and Reminders come in through {{today}}).
+    const servers = ['gmail'].filter((s) => googleReady(s) && configuredServersFor({ mcp_servers: [s] } as AgentConfig).length)
+    const agent = await this.createAgent(briefDraft(servers))
+    return agent.id
   }
 
   async createJobHunter(): Promise<string> {
@@ -976,7 +1004,8 @@ export class Backend implements NateBotApi {
     const routine = agent.routines.find((r) => r.id === routineId)
     if (!routine) return
     this.engine.system(agentId, 'Routine started manually')
-    this.engine.enqueue(agentId, { source: 'routine', routineId, prompt: routine.prompt, attachments: [] })
+    const prompt = await this.expandPrompt(routine.prompt)
+    this.engine.enqueue(agentId, { source: 'routine', routineId, prompt, attachments: [] })
   }
 
   async updateSettings(patch: Partial<AppSettings>): Promise<AppSettings> {

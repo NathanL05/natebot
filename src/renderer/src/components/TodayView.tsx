@@ -8,6 +8,7 @@ import { clockTime, dueTime, listTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
+import { Markdown } from './Markdown'
 import { CheckIcon } from './icons'
 import { Button, ConfirmDialog } from './ui'
 
@@ -79,6 +80,7 @@ export function TodayView() {
             {new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
 
+          <BriefCard />
           {agenda && <YourDay agenda={agenda} onRefresh={() => void api.todayAgenda(true).then(setAgenda)} />}
 
           <section className="mb-8">
@@ -228,6 +230,66 @@ function YourDay({ agenda, onRefresh }: { agenda: Agenda; onRefresh: () => void 
           to see {calendar || tasks || reminders ? 'them' : 'your events and tasks'} here. Reading them uses no Claude usage.
         </div>
       )}
+    </section>
+  )
+}
+
+/** This morning's brief from the Morning Brief agent, or a button to set it up. */
+function BriefCard() {
+  const brief = useStore((s) => s.agents.find((a) => a.id === 'morning-brief'))
+  const [text, setText] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!brief) return
+    void api.listMessages(brief.id).then((list) => {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      const latest = [...list].reverse().find((m) => m.role === 'agent' && m.text && !m.streaming && m.createdAt >= start.getTime())
+      setText(latest?.text ?? null)
+    })
+  }, [brief?.lastActivity, brief?.id])
+
+  const setUp = async (): Promise<void> => {
+    const id = await api.createMorningBrief()
+    useStore.getState().select(id)
+  }
+
+  if (!brief) {
+    return (
+      <div className="mb-8 flex items-center gap-4 rounded-2xl border border-dashed border-line-strong p-4">
+        <div className="min-w-0 flex-1 text-[13px]">
+          <div className="font-medium">Get a morning brief</div>
+          <div className="text-muted">
+            Each morning at 7:30 a Haiku agent sums up your day (schedule, tasks, deadlines, emails that need you) in a few lines,
+            shown right here. About one light run a day.
+          </div>
+        </div>
+        <Button variant="primary" onClick={() => void setUp()}>
+          Set up
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <section className="mb-8">
+      <div className="mb-2 flex items-center gap-3">
+        <h2 className="text-[14px] font-semibold">Morning brief</h2>
+        <button type="button" onClick={() => useStore.getState().select(brief.id)} className="ml-auto text-[12px] text-muted hover:text-fg">
+          Open chat
+        </button>
+      </div>
+      <div className="rounded-2xl bg-elev/60 px-4 py-3 text-[14px]">
+        {text ? (
+          <Markdown text={text} />
+        ) : (
+          <div className="text-[13px] text-muted">
+            No brief yet today.{' '}
+            <button type="button" className="text-accent" onClick={() => void api.runRoutineNow(brief.id, 'main')}>
+              Write it now
+            </button>
+          </div>
+        )}
+      </div>
     </section>
   )
 }
