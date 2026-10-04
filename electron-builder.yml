@@ -9,6 +9,9 @@ files:
   - out/**/*
   - resources/**/*
   - package.json
+# The Apple connector runs as a plain script (outside the archive) under ELECTRON_RUN_AS_NODE.
+asarUnpack:
+  - resources/apple-mcp.cjs
 mac:
   category: public.app-category.productivity
   icon: build/icon.icns
@@ -20,6 +23,7 @@ mac:
   gatekeeperAssess: false
   extendInfo:
     NSUserNotificationAlertStyle: alert
+    NSAppleEventsUsageDescription: NateBot reads and, with your approval, adds Apple Reminders and Notes for your agents.
 dmg:
   title: NateBot
   artifactName: NateBot-${version}-${arch}.dmg

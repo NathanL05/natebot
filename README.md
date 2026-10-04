@@ -546,6 +546,19 @@ never touches Gmail. In the same Google Cloud project, enable the
   Buddy or your CV for cover letters. Creating, importing or editing files only happens through **Approve**. It
   loads only the smaller core tool set, to keep each message light.
 
+## Connecting Apple Reminders & Notes
+
+**Settings → Connected tools → Apple Reminders & Notes → Connect…** adds NateBot's own small connector (no install
+needed). macOS asks once whether NateBot may control Reminders and Notes; click **Allow**. Then give **apple** to the
+agents that should use it.
+
+- Agents can list your reminder lists and open reminders, and search and read your notes. These sync with your iPhone
+  through iCloud.
+- Creating or completing a reminder, and creating a note, only happen through **Approve**.
+- If you clicked Don't Allow, turn it on in **System Settings → Privacy & Security → Automation → NateBot**.
+- The connector is `resources/apple-mcp.cjs`. It talks to the apps through `osascript` and passes your text to
+  scripts as data, never as code.
+
 ## Adding MCP servers
 
 Add servers to `~/NateBot/mcp.json` in the same format Claude Code uses (`command`/`args`/`env` for local

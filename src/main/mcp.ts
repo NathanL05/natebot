@@ -15,14 +15,15 @@ import { MCP_FILE, TMP_DIR } from './paths'
 
 export type ServerEntry = Record<string, unknown>
 
-const NATEBOT_KEYS = ['description', 'agent_notes', 'require_approval']
+const NATEBOT_KEYS = ['description', 'agent_notes', 'require_approval', 'natebot_managed']
 
 /** Servers we know about and hint at even before they're configured. */
 const SUGGESTED: Record<string, string> = {
   gmail: 'Read, search and draft Gmail',
   gcal: 'Read Google Calendar and find free time',
   gtasks: 'Read Google Tasks; changes need approval',
-  gdrive: 'Search and read Google Drive and Docs'
+  gdrive: 'Search and read Google Drive and Docs',
+  apple: 'Apple Reminders & Notes on this Mac (syncs to iPhone)'
 }
 
 const TEMPLATE = {

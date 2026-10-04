@@ -114,6 +114,8 @@ export interface NateBotApi {
   connectCalendar(): Promise<{ ok: boolean; error?: string }>
   /** Calendar ('gcal'), Tasks ('gtasks') or Drive ('gdrive'), which share Gmail's address and OAuth client. */
   googleStatus(server: string): Promise<GmailStatus>
+  /** Adds the Apple Reminders & Notes connector after macOS grants permission. */
+  connectApple(): Promise<{ ok: boolean; error?: string }>
   connectGoogle(server: string): Promise<{ ok: boolean; error?: string }>
 }
 
@@ -170,6 +172,7 @@ export const API_METHODS = [
   'calendarStatus',
   'connectCalendar',
   'googleStatus',
+  'connectApple',
   'connectGoogle'
 ] as const satisfies readonly (keyof NateBotApi)[]
 

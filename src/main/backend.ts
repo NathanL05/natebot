@@ -45,6 +45,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
+import { connectApple, refreshAppleEntry } from './apple'
 import { dueAction, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
@@ -105,6 +106,7 @@ export class Backend implements NateBotApi {
     mkdirSync(ROOT, { recursive: true })
     mkdirSync(WORKSPACES_DIR, { recursive: true })
     ensureMcpFile()
+    refreshAppleEntry()
     this.db = new Db(DB_FILE)
     this.db.repairInterrupted()
 
@@ -1051,6 +1053,13 @@ export class Backend implements NateBotApi {
     } finally {
       this.connecting = false
     }
+  }
+
+  async connectApple(): Promise<{ ok: boolean; error?: string }> {
+    const res = await connectApple()
+    log(`apple: connect ok=${res.ok}`)
+    emit('mcpServers', this.serverList())
+    return res
   }
 
   async googleStatus(server: string): Promise<GmailStatus> {

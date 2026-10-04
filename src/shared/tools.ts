@@ -5,6 +5,7 @@ const SERVER_NAMES: Record<string, string> = {
   gcal: 'Calendar',
   gdrive: 'Drive',
   gtasks: 'Tasks',
+  apple: 'Apple',
   github: 'GitHub',
   slack: 'Slack',
   notion: 'Notion'
