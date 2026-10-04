@@ -303,6 +303,41 @@ export function SettingsView() {
                 placeholder="e.g. Final-year student in Galway, applying for 2027 software graduate roles. Gym Mon/Wed/Fri evenings. Prefer short, direct answers."
               />
             </div>
+            <Row
+              label="Quiet hours"
+              hint={
+                settings.quietHours
+                  ? 'Notifications wait until the end, then one summary arrives. Reminders you set still ring.'
+                  : 'Hold notifications overnight and get one summary in the morning.'
+              }
+            >
+              <div className="flex items-center gap-2">
+                {settings.quietHours && (
+                  <>
+                    <input
+                      type="time"
+                      aria-label="Quiet from"
+                      className={`${inputBase} h-8 w-[100px] py-0 text-[12px]`}
+                      value={settings.quietHours.start}
+                      onChange={(e) => e.target.value && void patch({ quietHours: { ...settings.quietHours!, start: e.target.value } })}
+                    />
+                    <span className="text-[12px] text-muted">to</span>
+                    <input
+                      type="time"
+                      aria-label="Quiet until"
+                      className={`${inputBase} h-8 w-[100px] py-0 text-[12px]`}
+                      value={settings.quietHours.end}
+                      onChange={(e) => e.target.value && void patch({ quietHours: { ...settings.quietHours!, end: e.target.value } })}
+                    />
+                  </>
+                )}
+                <Toggle
+                  label="Quiet hours"
+                  checked={!!settings.quietHours}
+                  onChange={(v) => void patch({ quietHours: v ? { start: '22:30', end: '07:30' } : null })}
+                />
+              </div>
+            </Row>
             <PhoneRow topic={settings.pushTopic} details={settings.pushDetails} onChange={(p) => void patch(p)} />
             <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">

@@ -16,7 +16,8 @@ const defaults: AppSettings = {
   pauseRoutinesAt: 0.7,
   aboutMe: '',
   pushTopic: null,
-  pushDetails: false
+  pushDetails: false,
+  quietHours: null
 }
 
 describe('settings sanitising', () => {

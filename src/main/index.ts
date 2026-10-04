@@ -224,6 +224,10 @@ app.whenReady().then(async () => {
   })
   backend.onAgentsChanged = tray.update
   backend.onOpenAgent = openAgent
+  backend.onShowView = (view) => {
+    showWindow()
+    emit('navigate', view)
+  }
 
   mainWindow = createWindow()
   await backend.start()

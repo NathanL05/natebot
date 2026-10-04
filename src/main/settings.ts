@@ -41,7 +41,13 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
         : typeof raw.pushTopic === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(raw.pushTopic.trim())
           ? raw.pushTopic.trim()
           : fallback.pushTopic,
-    pushDetails: typeof raw.pushDetails === 'boolean' ? raw.pushDetails : fallback.pushDetails
+    pushDetails: typeof raw.pushDetails === 'boolean' ? raw.pushDetails : fallback.pushDetails,
+    quietHours:
+      raw.quietHours === null
+        ? null
+        : raw.quietHours && typeof raw.quietHours === 'object' && /^\d{1,2}:\d{2}$/.test(String(raw.quietHours.start)) && /^\d{1,2}:\d{2}$/.test(String(raw.quietHours.end))
+          ? { start: String(raw.quietHours.start), end: String(raw.quietHours.end) }
+          : fallback.quietHours
   }
 }
 
@@ -62,7 +68,8 @@ export class SettingsStore {
       pauseRoutinesAt: 0.7,
       aboutMe: '',
       pushTopic: null,
-      pushDetails: false
+      pushDetails: false,
+      quietHours: null
     }
     let raw: Partial<AppSettings> = {}
     try {
