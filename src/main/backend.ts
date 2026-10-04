@@ -3,6 +3,7 @@
 import { app, BrowserWindow, clipboard, dialog, Notification, powerMonitor, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { NateBotApi } from '@shared/ipc'
 import type {
@@ -49,7 +50,7 @@ import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
-import { appleConnected, connectApple, refreshAppleEntry } from './apple'
+import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
@@ -735,6 +736,21 @@ export class Backend implements NateBotApi {
 
   async todayAgenda(refresh?: boolean): Promise<Agenda> {
     return this.agenda.today(refresh === true)
+  }
+
+  async saveText(suggestedName: string, text: string): Promise<{ ok: boolean; path?: string }> {
+    const name = (typeof suggestedName === 'string' ? suggestedName : 'Reply').replace(/[/\\:*?"<>|]+/g, ' ').trim().slice(0, 80) || 'Reply'
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { defaultPath: join(homedir(), 'Documents', `${name}.md`), filters: [{ name: 'Markdown', extensions: ['md'] }, { name: 'Text', extensions: ['txt'] }] }
+    const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+    if (res.canceled || !res.filePath) return { ok: false }
+    writeFileSync(res.filePath, typeof text === 'string' ? text : '')
+    return { ok: true, path: res.filePath }
+  }
+
+  async saveToNotes(title: string, text: string): Promise<{ ok: boolean; error?: string }> {
+    if (!appleConnected()) return { ok: false, error: 'Connect Apple Reminders & Notes in Settings first.' }
+    return saveNote(String(title || 'From NateBot'), String(text ?? ''))
   }
 
   async setPinned(messageId: string, pinned: boolean): Promise<void> {

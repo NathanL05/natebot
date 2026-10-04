@@ -157,3 +157,20 @@ export const CopyIcon = (p: IconProps) => (
     <path d="M5 15V5a2 2 0 0 1 2-2h10" />
   </Icon>
 )
+export const SpeakerIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M11 5 6 9H3v6h3l5 4z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+  </Icon>
+)
+export const DownloadIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+  </Icon>
+)
+export const NoteIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5" y="3" width="14" height="18" rx="2" />
+    <path d="M9 8h6M9 12h6M9 16h4" />
+  </Icon>
+)
