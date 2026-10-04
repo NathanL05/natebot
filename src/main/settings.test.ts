@@ -17,6 +17,7 @@ const defaults: AppSettings = {
   aboutMe: '',
   pushTopic: null,
   pushDetails: false,
+  phoneInbox: false,
   quietHours: null
 }
 

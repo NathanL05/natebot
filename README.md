@@ -468,6 +468,12 @@ reminders, approvals, new email) then also reaches your phone through ntfy.sh. B
 (for example "Planner · Reminder"). Turn on **Include message text** for the full text. Anyone who knows the topic
 name can read it, so keep it private. **Send test** checks the setup.
 
+**Message agents from your phone** (same settings row, off by default): NateBot listens on `<your topic>-in`. In ntfy,
+subscribe to that topic too and send messages to it: `@planner move gym to 8` goes to the Planner, and plain text goes to
+the agent you used most recently. The reply comes back as a phone notification (message text is turned on for this).
+Anyone with the topic name could message your agents, so keep it private. Agents still can't send, delete or pay
+without your approval in NateBot.
+
 NateBot also checks the Gmail sign-in every few hours (no tokens) and warns you, once a day, if it has expired.
 
 ## Connecting Gmail
