@@ -146,3 +146,14 @@ export const MoreIcon = (p: IconProps) => (
     <circle cx="19" cy="12" r="1.2" fill="currentColor" />
   </Icon>
 )
+export const PinIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3z" />
+  </Icon>
+)
+export const CopyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+  </Icon>
+)

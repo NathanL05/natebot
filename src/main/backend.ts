@@ -677,6 +677,19 @@ export class Backend implements NateBotApi {
     return this.db.pendingMessages().filter((m) => this.store.get(m.agentId))
   }
 
+  async setPinned(messageId: string, pinned: boolean): Promise<void> {
+    const msg = typeof messageId === 'string' ? this.db.getMessage(messageId) : null
+    if (!msg || msg.streaming) return
+    if (pinned === true) msg.pinned = true
+    else delete msg.pinned
+    this.db.saveMessage(msg)
+    emit('message', msg)
+  }
+
+  async pinnedMessages(chatId: string): Promise<ChatMessage[]> {
+    return this.db.pinnedMessages(String(chatId))
+  }
+
   async listJobs(): Promise<Job[]> {
     return this.db.listJobs()
   }

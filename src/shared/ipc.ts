@@ -33,6 +33,10 @@ export interface NateBotApi {
   markRead(chatId: string): Promise<void>
   /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
   pendingMessages(): Promise<ChatMessage[]>
+  /** Pins or unpins a message. */
+  setPinned(messageId: string, pinned: boolean): Promise<void>
+  /** A chat's pinned messages, newest first. */
+  pinnedMessages(chatId: string): Promise<ChatMessage[]>
   /** The job tracker, most recently changed first. */
   listJobs(): Promise<Job[]>
   /** Edits a job from the tracker screen (status, deadline, notes…). */
@@ -126,6 +130,8 @@ export const API_METHODS = [
   'stop',
   'markRead',
   'searchMessages',
+  'setPinned',
+  'pinnedMessages',
   'listJobs',
   'updateJob',
   'deleteJob',

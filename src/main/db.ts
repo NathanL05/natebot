@@ -270,6 +270,14 @@ export class Db {
     })
   }
 
+  /** A chat's pinned messages, newest first. */
+  pinnedMessages(chatId: string): ChatMessage[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM messages WHERE agent_id = ? AND data LIKE '%"pinned":true%' ORDER BY created_at DESC LIMIT 50`)
+      .all(chatId) as unknown as MessageRow[]
+    return rows.map(toMessage).filter((m) => m.pinned)
+  }
+
   /** Agent messages with a proposed action or handoff still waiting for the user, newest first. */
   pendingMessages(): ChatMessage[] {
     const rows = this.db

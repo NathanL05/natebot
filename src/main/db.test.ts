@@ -136,3 +136,13 @@ describe('pending messages', () => {
     expect(db.pendingMessages().map((m) => m.id)).toEqual(['hand', 'act'])
   })
 })
+
+describe('pins', () => {
+  it('lists only pinned messages of one chat', () => {
+    const db = new Db(':memory:')
+    db.saveMessage({ id: 'a', agentId: 'planner', role: 'agent', text: 'Plan', createdAt: 1, pinned: true })
+    db.saveMessage({ id: 'b', agentId: 'planner', role: 'agent', text: 'Other', createdAt: 2 })
+    db.saveMessage({ id: 'c', agentId: 'email', role: 'agent', text: 'Mail', createdAt: 3, pinned: true })
+    expect(db.pinnedMessages('planner').map((m) => m.id)).toEqual(['a'])
+  })
+})

@@ -202,6 +202,8 @@ export interface ChatMessage {
   speakerId?: string
   /** Group chats only: attached files, relative to each member's workspace. */
   files?: string[]
+  /** Pinned by the user, listed in the chat header. */
+  pinned?: boolean
 }
 
 /** Group chat ids share the message and unread tables with agents; agent ids never contain ":". */
