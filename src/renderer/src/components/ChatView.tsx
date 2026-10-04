@@ -91,13 +91,13 @@ export function ChatView() {
           onClick={() =>
             missing.includes('gmail')
               ? useStore.getState().setGmailOpen(true)
-              : missing.includes('gcal')
-                ? useStore.getState().setCalendarOpen(true)
+              : missing.find((m) => m === 'gcal' || m === 'gtasks' || m === 'gdrive')
+                ? useStore.getState().setGoogleOpen(missing.find((m) => m === 'gcal' || m === 'gtasks' || m === 'gdrive') as 'gcal' | 'gtasks' | 'gdrive')
                 : useStore.getState().setDrawerOpen(true)
           }
           className="mx-6 mt-2 rounded-xl bg-elev px-3 py-2 text-left text-[12px] text-muted hover:text-fg"
         >
-          <span className="font-semibold text-warn">{missing.includes('gmail') ? 'Connect Gmail →' : missing.includes('gcal') ? 'Connect Calendar →' : `Set up ${missing.join(', ')}`}</span>
+          <span className="font-semibold text-warn">{missing.includes('gmail') ? 'Connect Gmail →' : missing.includes('gcal') ? 'Connect Calendar →' : missing.includes('gtasks') ? 'Connect Tasks →' : missing.includes('gdrive') ? 'Connect Drive →' : `Set up ${missing.join(', ')}`}</span>
           {' · '}This agent needs {missing.join(', ')}, which isn't set up yet.
         </button>
       )}

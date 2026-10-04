@@ -38,7 +38,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, gmailStatus, gmailTokenPath, googleReady, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, googleStatus, isGoogle, stopGmailConnect } from './gmail'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -181,7 +181,7 @@ export class Backend implements NateBotApi {
 
   /** mcp.json servers; Gmail only counts as set up once it has a sign-in token. */
   private serverList(): ReturnType<typeof listServers> {
-    return listServers().map((s) => (s.name === 'gmail' || s.name === 'gcal' ? { ...s, configured: googleReady(s.name) } : s))
+    return listServers().map((s) => (isGoogle(s.name) ? { ...s, configured: googleReady(s.name) } : s))
   }
 
   /** Resolves the shell PATH and checks claude. Runs once at startup. */
@@ -1046,6 +1046,22 @@ export class Backend implements NateBotApi {
     this.connecting = true
     try {
       const res = await connectGmail({ email, clientId, clientSecret }, (p) => emit('gmailProgress', p))
+      emit('mcpServers', this.serverList())
+      return res
+    } finally {
+      this.connecting = false
+    }
+  }
+
+  async googleStatus(server: string): Promise<GmailStatus> {
+    return googleStatus(String(server))
+  }
+
+  async connectGoogle(server: string): Promise<{ ok: boolean; error?: string }> {
+    if (this.connecting) return { ok: false, error: 'Already connecting.' }
+    this.connecting = true
+    try {
+      const res = await connectGoogle(String(server), (p) => emit('gmailProgress', p))
       emit('mcpServers', this.serverList())
       return res
     } finally {

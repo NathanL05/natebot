@@ -121,6 +121,8 @@ export function SettingsView() {
   const patch = useStore((s) => s.patchSettings)
   const gmail = useStore((s) => s.mcpServers.find((m) => m.name === 'gmail'))
   const calendar = useStore((s) => s.mcpServers.find((m) => m.name === 'gcal'))
+  const tasks = useStore((s) => s.mcpServers.find((m) => m.name === 'gtasks'))
+  const drive = useStore((s) => s.mcpServers.find((m) => m.name === 'gdrive'))
   const [checking, setChecking] = useState(false)
   const [pathDraft, setPathDraft] = useState(settings?.claudePath ?? '')
 
@@ -184,6 +186,12 @@ export function SettingsView() {
               hint={calendar?.configured ? calendar.description : 'Not connected. Lets agents read events and find free time; changes need approval.'}
             >
               <Button onClick={() => useStore.getState().setCalendarOpen(true)}>{calendar?.configured ? 'Reconnect…' : 'Connect Calendar…'}</Button>
+            </Row>
+            <Row label="Google Tasks" hint={tasks?.configured ? tasks.description : 'Not connected. Lets agents read your tasks (synced to your phone); changes need approval.'}>
+              <Button onClick={() => useStore.getState().setGoogleOpen('gtasks')}>{tasks?.configured ? 'Reconnect…' : 'Connect Tasks…'}</Button>
+            </Row>
+            <Row label="Google Drive & Docs" hint={drive?.configured ? drive.description : 'Not connected. Lets agents search and read your files; creating or editing needs approval.'}>
+              <Button onClick={() => useStore.getState().setGoogleOpen('gdrive')}>{drive?.configured ? 'Reconnect…' : 'Connect Drive…'}</Button>
             </Row>
             <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see README). They appear in each agent's settings.">
               <Button onClick={() => void api.openExternal('https://github.com/NathanL05/natebot#adding-mcp-servers')}>How-to</Button>

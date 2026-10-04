@@ -77,3 +77,11 @@ describe('connectCalendar', () => {
     expect(progress).not.toHaveBeenCalled()
   })
 })
+
+describe('extra Google services', async () => {
+  const { googleLabel, isGoogle } = await import('./gmail')
+  it('knows Tasks and Drive', () => {
+    expect(isGoogle('gtasks') && isGoogle('gdrive') && !isGoogle('slack')).toBe(true)
+    expect(googleLabel('gdrive')).toBe('Google Drive')
+  })
+})
