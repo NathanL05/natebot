@@ -265,6 +265,16 @@ and you're back in the app you were using. The reply arrives as a
 - **Stop:** ends the current run and cancels anything queued.
 - **Timeout:** runs time out after 15 minutes.
 
+## Morning brief
+
+On **Today**, **Get a morning brief → Set up** creates a Morning Brief agent (Haiku, low effort, Gmail if connected,
+one web search for the weather). Every day at 7:30 it writes a short brief: your day at a glance, schedule, tasks,
+deadlines, emails that need you, and one suggestion. The brief shows at the top of Today.
+
+Its routine prompt contains `{{today}}`, which NateBot fills in, just before the run, with today's calendar, tasks,
+reminders, job deadlines and waiting approvals, so the agent doesn't spend tool calls fetching them. You can use
+`{{today}}` in any routine prompt.
+
 ## Today
 
 **Today** (in the sidebar above Marketplace, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:

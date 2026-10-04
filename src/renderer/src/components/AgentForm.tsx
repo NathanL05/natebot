@@ -278,7 +278,7 @@ function RoutinesEditor({ routines, onChange }: { routines: Routine[]; onChange:
           </div>
           <div className={r.enabled ? 'space-y-3' : 'space-y-3 opacity-60'}>
             <SchedulePicker cron={r.cron} onChange={(cron) => update(r.id, { cron })} />
-            <Field label="What should it do each time?">
+            <Field label="What should it do each time?" hint="Tip: {{today}} adds today's calendar, tasks, reminders and deadlines, without extra tool calls.">
               <textarea
                 className={`${inputClass} min-h-[70px] resize-y`}
                 value={r.prompt}
