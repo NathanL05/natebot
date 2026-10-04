@@ -60,9 +60,10 @@ export function QuickCapture() {
   useEffect(() => {
     document.documentElement.classList.add('capture')
     void load()
-    const offShown = api.on('captureShown', () => {
+    const offShown = api.on('captureShown', (shown) => {
       void load()
-      setText('')
+      setText(shown.text ?? '')
+      if (shown.agent) setAgentId(shown.agent)
       setWithClip(false)
       void api.readClipboard().then(setClip)
       requestAnimationFrame(() => box.current?.focus())

@@ -245,6 +245,11 @@ irreversible actions without approval.
 and you're back in the app you were using. The reply arrives as a
   notification. Change or turn off the shortcut in **Settings → General → Quick capture**. If another app already
   uses the shortcut, Settings says so.
+- **Share to NateBot:** `natebot://capture?text=…&agent=…` opens the quick-capture box pre-filled. It never sends by
+  itself; you press Enter. To get **Send to NateBot** in the Share menu of Safari, Mail and other apps, make a shortcut in
+  the Shortcuts app: turn on *Show in Share Sheet* (receiving Text, URLs and Safari web pages), add **URL Encode**
+  (Shortcut Input), then **Open URLs** with `natebot://capture?text=` followed by the encoded text. Add `&agent=job-hunter`
+  to pick an agent.
 - **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every
   message (yours and the agents', at least 2 characters). Click a result to open that chat at the message.
 - **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,

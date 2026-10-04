@@ -12,6 +12,9 @@ files:
 # The Apple connector runs as a plain script (outside the archive) under ELECTRON_RUN_AS_NODE.
 asarUnpack:
   - resources/apple-mcp.cjs
+protocols:
+  - name: NateBot
+    schemes: [natebot]
 mac:
   category: public.app-category.productivity
   icon: build/icon.icns

@@ -6,6 +6,7 @@ import { Backend } from './backend'
 import type { NateBotEvents } from '@shared/ipc'
 import { emit, registerApi } from './ipc'
 import { createCapture } from './capture'
+import { parseShareLink } from './share'
 import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
 
@@ -23,6 +24,25 @@ registerAvatarScheme()
 
 // One NateBot at a time; a second launch just shows the existing window.
 if (!app.requestSingleInstanceLock()) app.quit()
+
+// natebot://capture?text=…&agent=… (e.g. from a Shortcuts "Share" action) opens the
+// quick-capture box pre-filled. Any web page can open such a link, so it never sends anything.
+let openCapture: ((prefill: { text?: string; agent?: string }) => void) | null = null
+let pendingLink: string | null = null
+function handleLink(url: string): void {
+  if (!openCapture) {
+    pendingLink = url
+    return
+  }
+  const prefill = parseShareLink(url)
+  if (prefill) openCapture(prefill)
+}
+app.on('open-url', (e, url) => {
+  e.preventDefault()
+  handleLink(url)
+})
+// The packaged app registers the scheme in its Info.plist; a dev copy must not take it over.
+if (app.isPackaged) app.setAsDefaultProtocolClient('natebot')
 
 let mainWindow: BrowserWindow | null = null
 let quitting = false
@@ -183,6 +203,9 @@ app.whenReady().then(async () => {
   backend.onCaptureShortcut = capture.setShortcut
   backend.onHideCapture = capture.hide
   backend.applyCaptureShortcut()
+  openCapture = (prefill) => capture.show(prefill)
+  if (pendingLink) handleLink(pendingLink)
+  pendingLink = null
 
   const tray = createTray({
     resourcesDir,
