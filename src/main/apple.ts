@@ -51,6 +51,24 @@ function probe(appName: 'Reminders' | 'Notes'): Promise<string | null> {
   })
 }
 
+const CREATE_NOTE = `function run(argv) {
+  const a = JSON.parse(argv[0])
+  const app = Application('Notes')
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const html = '<h1>' + esc(a.title) + '</h1>' + esc(a.body).split('\\n').map((l) => '<div>' + (l || '<br>') + '</div>').join('')
+  app.defaultAccount().defaultFolder().notes.push(app.Note({ body: html }))
+  return 'ok'
+}`
+
+/** Saves text as a new Apple note (the user asked for it with Save to Notes, so no approval step). */
+export function saveNote(title: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', CREATE_NOTE, JSON.stringify({ title: title.slice(0, 200), body: body.slice(0, 50_000) })], { timeout: 60_000 }, (err, _o, stderr) =>
+      resolve(err ? { ok: false, error: /-1743|not allowed/i.test(String(stderr)) ? 'NateBot is not allowed to control Notes (System Settings → Privacy & Security → Automation).' : 'Notes could not save it.' } : { ok: true })
+    )
+  })
+}
+
 export async function connectApple(): Promise<{ ok: boolean; error?: string }> {
   if (process.platform !== 'darwin') return { ok: false, error: 'Apple Reminders and Notes need macOS.' }
   for (const name of ['Reminders', 'Notes'] as const) {

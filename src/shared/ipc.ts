@@ -36,6 +36,10 @@ export interface NateBotApi {
   pendingMessages(): Promise<ChatMessage[]>
   /** Today's events and tasks from connected calendars and task lists (no Claude run). */
   todayAgenda(refresh?: boolean): Promise<Agenda>
+  /** Saves text to a file the user picks (Markdown by default). */
+  saveText(suggestedName: string, text: string): Promise<{ ok: boolean; path?: string }>
+  /** Saves text as a new Apple note. */
+  saveToNotes(title: string, text: string): Promise<{ ok: boolean; error?: string }>
   /** Pins or unpins a message. */
   setPinned(messageId: string, pinned: boolean): Promise<void>
   /** A chat's pinned messages, newest first. */
@@ -136,6 +140,8 @@ export const API_METHODS = [
   'markRead',
   'searchMessages',
   'todayAgenda',
+  'saveText',
+  'saveToNotes',
   'setPinned',
   'pinnedMessages',
   'listJobs',

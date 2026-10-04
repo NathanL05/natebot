@@ -6,7 +6,7 @@ import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { ReminderCard } from './ReminderCard'
-import { AlertIcon, CheckIcon, CopyIcon, PaperclipIcon, PinIcon } from './icons'
+import { AlertIcon, CheckIcon, CopyIcon, DownloadIcon, NoteIcon, PaperclipIcon, PinIcon, SpeakerIcon } from './icons'
 import { Markdown } from './Markdown'
 import { api, useStore } from '../lib/store'
 import { ToolLines } from './ToolLines'
@@ -53,9 +53,40 @@ function Speaker({ agent, showName, children }: { agent: AgentSummary | undefine
   )
 }
 
-/** Copy and Pin, shown under an agent reply on hover (Pin stays visible once pinned). */
+/** Plain text for reading aloud: no Markdown symbols, links or code fences. */
+function speakable(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`#>|]/g, '')
+    .replace(/https?:\/\/\S+/g, 'link')
+}
+
+/** Copy, Listen, Save, Notes and Pin, shown under an agent reply on hover (Pin stays visible once pinned). */
 function MessageTools({ msg }: { msg: ChatMessage }) {
   const [copied, setCopied] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
+  const [note, setNote] = useState('')
+  const appleOn = useStore((s) => s.mcpServers.some((m) => m.name === 'apple' && m.configured))
+  const title = (msg.text.split('\n').find((l) => l.trim()) ?? 'Reply').replace(/[*_`#>]/g, '').trim().slice(0, 60)
+
+  const listen = (): void => {
+    if (speaking) {
+      speechSynthesis.cancel()
+      setSpeaking(false)
+      return
+    }
+    speechSynthesis.cancel()
+    const u = new SpeechSynthesisUtterance(speakable(msg.text))
+    u.onend = () => setSpeaking(false)
+    u.onerror = () => setSpeaking(false)
+    speechSynthesis.speak(u)
+    setSpeaking(true)
+  }
+  const flash = (text: string): void => {
+    setNote(text)
+    setTimeout(() => setNote(''), 1800)
+  }
   const btn = 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted transition hover:bg-hover hover:text-fg'
   return (
     <div className={`mt-0.5 ml-1 flex gap-0.5 transition-opacity ${msg.pinned ? '' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -71,9 +102,21 @@ function MessageTools({ msg }: { msg: ChatMessage }) {
       >
         {copied ? <CheckIcon size={11} /> : <CopyIcon size={11} />} {copied ? 'Copied' : 'Copy'}
       </button>
+      <button type="button" className={`${btn} ${speaking ? 'text-accent' : ''}`} onClick={listen}>
+        <SpeakerIcon size={11} /> {speaking ? 'Stop' : 'Listen'}
+      </button>
+      <button type="button" className={btn} onClick={() => void api.saveText(title, msg.text).then((r) => r.ok && flash('Saved'))}>
+        <DownloadIcon size={11} /> Save…
+      </button>
+      {appleOn && (
+        <button type="button" className={btn} onClick={() => void api.saveToNotes(title, msg.text).then((r) => flash(r.ok ? 'Added to Notes' : (r.error ?? 'Not saved')))}>
+          <NoteIcon size={11} /> Notes
+        </button>
+      )}
       <button type="button" className={`${btn} ${msg.pinned ? 'text-accent' : ''}`} onClick={() => void api.setPinned(msg.id, !msg.pinned)}>
         <PinIcon size={11} /> {msg.pinned ? 'Pinned' : 'Pin'}
       </button>
+      {note && <span className="px-1.5 py-0.5 text-[11px] text-muted">{note}</span>}
     </div>
   )
 }
