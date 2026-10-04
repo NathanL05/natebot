@@ -57,6 +57,8 @@ export interface NateBotApi {
   searchMessages(query: string): Promise<MessageHit[]>
   /** Native file picker (multiple files). Returns absolute paths. */
   pickAttachments(): Promise<string[]>
+  /** Picks a folder for an agent to read. Returns its path, or null if cancelled. */
+  pickFolder(): Promise<string | null>
 
   createAgent(draft: AgentDraft): Promise<AgentConfig>
   updateAgent(agent: AgentConfig): Promise<AgentConfig>
@@ -151,6 +153,7 @@ export const API_METHODS = [
   'createMorningBrief',
   'pendingMessages',
   'pickAttachments',
+  'pickFolder',
   'createAgent',
   'updateAgent',
   'deleteAgent',

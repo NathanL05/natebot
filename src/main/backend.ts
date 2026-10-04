@@ -831,14 +831,14 @@ export class Backend implements NateBotApi {
     if (existing) return existing.id
     // Only the tools that are actually connected (Calendar, Tasks and Reminders come in through {{today}}).
     const servers = ['gmail'].filter((s) => googleReady(s) && configuredServersFor({ mcp_servers: [s] } as AgentConfig).length)
-    const agent = await this.createAgent(briefDraft(servers))
+    const agent = await this.createAgent({ ...briefDraft(servers), read_folders: this.sharedFolders() })
     return agent.id
   }
 
   async createJobHunter(): Promise<string> {
     const existing = this.store.get(JOB_HUNTER_ID)
     if (existing) return existing.id
-    const agent = await this.createAgent(JOB_HUNTER)
+    const agent = await this.createAgent({ ...JOB_HUNTER, read_folders: this.sharedFolders() })
     return agent.id
   }
 
@@ -846,6 +846,18 @@ export class Backend implements NateBotApi {
     const q = typeof query === 'string' ? query.trim() : ''
     if (q.length < 2) return []
     return this.db.searchMessages(q.slice(0, 200)).filter((h) => (isRoomId(h.chatId) ? this.rooms.get(h.chatId) : this.store.get(h.chatId)))
+  }
+
+  async pickFolder(): Promise<string | null> {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { properties: ['openDirectory' as const], message: 'Choose a folder this agent may read (it can never change it)' }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return res.canceled ? null : (res.filePaths[0] ?? null)
+  }
+
+  /** Folders any agent can already read: new built-in agents (Job Hunter, Morning Brief) get them too. */
+  private sharedFolders(): string[] {
+    return [...new Set(this.store.list().flatMap((a) => a.read_folders))]
   }
 
   async pickAttachments(): Promise<string[]> {

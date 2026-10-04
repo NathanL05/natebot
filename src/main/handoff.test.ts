@@ -16,6 +16,7 @@ const agent = (id: string, name: string, instructions = ''): AgentConfig => ({
   quick_prompts: [],
   routines: [],
   email_triggers: [],
+  read_folders: [],
   session_id: null
 })
 

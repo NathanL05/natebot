@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_ROUTINES, MODELS, type EmailTrigger, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
+import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MODELS, type EmailTrigger, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
+import { api } from '../lib/store'
 import { Avatar } from './Avatar'
 import { ChevronIcon, PlusIcon, TrashIcon } from './icons'
 import { isValidCron, SchedulePicker } from './SchedulePicker'
@@ -20,7 +21,8 @@ export function blankDraft(model: ModelId, effort: EffortLevel): AgentDraft {
     disallowed_tools: [],
     quick_prompts: [],
     routines: [],
-    email_triggers: []
+    email_triggers: [],
+    read_folders: []
   }
 }
 
@@ -162,6 +164,31 @@ export function AgentForm({
           }
           placeholder={'Give me a summary of my emails\nAnything urgent?'}
         />
+      </Field>
+
+      <Field label="Folders it can read" hint="Folders on this Mac the agent may read and search, e.g. your career plans. It can never change them.">
+        <div className="space-y-1.5">
+          {draft.read_folders.map((f) => (
+            <div key={f} className="flex items-center gap-2 rounded-lg bg-elev px-3 py-1.5">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px]" title={f}>
+                {f.replace(/^\/Users\/[^/]+/, '~')}
+              </span>
+              <IconButton label={`Remove ${f}`} onClick={() => set('read_folders', draft.read_folders.filter((x) => x !== f))}>
+                <TrashIcon size={13} />
+              </IconButton>
+            </div>
+          ))}
+          {draft.read_folders.length < MAX_READ_FOLDERS && (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                void api.pickFolder().then((f) => f && !draft.read_folders.includes(f) && set('read_folders', [...draft.read_folders, f]))
+              }
+            >
+              <PlusIcon size={13} /> Add folder…
+            </Button>
+          )}
+        </div>
       </Field>
 
       <RoutinesEditor routines={draft.routines} onChange={(routines) => set('routines', routines)} />

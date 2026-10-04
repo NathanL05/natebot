@@ -9,7 +9,7 @@ export interface AgentTemplate {
   draft: AgentDraft
 }
 
-const base = { shape: null, allowed_tools: [], disallowed_tools: [], mcp_servers: [], routines: [], email_triggers: [], quick_prompts: [] } satisfies Partial<AgentDraft>
+const base = { shape: null, allowed_tools: [], disallowed_tools: [], mcp_servers: [], routines: [], email_triggers: [], read_folders: [], quick_prompts: [] } satisfies Partial<AgentDraft>
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
   {

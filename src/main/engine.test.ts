@@ -54,6 +54,7 @@ const emailAgent: AgentConfig = {
   quick_prompts: [],
   routines: [],
   email_triggers: [],
+  read_folders: [],
   session_id: null
 }
 
@@ -359,5 +360,20 @@ describe('saving usage', () => {
     expect(setSession).toHaveBeenLastCalledWith('email-agent', null)
     expect(notes.at(-1)).toContain('User: Plan my week')
     expect(saved.at(-1)?.text).toMatch(/fresh session/)
+  })
+})
+
+describe('read-only folders', () => {
+  it('adds the folder and denies writes inside it', async () => {
+    const dir = tmpdir()
+    const { run } = setup({ ...helper, read_folders: [dir, '/does/not/exist'] })
+    h.events.push(...reply('Read it.'))
+    await run('What does my plan say?')
+    const s = h.spawns[0]
+    expect(s?.args.filter((a, i) => s.args[i - 1] === '--add-dir')).toEqual([dir])
+    expect(flag(s, '--disallowedTools')?.split(',')).toEqual(expect.arrayContaining([`Edit(/${dir}/**)`, `Write(/${dir}/**)`]))
+    const prompt = s?.args[s.args.indexOf('--append-system-prompt') + 1] ?? ''
+    expect(prompt).toContain(`folder ${dir}`)
+    expect(prompt).not.toContain('/does/not/exist')
   })
 })

@@ -20,6 +20,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     quick_prompts: ['Give me a summary of my emails', 'Anything urgent I need to reply to?'],
     // Off until the user opts in: it needs Gmail, which isn't connected on first launch.
     email_triggers: [],
+    read_folders: [],
     routines: [{ id: 'main', enabled: false, cron: '0 8 * * 1-5', prompt: 'Do my morning inbox sweep.' }],
     session_id: null
   },
@@ -40,6 +41,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     disallowed_tools: [],
     quick_prompts: ['Plan my day', 'Plan my week'],
     email_triggers: [],
+    read_folders: [],
     routines: [{ id: 'main', enabled: false, cron: '0 18 * * 0', prompt: 'Help me plan the week ahead.' }],
     session_id: null
   },
@@ -59,6 +61,7 @@ export const STARTER_AGENTS: AgentConfig[] = [
     disallowed_tools: [],
     quick_prompts: [],
     email_triggers: [],
+    read_folders: [],
     routines: [],
     session_id: null
   }

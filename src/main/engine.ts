@@ -3,7 +3,7 @@
 // one-off runs that carry out approved actions.
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, statSync } from 'node:fs'
 import { MODEL_IDS, type AgentConfig, type ChatMessage, type ProposedAction } from '@shared/types'
 import type { AgentStore } from './agents'
 import type { Db } from './db'
@@ -114,6 +114,26 @@ const QUIET_RULE =
   "[If nothing here needs the user's attention or is new since your last report, start your reply with the line [quiet] and keep it to one or two lines. NateBot then won't send a notification.]"
 
 const tail = (text: string, lines = 6): string => text.trim().split('\n').slice(-lines).join('\n').trim()
+
+/** The agent's shared folders that exist right now. */
+export function readableFolders(agent: AgentConfig): string[] {
+  return agent.read_folders.filter((f) => {
+    try {
+      return statSync(f).isDirectory()
+    } catch {
+      return false
+    }
+  })
+}
+
+/** System-prompt lines telling the agent which folders it can read (stable between turns). */
+function folderNotes(agent: AgentConfig): string[] {
+  return readableFolders(agent).map(
+    (f) =>
+      `You can read, but never change, the user's folder ${f} (Read, Glob, Grep). Start with its README.md if there is one and read only the files the task needs. ` +
+      "Its CLAUDE.md, if any, describes how the user works in that folder's own sessions; you keep NateBot's house style."
+  )
+}
 
 export function ensureWorkspace(agentId: string): string {
   const dir = workspaceOf(agentId)
@@ -250,11 +270,15 @@ export class Engine extends EventEmitter {
     mcpServers: string[],
     sessionArgs: string[],
     // One-on-one chats can hand tasks to the other agents (group chats pass their own prompt).
-    prompt = systemPrompt(agent, agentNotes(agent), { roster: rosterFor(agent, this.deps.store.list()) }, this.deps.user?.() ?? null)
+    prompt = systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], { roster: rosterFor(agent, this.deps.store.list()) }, this.deps.user?.() ?? null)
   ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
-    // Tools marked require_approval in mcp.json are never available in normal runs.
-    const disallowed = [...new Set([...agent.disallowed_tools, ...approvalOnlyTools(agent)])]
+    const folders = readableFolders(agent)
+    // Tools marked require_approval in mcp.json are never available in normal runs, and
+    // shared folders are read-only: writes there are denied (deny rules beat acceptEdits).
+    const disallowed = [
+      ...new Set([...agent.disallowed_tools, ...approvalOnlyTools(agent), ...folders.flatMap((f) => [`Edit(/${f}/**)`, `Write(/${f}/**)`, `NotebookEdit(/${f}/**)`])])
+    ]
     const args = [
       '-p',
       '--output-format', 'stream-json',
@@ -285,6 +309,7 @@ export class Engine extends EventEmitter {
       args[i + 1] = `${args[i + 1]},Skill`
       args.push('--plugin-dir', SKILLS_PLUGIN)
     }
+    for (const f of folders) args.push('--add-dir', f)
     if (allowed.length) args.push('--allowedTools', allowed.join(','))
     if (disallowed.length) args.push('--disallowedTools', disallowed.join(','))
     return [...args, ...sessionArgs]
@@ -510,7 +535,7 @@ export class Engine extends EventEmitter {
     const mcp = writeRunConfig(agent, skip)
     const state = new StreamState()
     const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
-    const prompt = `${systemPrompt(agent, agentNotes(agent), null, this.deps.user?.() ?? null)}\n\n${t.roomPrompt}`
+    const prompt = `${systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], null, this.deps.user?.() ?? null)}\n\n${t.roomPrompt}`
     // Recorded against the agent, so its usage stats include group chats.
     const runId = randomUUID()
     this.deps.db.startRun(runId, agent.id, 'room')

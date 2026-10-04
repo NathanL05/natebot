@@ -55,6 +55,7 @@ export const JOB_HUNTER: AgentDraft = {
     '```',
     'status is saved (worth applying to), applied, interview, offer or rejected. deadline is YYYY-MM-DD, or leave it out.',
     "Skip marketing, newsletters and roles that clearly don't fit. Before the block, give me 2-4 short lines: what changed and what I should do next.",
+    'If you can read my career-plan folders, check roles against them (target companies, the role I am aiming for) and say why a role fits or not.',
     'Never send an email yourself: draft replies and propose them for approval.'
   ].join('\n'),
   mcp_servers: ['gmail'],
@@ -64,6 +65,7 @@ export const JOB_HUNTER: AgentDraft = {
   routines: [
     { id: 'main', enabled: true, cron: '30 8 * * 1-5', prompt: 'Check my email for job application updates and new roles worth applying to since your last check.' }
   ],
+  read_folders: [],
   email_triggers: [
     {
       id: 'interviews',
