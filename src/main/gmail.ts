@@ -213,10 +213,15 @@ export function googleReady(server: string): boolean {
   }
 }
 
-/** The Gmail sign-in token file, once Gmail is connected (read by the email-trigger watcher). */
+/** A Google service's sign-in token file once it's connected (for NateBot's own API calls). */
+export function googleTokenPath(server: string): string | null {
+  if (!isGoogle(server)) return null
+  const { email } = savedEntry(server)
+  return email && googleReady(server) ? tokenFile(email, SERVICES[server].credentialsDir) : null
+}
+
 export function gmailTokenPath(): string | null {
-  const { email } = savedEntry('gmail')
-  return email && googleReady('gmail') ? tokenFile(email, GMAIL_CREDENTIALS_DIR) : null
+  return googleTokenPath('gmail')
 }
 
 export function gmailReady(): boolean {

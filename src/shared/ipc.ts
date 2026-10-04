@@ -1,6 +1,7 @@
 // The whole renderer <-> main contract. The preload exposes exactly these
 // methods and events, nothing else.
 import type {
+  Agenda,
   AgentConfig,
   AgentDraft,
   AgentSummary,
@@ -33,6 +34,8 @@ export interface NateBotApi {
   markRead(chatId: string): Promise<void>
   /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
   pendingMessages(): Promise<ChatMessage[]>
+  /** Today's events and tasks from connected calendars and task lists (no Claude run). */
+  todayAgenda(refresh?: boolean): Promise<Agenda>
   /** Pins or unpins a message. */
   setPinned(messageId: string, pinned: boolean): Promise<void>
   /** A chat's pinned messages, newest first. */
@@ -130,6 +133,7 @@ export const API_METHODS = [
   'stop',
   'markRead',
   'searchMessages',
+  'todayAgenda',
   'setPinned',
   'pinnedMessages',
   'listJobs',

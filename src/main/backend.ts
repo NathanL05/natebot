@@ -6,6 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile, 
 import { basename, join } from 'node:path'
 import type { NateBotApi } from '@shared/ipc'
 import type {
+  Agenda,
   AgentConfig,
   AgentDraft,
   AgentSummary,
@@ -38,7 +39,8 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, googleStatus, isGoogle, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
+import { AgendaReader } from './agenda'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -46,7 +48,7 @@ import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { digest, inQuietHours } from './quiet'
-import { connectApple, refreshAppleEntry } from './apple'
+import { appleConnected, connectApple, refreshAppleEntry } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
@@ -78,6 +80,7 @@ export class Backend implements NateBotApi {
   private scheduler: Scheduler
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
+  private agenda = new AgendaReader(googleTokenPath, appleConnected)
   private backupTimer: NodeJS.Timeout | undefined
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
@@ -709,6 +712,10 @@ export class Backend implements NateBotApi {
 
   async pendingMessages(): Promise<ChatMessage[]> {
     return this.db.pendingMessages().filter((m) => this.store.get(m.agentId))
+  }
+
+  async todayAgenda(refresh?: boolean): Promise<Agenda> {
+    return this.agenda.today(refresh === true)
   }
 
   async setPinned(messageId: string, pinned: boolean): Promise<void> {
