@@ -10,6 +10,7 @@ import { RoomModal } from './components/RoomModal'
 import { RoomView } from './components/RoomView'
 import { RoutinesView } from './components/RoutinesView'
 import { TodayView } from './components/TodayView'
+import { CommandPalette } from './components/CommandPalette'
 import { JobsView } from './components/JobsView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -28,8 +29,19 @@ export function App() {
   const theme = useStore((s) => s.settings?.theme ?? 'dark')
   const accent = useStore((s) => s.settings?.accent ?? 'violet')
 
+  const paletteOpen = useStore((s) => s.paletteOpen)
+
   useEffect(() => {
     void useStore.getState().init()
+    // ⌘K toggles the command palette from anywhere in the window.
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        useStore.setState((s) => ({ paletteOpen: !s.paletteOpen }))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   useEffect(() => {
@@ -57,6 +69,7 @@ export function App() {
       {addOpen && <AddAgentModal />}
       {gmailOpen && <ConnectGmailModal />}
       {googleOpen && <ConnectGoogleModal server={googleOpen} />}
+      {paletteOpen && <CommandPalette />}
       {marketplaceOpen && <MarketplaceModal />}
       {roomEditor && <RoomModal key={roomEditor} />}
     </div>
