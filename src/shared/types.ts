@@ -244,6 +244,15 @@ export interface MessageHit {
   createdAt: number
 }
 
+/** Today's events and tasks for the Today screen, read directly from Google and Apple (no Claude run). */
+export interface Agenda {
+  events: { title: string; start: number; end: number; allDay: boolean; location: string | null }[]
+  tasks: { title: string; due: number | null; source: 'Google Tasks' | 'Reminders' }[]
+  /** Which sources are connected (to suggest the others). */
+  connected: { calendar: boolean; tasks: boolean; reminders: boolean }
+  errors: string[]
+}
+
 export interface McpServerInfo {
   name: string
   configured: boolean

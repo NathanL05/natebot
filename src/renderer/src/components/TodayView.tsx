@@ -1,10 +1,10 @@
 // Today: everything waiting for you across all agents, what's coming up, and what the
 // routines found. Built from data NateBot already has, so it never runs Claude.
 import { useCallback, useEffect, useState } from 'react'
-import type { ChatMessage, Reminder, RoutineInfo } from '@shared/types'
+import type { Agenda, ChatMessage, Reminder, RoutineInfo } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
-import { dueTime, listTime } from '../lib/format'
+import { clockTime, dueTime, listTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
@@ -27,6 +27,7 @@ export function TodayView() {
   const [routines, setRoutines] = useState<RoutineInfo[]>([])
   const [confirm, setConfirm] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [agenda, setAgenda] = useState<Agenda | null>(null)
 
   const load = useCallback(() => {
     void api.pendingMessages().then(setPending)
@@ -35,6 +36,7 @@ export function TodayView() {
   }, [])
   // Agents change whenever a run finishes or something is approved, rejected or handed off.
   useEffect(load, [agents, load])
+  useEffect(() => void api.todayAgenda().then(setAgenda), [])
 
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]))
   const actions = pending.flatMap((m) => (m.actions ?? []).filter((a) => a.status === 'pending').map((a) => ({ m, a })))
@@ -76,6 +78,8 @@ export function TodayView() {
           <p className="mb-6 text-[13px] text-muted">
             {new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
+
+          {agenda && <YourDay agenda={agenda} onRefresh={() => void api.todayAgenda(true).then(setAgenda)} />}
 
           <section className="mb-8">
             <div className="mb-2 flex items-center gap-3">
@@ -171,5 +175,59 @@ export function TodayView() {
         />
       )}
     </div>
+  )
+}
+
+/** Today's events and tasks, read straight from Google Calendar, Google Tasks and Apple Reminders. */
+function YourDay({ agenda, onRefresh }: { agenda: Agenda; onRefresh: () => void }) {
+  const { calendar, tasks, reminders } = agenda.connected
+  const missing = [!calendar && 'Google Calendar', !tasks && !reminders && 'Google Tasks or Apple Reminders'].filter(Boolean)
+  const now = Date.now()
+  return (
+    <section className="mb-8">
+      <div className="mb-2 flex items-center gap-3">
+        <h2 className="text-[14px] font-semibold">Your day</h2>
+        {(calendar || tasks || reminders) && (
+          <button type="button" onClick={onRefresh} className="ml-auto text-[12px] text-muted hover:text-fg">
+            Refresh
+          </button>
+        )}
+      </div>
+      {calendar || tasks || reminders ? (
+        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-elev/60">
+          {agenda.events.map((e, i) => (
+            <div key={`e${i}`} className={`flex items-center gap-3 px-4 py-2.5 ${!e.allDay && e.end < now ? 'opacity-50' : ''}`}>
+              <div className="w-[110px] shrink-0 text-[12px] font-medium">{e.allDay ? 'All day' : `${clockTime(e.start)}–${clockTime(e.end)}`}</div>
+              <div className="min-w-0 flex-1 truncate text-[13px]">
+                {e.title}
+                {e.location && <span className="text-muted"> · {e.location}</span>}
+              </div>
+            </div>
+          ))}
+          {agenda.tasks.map((t, i) => (
+            <div key={`t${i}`} className="flex items-center gap-3 px-4 py-2.5">
+              <div className={`w-[110px] shrink-0 text-[12px] font-medium ${t.due !== null && t.due < now ? 'text-warn' : ''}`}>
+                {t.due === null ? 'To do' : t.due < now - 86_400_000 ? 'Overdue' : t.source === 'Reminders' ? clockTime(t.due) : 'Due today'}
+              </div>
+              <div className="min-w-0 flex-1 truncate text-[13px]">○ {t.title}</div>
+              <div className="shrink-0 text-[11px] text-muted">{t.source}</div>
+            </div>
+          ))}
+          {agenda.events.length === 0 && agenda.tasks.length === 0 && (
+            <div className="px-4 py-4 text-center text-[13px] text-muted">Nothing on your calendar or task lists today.</div>
+          )}
+          {agenda.errors.length > 0 && <div className="px-4 py-2 text-[12px] text-warn">{agenda.errors.join(' · ')}</div>}
+        </div>
+      ) : null}
+      {missing.length > 0 && (
+        <div className="mt-2 text-[12px] text-muted">
+          Connect {missing.join(' and ')} in{' '}
+          <button type="button" className="text-accent" onClick={() => useStore.getState().setView('settings')}>
+            Settings → Connected tools
+          </button>{' '}
+          to see {calendar || tasks || reminders ? 'them' : 'your events and tasks'} here. Reading them uses no Claude usage.
+        </div>
+      )}
+    </section>
   )
 }

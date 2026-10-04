@@ -269,7 +269,8 @@ and you're back in the app you were using. The reply arrives as a
 
 **Today** (in the sidebar above Marketplace, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
 proposed actions and handoffs waiting for your OK (with **Approve all** when there are several, after a confirmation
-listing each one), reminders and routines due in the next day, and what routines found in the last day. A badge
+listing each one), reminders and routines due in the next day, and what routines found in the last day. At the top, **Your day** lists today's Google Calendar events and the tasks due from Google Tasks and Apple Reminders,
+once those are connected. NateBot reads them directly, so this uses no Claude usage. A badge
 shows how many approvals are waiting. It's built from what NateBot already stores, so opening it uses no tokens.
 
 ## Group chats

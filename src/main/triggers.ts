@@ -2,9 +2,9 @@
 // (using the Connect Gmail sign-in, no Claude run), and only wakes an agent when new
 // mail matches one of its searches. A trigger's first check just records what's
 // already there, so turning one on never fires on old mail.
-import { readFileSync } from 'node:fs'
 import type { AgentConfig, EmailTrigger } from '@shared/types'
 import { TRIGGER_START, type Db } from './db'
+import { GoogleToken } from './google-api'
 
 const CHECK_EVERY_MS = 5 * 60_000
 const FIRST_CHECK_MS = 30_000
@@ -35,19 +35,10 @@ ${list}
 What to do: ${t.prompt || 'Tell me briefly what arrived and whether it needs me.'}`
 }
 
-interface TokenFile {
-  token?: string
-  expiry?: string
-  refresh_token?: string
-  client_id?: string
-  client_secret?: string
-  token_uri?: string
-}
-
 export class EmailWatcher {
   private timer: NodeJS.Timeout | undefined
   private first: NodeJS.Timeout | undefined
-  private access: { token: string; until: number } | null = null
+  private google: GoogleToken
   private runs = new Map<string, { day: string; count: number }>()
   private checking = false
   private lastError = ''
@@ -63,7 +54,9 @@ export class EmailWatcher {
       onSignInExpired: () => void
       log: (line: string) => void
     }
-  ) {}
+  ) {
+    this.google = new GoogleToken(deps.tokenPath, deps.onSignInExpired)
+  }
 
   start(): void {
     this.first = setTimeout(() => void this.check(), FIRST_CHECK_MS)
@@ -80,19 +73,18 @@ export class EmailWatcher {
     const watched = this.deps.agents().flatMap((a) => (a.mcp_servers.includes('gmail') ? a.email_triggers.filter((t) => t.enabled).map((t) => ({ a, t })) : []))
     // Without triggers, still check the sign-in every few hours, so an expired one is caught before a routine needs it.
     const due = watched.length > 0 || Date.now() - this.signInCheckedAt > SIGN_IN_CHECK_MS
-    const path = due ? this.deps.tokenPath() : null
-    if (!path) return
+    if (!due || !this.google.available()) return
     this.signInCheckedAt = Date.now()
     this.checking = true
     try {
-      const token = await this.token(path)
+      await this.google.get()
       for (const { a, t } of watched) {
         const key = triggerKey(a.id, t)
-        const ids = await this.search(token, t.query)
+        const ids = await this.search(t.query)
         const started = this.deps.db.triggerStarted(key)
         const unseen = this.deps.db.unseenEmails(key, [TRIGGER_START, ...ids]).filter((id) => id !== TRIGGER_START)
         if (!started || unseen.length === 0 || !this.allowRun(key)) continue
-        const hits = await Promise.all(unseen.slice(0, 5).map((id) => this.details(token, id)))
+        const hits = await Promise.all(unseen.slice(0, 5).map((id) => this.details(id)))
         this.deps.onMatch(a.id, t, hits)
       }
       this.lastError = ''
@@ -114,44 +106,14 @@ export class EmailWatcher {
     return true
   }
 
-  /** An access token: the saved one while it's valid, else refreshed (kept in memory only). */
-  private async token(path: string): Promise<string> {
-    if (this.access && this.access.until > Date.now() + 60_000) return this.access.token
-    const f = JSON.parse(readFileSync(path, 'utf8')) as TokenFile
-    const expiry = f.expiry ? Date.parse(/Z|[+-]\d\d:?\d\d$/.test(f.expiry) ? f.expiry : `${f.expiry}Z`) : 0
-    if (f.token && expiry > Date.now() + 60_000) {
-      this.access = { token: f.token, until: expiry }
-      return f.token
-    }
-    if (!f.refresh_token || !f.client_id || !f.client_secret) throw new Error('the Gmail sign-in has no refresh token; reconnect Gmail')
-    const res = await fetch(f.token_uri || 'https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: f.client_id, client_secret: f.client_secret, refresh_token: f.refresh_token, grant_type: 'refresh_token' })
-    })
-    if (res.status === 400 || res.status === 401) this.deps.onSignInExpired()
-    if (!res.ok) throw new Error(`Google sign-in refresh failed (${res.status}); reconnect Gmail if this keeps happening`)
-    const body = (await res.json()) as { access_token: string; expires_in: number }
-    this.access = { token: body.access_token, until: Date.now() + body.expires_in * 1000 }
-    return body.access_token
-  }
-
-  private async get<T>(token: string, url: string): Promise<T> {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (res.status === 401) this.access = null
-    if (!res.ok) throw new Error(`Gmail returned ${res.status}`)
-    return (await res.json()) as T
-  }
-
-  private async search(token: string, query: string): Promise<string[]> {
+  private async search(query: string): Promise<string[]> {
     const q = encodeURIComponent(`(${query}) newer_than:2d`)
-    const body = await this.get<{ messages?: { id: string }[] }>(token, `${API}/messages?q=${q}&maxResults=20`)
+    const body = await this.google.fetchJson<{ messages?: { id: string }[] }>(`${API}/messages?q=${q}&maxResults=20`)
     return (body.messages ?? []).map((m) => m.id)
   }
 
-  private async details(token: string, id: string): Promise<EmailHit> {
-    const m = await this.get<{ snippet?: string; payload?: { headers?: { name: string; value: string }[] } }>(
-      token,
+  private async details(id: string): Promise<EmailHit> {
+    const m = await this.google.fetchJson<{ snippet?: string; payload?: { headers?: { name: string; value: string }[] } }>(
       `${API}/messages/${encodeURIComponent(id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`
     )
     const header = (name: string): string => m.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
