@@ -151,7 +151,12 @@ export interface Reminder {
   kind: 'message' | 'task'
   text: string
   status: ReminderStatus
+  /** Repeating reminders move to their next time after going off, until cancelled. */
+  repeat?: ReminderRepeat
 }
+
+export type ReminderRepeat = 'daily' | 'weekdays' | 'weekly'
+export const REMINDER_REPEATS: ReminderRepeat[] = ['daily', 'weekdays', 'weekly']
 
 export type JobStatus = 'saved' | 'applied' | 'interview' | 'offer' | 'rejected'
 export const JOB_STATUSES: { id: JobStatus; label: string }[] = [

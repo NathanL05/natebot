@@ -79,6 +79,7 @@ interface ReminderRow {
   kind: string
   text: string
   status: string
+  repeat: string | null
 }
 
 function toReminder(row: ReminderRow): Reminder {
@@ -89,7 +90,8 @@ function toReminder(row: ReminderRow): Reminder {
     at: row.at,
     kind: row.kind === 'task' ? 'task' : 'message',
     text: row.text,
-    status: row.status as ReminderStatus
+    status: row.status as ReminderStatus,
+    ...(row.repeat ? { repeat: row.repeat as Reminder['repeat'] } : {})
   }
 }
 
@@ -206,6 +208,9 @@ export class Db {
     if (!runCols.some((c) => c.name === 'cost_usd')) this.db.exec('ALTER TABLE runs ADD COLUMN cost_usd REAL')
     // Added later: which of the agent's routines a routine run was (null before: the "main" one).
     if (!runCols.some((c) => c.name === 'routine_id')) this.db.exec('ALTER TABLE runs ADD COLUMN routine_id TEXT')
+    // Added later: repeating reminders.
+    const remCols = this.db.prepare('PRAGMA table_info(reminders)').all() as { name: string }[]
+    if (!remCols.some((c) => c.name === 'repeat')) this.db.exec('ALTER TABLE reminders ADD COLUMN repeat TEXT')
   }
 
   close(): void {
@@ -513,10 +518,10 @@ export class Db {
   saveReminder(r: Reminder): void {
     this.db
       .prepare(
-        `INSERT INTO reminders (id, agent_id, message_id, at, kind, text, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET status = excluded.status`
+        `INSERT INTO reminders (id, agent_id, message_id, at, kind, text, status, created_at, repeat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET status = excluded.status, at = excluded.at`
       )
-      .run(r.id, r.agentId, r.messageId, r.at, r.kind, r.text, r.status, Date.now())
+      .run(r.id, r.agentId, r.messageId, r.at, r.kind, r.text, r.status, Date.now(), r.repeat ?? null)
   }
 
   reminder(id: string): Reminder | null {

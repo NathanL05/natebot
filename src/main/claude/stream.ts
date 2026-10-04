@@ -241,6 +241,7 @@ export interface ParsedReminder {
   at: string
   kind: 'message' | 'task'
   text: string
+  repeat?: string
 }
 
 export function extractReminders(text: string): { text: string; reminders: ParsedReminder[]; error: string | null } {
@@ -254,8 +255,9 @@ export function extractReminders(text: string): { text: string; reminders: Parse
       .filter((r): r is Json => !!r && typeof r === 'object' && typeof r['at'] === 'string')
       .flatMap((r): ParsedReminder[] => {
         const at = String(r['at'])
-        if (typeof r['task'] === 'string' && r['task'].trim()) return [{ at, kind: 'task', text: r['task'].trim() }]
-        if (typeof r['message'] === 'string' && r['message'].trim()) return [{ at, kind: 'message', text: r['message'].trim() }]
+        const repeat = typeof r['repeat'] === 'string' ? { repeat: r['repeat'] } : {}
+        if (typeof r['task'] === 'string' && r['task'].trim()) return [{ at, kind: 'task', text: r['task'].trim(), ...repeat }]
+        if (typeof r['message'] === 'string' && r['message'].trim()) return [{ at, kind: 'message', text: r['message'].trim(), ...repeat }]
         return []
       })
     return { text: clean, reminders, error: null }

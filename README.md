@@ -368,6 +368,8 @@ Claude usage**. Only when new mail matches does the agent run once, in a light s
 preview of the matching emails, which are framed as data, never instructions. You get a **New email** notification
 with its answer.
 
+- One-click presets: **Security alerts** (Google, Microsoft and Instagram sign-in warnings), **Interviews &
+  assessments**, **Bills & renewals**.
 - A trigger's first check only records what's already there, so turning one on never fires on old mail. Changing
   the search starts it over.
 - At most 10 runs a day per trigger, up to 3 triggers per agent, and the weekly pause in Settings → Usage applies.
@@ -384,7 +386,9 @@ Reminders are set straight away. Click **Cancel** on the card (or in **Routines 
 - **Task reminders** run the agent at that time with the task as its prompt (for example checking your inbox),
   using the same tools and approvals as any other message. The agent picks this kind only when the moment needs
   fresh work.
-- Reminders are one-off. For something that repeats, use a routine.
+- **Repeating reminders:** "every weekday at 10pm remind me to prep tomorrow" sets a reminder that repeats daily, on
+  weekdays or weekly. After going off it moves to its next time, and Cancel ends the series. For repeating work that
+  needs more than a nudge, use a routine.
 - Like routines, they go off while NateBot is running and the Mac is awake. A message reminder that was missed
   shows up as soon as NateBot starts or the Mac wakes. A task more than 12 hours late is skipped and the chat says so.
 - Limits: 5 per reply, 20 waiting per agent, up to a year ahead. Group chats can't set reminders.

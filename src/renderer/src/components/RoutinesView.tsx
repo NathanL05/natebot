@@ -106,6 +106,7 @@ export function RoutinesView() {
                       <div className="text-[12px] text-muted">
                         {dueTime(r.at)} · {agent?.name}
                         {r.kind === 'task' ? ' will work on it' : ''}
+                        {r.repeat ? ` · repeats ${r.repeat === 'weekdays' ? 'on weekdays' : r.repeat}` : ''}
                       </div>
                       <div className="truncate text-[13px]">{r.text}</div>
                     </div>
