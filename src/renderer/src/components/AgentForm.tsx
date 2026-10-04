@@ -293,6 +293,24 @@ function RoutinesEditor({ routines, onChange }: { routines: Routine[]; onChange:
   )
 }
 
+const TRIGGER_PRESETS: { label: string; query: string; prompt: string }[] = [
+  {
+    label: 'Security alerts',
+    query: 'from:(no-reply@accounts.google.com OR account-security-noreply@accountprotection.microsoft.com OR security@mail.instagram.com) subject:(security OR sign-in OR "new device" OR "recovery")',
+    prompt: "Tell me in one line which account and device this is about and whether it looks like me. If it's suspicious, say exactly what to check."
+  },
+  {
+    label: 'Interviews & assessments',
+    query: 'subject:(interview OR assessment OR "coding challenge" OR "next steps" OR "online test")',
+    prompt: 'Tell me who it is from, what they want and by when, and draft a reply if one is needed.'
+  },
+  {
+    label: 'Bills & renewals',
+    query: 'subject:(invoice OR "payment due" OR "your bill" OR renewal OR "will renew")',
+    prompt: "Tell me what's due, how much and when, and set a reminder a few days before."
+  }
+]
+
 /** Runs the agent when new email matches a Gmail search. NateBot checks Gmail itself, so waiting costs nothing. */
 function TriggersEditor({ triggers, onChange }: { triggers: EmailTrigger[]; onChange: (t: EmailTrigger[]) => void }) {
   const update = (id: string, patch: Partial<EmailTrigger>): void => onChange(triggers.map((t) => (t.id === id ? { ...t, ...patch } : t)))
@@ -313,6 +331,20 @@ function TriggersEditor({ triggers, onChange }: { triggers: EmailTrigger[]; onCh
           </Button>
         )}
       </div>
+      {triggers.length < MAX_EMAIL_TRIGGERS && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {TRIGGER_PRESETS.filter((p) => !triggers.some((t) => t.query === p.query)).map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => onChange([...triggers, { id: `t${Math.random().toString(36).slice(2, 8)}`, enabled: true, query: p.query, prompt: p.prompt }])}
+              className="rounded-full border border-line-strong px-2.5 py-0.5 text-[12px] text-muted transition hover:text-fg"
+            >
+              + {p.label}
+            </button>
+          ))}
+        </div>
+      )}
       {triggers.map((t, i) => (
         <div key={t.id} className={`mt-4 space-y-2.5 ${i > 0 ? 'border-t border-line pt-4' : ''}`}>
           <div className="flex items-center gap-2">

@@ -68,7 +68,7 @@ const REMINDER_RULES = `- To remind the user later, or to do something at a set 
 ${FENCE}reminders
 [{"at": "2026-10-03T19:00", "message": "Time to leave for the gym"}, {"at": "2026-10-04T08:30", "task": "Check whether Sarah replied about the deadline and tell me"}]
 ${FENCE}
-  "at" is the local time (work it out from the [Current time] line). A "message" is shown to the user as written at that time, with a notification, and costs nothing. A "task" instead runs you at that time with its text as your prompt: use it only when the moment needs fresh work, like checking email or the web or writing something new. Reminders are one-off and set as soon as you reply, so just confirm them in a few words and don't describe the block. You can't change or cancel one; the user cancels them in NateBot. For something that repeats, suggest a routine instead.
+  "at" is the local time (work it out from the [Current time] line). A "message" is shown to the user as written at that time, with a notification, and costs nothing. A "task" instead runs you at that time with its text as your prompt: use it only when the moment needs fresh work, like checking email or the web or writing something new. Add "repeat": "daily", "weekdays" or "weekly" for a simple repeating nudge. Reminders are set as soon as you reply, so just confirm them in a few words and don't describe the block. You can't change or cancel one; the user cancels them in NateBot. For repeating work that needs more than a nudge, suggest a routine.
 `
 
 /** One-off prompt used after the user approves a proposed action. */

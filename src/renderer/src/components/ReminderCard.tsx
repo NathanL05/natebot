@@ -33,6 +33,7 @@ export function ReminderCard({ reminder }: { reminder: Reminder }) {
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-semibold">{dueTime(reminder.at)}</span>
           <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{label}</span>
+          {reminder.repeat && reminder.status === 'scheduled' && <span className="text-[11px] text-muted">repeats {reminder.repeat === 'weekdays' ? 'on weekdays' : reminder.repeat}</span>}
         </div>
         <div className="selectable mt-0.5 text-[13px] whitespace-pre-wrap">{reminder.text}</div>
         {reminder.kind === 'task' && <div className="mt-0.5 text-[11px] text-muted">The agent will work on this then (uses your Claude limit).</div>}

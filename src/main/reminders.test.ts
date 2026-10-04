@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Reminder } from '@shared/types'
-import { dueAction, MAX_PER_REPLY, MAX_SCHEDULED, parseTime, resolveReminders, TASK_CATCH_UP } from './reminders'
+import { dueAction, MAX_PER_REPLY, MAX_SCHEDULED, nextRepeat, parseTime, resolveReminders, TASK_CATCH_UP } from './reminders'
 
 const now = new Date(2026, 9, 3, 13, 0).getTime() // Sat 3 Oct 2026, 1pm local
 
@@ -54,5 +54,24 @@ describe('dueAction', () => {
     expect(dueAction(r({ at: old }), now)).toBe('run')
     expect(dueAction(r({ at: old, kind: 'task' }), now)).toBe('miss')
     expect(dueAction(r({ at: now - 60_000, kind: 'task' }), now)).toBe('run')
+  })
+})
+
+describe('repeating reminders', () => {
+  it('keeps a valid repeat and drops an unknown one', () => {
+    const at = '2026-10-03T22:00'
+    expect(resolveReminders([{ at, kind: 'message', text: 'Prep', repeat: 'weekdays' }], 'a', 'm', now).reminders[0]?.repeat).toBe('weekdays')
+    expect(resolveReminders([{ at, kind: 'message', text: 'Prep', repeat: 'hourly' }], 'a', 'm', now).reminders[0]?.repeat).toBeUndefined()
+  })
+
+  it('moves to the next day, weekday or week at the same time', () => {
+    const fri = new Date(2026, 9, 2, 22, 0).getTime()
+    expect(new Date(nextRepeat(fri, 'daily', fri)).getDate()).toBe(3)
+    expect(new Date(nextRepeat(fri, 'weekdays', fri)).getDate()).toBe(5) // Monday
+    expect(new Date(nextRepeat(fri, 'weekly', fri)).getDate()).toBe(9)
+    // Missed several days: the next one is still ahead of now, at 22:00.
+    const later = new Date(2026, 9, 6, 23, 0).getTime()
+    const next = new Date(nextRepeat(fri, 'daily', later))
+    expect([next.getDate(), next.getHours()]).toEqual([7, 22])
   })
 })

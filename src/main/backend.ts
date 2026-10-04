@@ -46,7 +46,7 @@ import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { connectApple, refreshAppleEntry } from './apple'
-import { dueAction, ReminderClock } from './reminders'
+import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
@@ -461,6 +461,18 @@ export class Backend implements NateBotApi {
     }
   }
 
+  /** Moves a repeating reminder to its next time, here and on the card that set it. */
+  private moveReminder(r: Reminder, at: number): void {
+    this.db.saveReminder({ ...r, at })
+    const msg = r.messageId ? this.db.getMessage(r.messageId) : null
+    const copy = msg?.reminders?.find((x) => x.id === r.id)
+    if (msg && copy) {
+      copy.at = at
+      this.db.saveMessage(msg)
+      emit('message', msg)
+    }
+  }
+
   /** Runs every reminder that's due (late ones too, after sleep or a restart), then waits for the next. */
   private fireReminders(): void {
     const now = Date.now()
@@ -480,7 +492,9 @@ export class Backend implements NateBotApi {
         this.engine.system(r.agentId, `Missed reminder (due ${due}, while the Mac was asleep or NateBot was closed): ${r.text}`)
         continue
       }
-      this.setReminderStatus(r, 'done')
+      // A repeating reminder moves on to its next time instead of finishing.
+      if (r.repeat) this.moveReminder(r, nextRepeat(r.at, r.repeat, now))
+      else this.setReminderStatus(r, 'done')
       log(`reminder: agent=${r.agentId} kind=${r.kind} late=${now - r.at > LATE_AFTER_MS}`)
       const paused = r.kind === 'task' ? this.weekPaused() : null
       if (paused) {

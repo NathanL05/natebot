@@ -4,7 +4,7 @@
 // the same tools and permissions it has now, so neither can do more than the
 // agent could already do in the moment.
 import { randomUUID } from 'node:crypto'
-import type { Reminder } from '@shared/types'
+import { REMINDER_REPEATS, type Reminder, type ReminderRepeat } from '@shared/types'
 import type { ParsedReminder } from './claude/stream'
 
 /** Most reminders one reply can set. */
@@ -51,9 +51,22 @@ export function resolveReminders(
     else if (at > now + MAX_AHEAD) problems.push(`A reminder for ${r.at} is more than a year away, so it wasn't set.`)
     else if (reminders.length >= MAX_PER_REPLY) problems.push(`Only ${MAX_PER_REPLY} reminders can be set at once; the rest were ignored.`)
     else if (scheduled + reminders.length >= MAX_SCHEDULED) problems.push(`This agent already has ${MAX_SCHEDULED} reminders waiting, so no more were set.`)
-    else reminders.push({ id: randomUUID(), agentId, messageId, at: Math.max(at, now), kind: r.kind, text: r.text.slice(0, 2000), status: 'scheduled' })
+    else {
+      const repeat = REMINDER_REPEATS.includes(r.repeat as ReminderRepeat) ? { repeat: r.repeat as ReminderRepeat } : {}
+      reminders.push({ id: randomUUID(), agentId, messageId, at: Math.max(at, now), kind: r.kind, text: r.text.slice(0, 2000), status: 'scheduled', ...repeat })
+    }
   }
   return { reminders, problems: [...new Set(problems)] }
+}
+
+/** A repeating reminder's next time after it went off: same time of day, later than `now`. */
+export function nextRepeat(at: number, repeat: ReminderRepeat, now: number): number {
+  const d = new Date(at)
+  do {
+    d.setDate(d.getDate() + (repeat === 'weekly' ? 7 : 1))
+    if (repeat === 'weekdays') while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1)
+  } while (d.getTime() <= now)
+  return d.getTime()
 }
 
 /** What to do with a reminder now: run it, mark it missed, or nothing yet. */
