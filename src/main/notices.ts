@@ -24,7 +24,10 @@ const SHOWN: [string, string][] = [
   ['subject', 'Subject'],
   ['title', 'Title'],
   ['when', 'When'],
-  ['date', 'Date']
+  ['date', 'Date'],
+  ['due', 'Due'],
+  ['task_list_id', 'List'],
+  ['name', 'Name']
 ]
 
 /** Message text: fine to leave out of a notification (it's in the app). */

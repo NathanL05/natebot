@@ -24,6 +24,8 @@ import { ROOT } from './paths'
 export const WORKSPACE_MCP_VERSION = '1.29.0'
 export const GMAIL_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google')
 export const CALENDAR_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google-calendar')
+export const TASKS_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google-tasks')
+export const DRIVE_CREDENTIALS_DIR = join(ROOT, 'credentials', 'google-drive')
 /** workspace-mcp's stdio sign-in callback: http://localhost:8000/oauth2callback */
 const CALLBACK_PORT = 8000
 const SIGNIN_TIMEOUT = 5 * 60_000
@@ -40,7 +42,21 @@ export const GMAIL_APPROVAL_TOOLS = [
 /** Calendar tools that change things (create/update/delete events, RSVP…): only through Approve. */
 export const CALENDAR_APPROVAL_TOOLS = ['manage_event', 'create_calendar', 'manage_out_of_office', 'manage_focus_time']
 
-type GoogleServer = 'gmail' | 'gcal'
+/** Task changes (create, update, complete, delete) only through Approve. */
+export const TASKS_APPROVAL_TOOLS = ['manage_task', 'manage_task_list']
+
+/** Drive and Docs tools that create or change files: only through Approve. Reading is free. */
+export const DRIVE_APPROVAL_TOOLS = [
+  'create_drive_file',
+  'create_drive_folder',
+  'import_to_google_doc',
+  'import_to_google_slides',
+  'import_to_google_sheets',
+  'create_doc',
+  'modify_doc_text'
+]
+
+export type GoogleServer = 'gmail' | 'gcal' | 'gtasks' | 'gdrive'
 
 interface GoogleService {
   server: GoogleServer
@@ -62,10 +78,62 @@ const SERVICES: Record<GoogleServer, GoogleService> = {
     label: 'Google Calendar',
     credentialsDir: CALENDAR_CREDENTIALS_DIR,
     probe: (email) => ({ name: 'list_calendars', arguments: { user_google_email: email } })
+  },
+  gtasks: {
+    server: 'gtasks',
+    label: 'Google Tasks',
+    credentialsDir: TASKS_CREDENTIALS_DIR,
+    probe: (email) => ({ name: 'list_task_lists', arguments: { user_google_email: email, max_results: 1 } })
+  },
+  gdrive: {
+    server: 'gdrive',
+    label: 'Google Drive',
+    credentialsDir: DRIVE_CREDENTIALS_DIR,
+    probe: (email) => ({ name: 'search_drive_files', arguments: { user_google_email: email, query: 'trashed = false', page_size: 1 } })
   }
 }
 
-const isGoogle = (server: string): server is GoogleServer => server === 'gmail' || server === 'gcal'
+export const isGoogle = (server: string): server is GoogleServer => server in SERVICES
+
+/** "Gmail", "Google Calendar"… for messages. */
+export const googleLabel = (server: string): string => (isGoogle(server) ? SERVICES[server].label : server)
+
+/** The extra Google services that borrow Gmail's address and OAuth client, each with its own sign-in. */
+const EXTRA: Record<Exclude<GoogleServer, 'gmail'>, (email: string, clientId: string, clientSecret: string) => ServerEntry> = {
+  gcal: (e, id, secret) => calendarEntry(e, id, secret),
+  gtasks: (email, clientId, clientSecret) => ({
+    command: 'uvx',
+    args: [`workspace-mcp==${WORKSPACE_MCP_VERSION}`, '--single-user', '--tools', 'tasks', '--tool-tier', 'complete'],
+    env: googleEnv(email, clientId, clientSecret, TASKS_CREDENTIALS_DIR),
+    description: `Google Tasks (${email}): read your task lists. Changes need your approval.`,
+    agent_notes:
+      `The Google account is ${email}. Pass user_google_email="${email}" to Tasks tools. ` +
+      'Read with list_task_lists, list_tasks and get_task. Adding, changing, completing or deleting a task uses manage_task and needs approval: propose it. ' +
+      "If a Tasks tool says sign-in is needed, tell the user to click Connect Tasks in NateBot's Settings.",
+    require_approval: TASKS_APPROVAL_TOOLS
+  }),
+  gdrive: (email, clientId, clientSecret) => ({
+    command: 'uvx',
+    args: [`workspace-mcp==${WORKSPACE_MCP_VERSION}`, '--single-user', '--tools', 'drive', 'docs', '--tool-tier', 'core'],
+    env: googleEnv(email, clientId, clientSecret, DRIVE_CREDENTIALS_DIR),
+    description: `Google Drive and Docs (${email}): search and read files. Creating or editing needs your approval.`,
+    agent_notes:
+      `The Google account is ${email}. Pass user_google_email="${email}" to Drive and Docs tools. ` +
+      'Find files with search_drive_files and read them with get_drive_file_content or get_doc_content. Creating or editing files needs approval: propose it. ' +
+      "If a Drive tool says sign-in is needed, tell the user to click Connect Drive in NateBot's Settings.",
+    require_approval: DRIVE_APPROVAL_TOOLS
+  })
+}
+
+function googleEnv(email: string, clientId: string, clientSecret: string, dir: string): Record<string, string> {
+  return {
+    GOOGLE_OAUTH_CLIENT_ID: clientId,
+    GOOGLE_OAUTH_CLIENT_SECRET: clientSecret,
+    USER_GOOGLE_EMAIL: email,
+    OAUTHLIB_INSECURE_TRANSPORT: '1',
+    WORKSPACE_MCP_CREDENTIALS_DIR: dir
+  }
+}
 
 export function calendarEntry(email: string, clientId: string, clientSecret: string): ServerEntry {
   return {
@@ -157,10 +225,16 @@ export function gmailReady(): boolean {
 
 /** Calendar uses Gmail's address and OAuth client, so it can be connected once Gmail is set up. */
 export function calendarStatus(): GmailStatus {
+  return googleStatus('gcal')
+}
+
+/** Status of Calendar, Tasks or Drive, with Gmail's details (they share its address and client). */
+export function googleStatus(server: string): GmailStatus {
   const gmail = savedEntry('gmail')
+  const s = isGoogle(server) ? server : 'gcal'
   return {
-    configured: !!savedEntry('gcal').email,
-    connected: googleReady('gcal'),
+    configured: !!savedEntry(s).email,
+    connected: googleReady(s),
     email: gmail.email,
     clientId: gmail.clientId,
     hasSecret: !!gmail.clientSecret,
@@ -269,20 +343,28 @@ export async function connectGmail(
   const res = await signIn(SERVICES.gmail, gmailEntry(email, clientId, clientSecret), email, onProgress)
   // Calendar borrows Gmail's address and OAuth client: keep it in step. With a new address its
   // token no longer matches, and with a new client the old token is ignored, so it asks to reconnect.
-  const cal = savedEntry('gcal')
-  if (res.ok && cal.email && (cal.email !== email || cal.clientId !== clientId || cal.clientSecret !== clientSecret)) {
-    saveServer('gcal', calendarEntry(email, clientId, clientSecret))
-    log('gcal: updated to match Gmail')
+  for (const server of Object.keys(EXTRA) as (keyof typeof EXTRA)[]) {
+    const other = savedEntry(server)
+    if (res.ok && other.email && (other.email !== email || other.clientId !== clientId || other.clientSecret !== clientSecret)) {
+      saveServer(server, EXTRA[server](email, clientId, clientSecret))
+      log(`${server}: updated to match Gmail`)
+    }
   }
   return res
 }
 
-export async function connectCalendar(onProgress: (p: GmailProgress) => void): Promise<{ ok: boolean; error?: string }> {
+/** Connects Calendar, Tasks or Drive with Gmail's address and OAuth client (each keeps its own sign-in). */
+export async function connectGoogle(server: string, onProgress: (p: GmailProgress) => void): Promise<{ ok: boolean; error?: string }> {
+  if (!isGoogle(server) || server === 'gmail') return { ok: false, error: 'Unknown Google service.' }
   const { email, clientId, clientSecret } = savedEntry('gmail')
   if (!email || !clientId || !clientSecret) {
-    return { ok: false, error: 'Connect Gmail first: Calendar uses the same Google address and OAuth client.' }
+    return { ok: false, error: `Connect Gmail first: ${SERVICES[server].label} uses the same Google address and OAuth client.` }
   }
-  return signIn(SERVICES.gcal, calendarEntry(email, clientId, clientSecret), email, onProgress)
+  return signIn(SERVICES[server], EXTRA[server](email, clientId, clientSecret), email, onProgress)
+}
+
+export async function connectCalendar(onProgress: (p: GmailProgress) => void): Promise<{ ok: boolean; error?: string }> {
+  return connectGoogle('gcal', onProgress)
 }
 
 /** Saves the entry, starts the connector, and keeps it alive through Google sign-in until a probe call works. */

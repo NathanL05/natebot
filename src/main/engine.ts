@@ -9,7 +9,7 @@ import type { AgentStore } from './agents'
 import type { Db } from './db'
 import { childEnv } from './env'
 import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
-import { googleReady } from './gmail'
+import { googleLabel, googleReady } from './gmail'
 import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
@@ -324,7 +324,7 @@ export class Engine extends EventEmitter {
       // the run), so agents only get Gmail once Connect Gmail has stored a token.
       const skip = agent.mcp_servers.filter((s) => !googleReady(s))
       if (skip.length) {
-        const names = skip.map((s) => (s === 'gcal' ? 'Calendar' : 'Gmail')).join(' and ')
+        const names = skip.map(googleLabel).join(' and ')
         const verb = skip.length > 1 ? "aren't connected yet, so this reply didn't use them" : "isn't connected yet, so this reply didn't use it"
         extraLines.push({ role: 'system', text: `${names} ${verb}. Connect ${skip.length > 1 ? 'them' : 'it'} in Settings → Connected tools.` })
       }
@@ -615,7 +615,7 @@ export class Engine extends EventEmitter {
     if (!configuredServersFor(agent).includes(server)) {
       return fail(`${tool} isn't part of this agent's connected tools.`)
     }
-    if (!googleReady(server)) return fail(`${server === 'gcal' ? 'Calendar' : 'Gmail'} isn't connected. Connect it in Settings, then approve again.`)
+    if (!googleReady(server)) return fail(`${googleLabel(server)} isn't connected. Connect it in Settings, then approve again.`)
     const bin = this.deps.claudePath()
     if (!bin) return fail("Claude Code isn't available.")
     if (this.deps.usage.waitMs() > 0) {

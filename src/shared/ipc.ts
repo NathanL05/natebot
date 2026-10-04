@@ -112,6 +112,9 @@ export interface NateBotApi {
   /** Calendar reuses Gmail's address and OAuth client; it has its own sign-in. */
   calendarStatus(): Promise<GmailStatus>
   connectCalendar(): Promise<{ ok: boolean; error?: string }>
+  /** Calendar ('gcal'), Tasks ('gtasks') or Drive ('gdrive'), which share Gmail's address and OAuth client. */
+  googleStatus(server: string): Promise<GmailStatus>
+  connectGoogle(server: string): Promise<{ ok: boolean; error?: string }>
 }
 
 export const API_METHODS = [
@@ -165,7 +168,9 @@ export const API_METHODS = [
   'gmailStatus',
   'connectGmail',
   'calendarStatus',
-  'connectCalendar'
+  'connectCalendar',
+  'googleStatus',
+  'connectGoogle'
 ] as const satisfies readonly (keyof NateBotApi)[]
 
 // Compile-time check that API_METHODS lists every method.

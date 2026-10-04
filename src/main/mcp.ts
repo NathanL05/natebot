@@ -20,7 +20,9 @@ const NATEBOT_KEYS = ['description', 'agent_notes', 'require_approval']
 /** Servers we know about and hint at even before they're configured. */
 const SUGGESTED: Record<string, string> = {
   gmail: 'Read, search and draft Gmail',
-  gcal: 'Read Google Calendar and find free time'
+  gcal: 'Read Google Calendar and find free time',
+  gtasks: 'Read Google Tasks; changes need approval',
+  gdrive: 'Search and read Google Drive and Docs'
 }
 
 const TEMPLATE = {

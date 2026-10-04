@@ -531,6 +531,21 @@ Creating, changing, deleting or answering an event (`manage_event`, plus out-of-
 calendars) is blocked in normal runs and only happens through **Approve**. The approval notification shows the
 event, start and end times, and guests.
 
+## Connecting Google Tasks and Drive
+
+Like Calendar, these reuse Gmail's Google address and OAuth client but get their own sign-in, so connecting them
+never touches Gmail. In the same Google Cloud project, enable the
+[Google Tasks API](https://console.cloud.google.com/apis/library/tasks.googleapis.com) or the
+[Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com) and
+[Google Docs API](https://console.cloud.google.com/apis/library/docs.googleapis.com), then click **Connect Tasks…** or
+**Connect Drive…** in **Settings → Connected tools** and give the server to the agents that should use it.
+
+- **Tasks** (`gtasks`): agents read your task lists, which sync to Google Calendar and the Tasks app on your phone.
+  Adding, completing or deleting a task (`manage_task`) only happens through **Approve**.
+- **Drive & Docs** (`gdrive`): agents search Drive and read files and Docs, for example lecture notes for the Study
+  Buddy or your CV for cover letters. Creating, importing or editing files only happens through **Approve**. It
+  loads only the smaller core tool set, to keep each message light.
+
 ## Adding MCP servers
 
 Add servers to `~/NateBot/mcp.json` in the same format Claude Code uses (`command`/`args`/`env` for local
