@@ -193,6 +193,7 @@ export function SettingsView() {
             <Row label="Google Drive & Docs" hint={drive?.configured ? drive.description : 'Not connected. Lets agents search and read your files; creating or editing needs approval.'}>
               <Button onClick={() => useStore.getState().setGoogleOpen('gdrive')}>{drive?.configured ? 'Reconnect…' : 'Connect Drive…'}</Button>
             </Row>
+            <AppleRow />
             <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see README). They appear in each agent's settings.">
               <Button onClick={() => void api.openExternal('https://github.com/NathanL05/natebot#adding-mcp-servers')}>How-to</Button>
             </Row>
@@ -385,5 +386,37 @@ function PhoneRow({ topic, details, onChange }: { topic: string | null; details:
         </div>
       )}
     </div>
+  )
+}
+
+/** Apple Reminders & Notes: one click, then macOS asks for permission. */
+function AppleRow() {
+  const apple = useStore((s) => s.mcpServers.find((m) => m.name === 'apple'))
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const connect = async (): Promise<void> => {
+    setBusy(true)
+    setError('')
+    const res = await api.connectApple()
+    setBusy(false)
+    if (!res.ok) setError(res.error ?? 'Something went wrong.')
+  }
+  return (
+    <Row
+      label="Apple Reminders & Notes"
+      hint={
+        error ? (
+          <span className="text-danger">{error}</span>
+        ) : apple?.configured ? (
+          apple.description
+        ) : (
+          'Not connected. Lets agents read your reminders and notes (synced to your iPhone); adding or completing needs approval. macOS asks for permission once.'
+        )
+      }
+    >
+      <Button disabled={busy} onClick={() => void connect()}>
+        {busy ? 'Waiting for macOS…' : apple?.configured ? 'Reconnect' : 'Connect…'}
+      </Button>
+    </Row>
   )
 }
