@@ -50,6 +50,7 @@ import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
+import { parsePhoneMessage, PhoneInbox } from './phone'
 import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
@@ -83,6 +84,9 @@ export class Backend implements NateBotApi {
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected)
+  private phone = new PhoneInbox((text) => this.fromPhone(text), log)
+  /** Agents answering a message from your phone: their reply always goes to the phone. */
+  private phoneWaiting = new Set<string>()
   private backupTimer: NodeJS.Timeout | undefined
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
@@ -210,6 +214,7 @@ export class Backend implements NateBotApi {
     this.backup()
     this.backupTimer = setInterval(() => this.backup(), 60 * 60_000)
     this.quietTimer = setInterval(() => this.endQuiet(), 60_000)
+    this.syncPhone()
     powerMonitor.on('resume', this.onResume)
   }
 
@@ -227,6 +232,7 @@ export class Backend implements NateBotApi {
     this.emailWatcher.stop()
     clearInterval(this.backupTimer)
     clearInterval(this.quietTimer)
+    this.phone.stop()
     this.rooms.shutdown()
     this.engine.shutdown()
     this.store.close()
@@ -323,6 +329,30 @@ export class Backend implements NateBotApi {
     return n
   }
 
+  private syncPhone(): void {
+    const { phoneInbox, pushTopic } = this.settings.get()
+    this.phone.listen(phoneInbox && pushTopic ? `${pushTopic}-in` : null)
+  }
+
+  /** A message from your phone: to the @named agent, or the one you used last. */
+  private fromPhone(raw: string): void {
+    const { agent, text } = parsePhoneMessage(raw)
+    if (!text) return
+    const agents = this.summaries()
+    const key = agent?.replace(/[^a-z0-9]/g, '') ?? ''
+    const target = agent
+      ? agents.find((a) => a.id === agent || a.name.toLowerCase().replace(/[^a-z0-9]/g, '').startsWith(key))
+      : [...agents].sort((a, b) => b.lastActivity - a.lastActivity)[0]
+    if (!target) {
+      void this.push('NateBot', agent ? `No agent called "${agent}".` : 'Add an agent in NateBot first.')
+      return
+    }
+    log(`phone: message for ${target.id}`)
+    this.engine.system(target.id, 'Message from your phone')
+    this.phoneWaiting.add(target.id)
+    void this.sendMessage(target.id, text)
+  }
+
   /** When quiet hours are over, one notification sums up what was held. */
   private endQuiet(): void {
     if (!this.held.length) return
@@ -412,6 +442,13 @@ export class Backend implements NateBotApi {
   private onRunFinished(r: RunFinished): void {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     void this.usage.refresh()
+    // You asked from your phone: answer there, even if the Mac is in front or it's quiet hours.
+    if (r.source === 'chat' && this.phoneWaiting.delete(r.agentId) && !r.needsApproval) {
+      // The whole reply, not just its first line: on a phone this is the conversation.
+      const text = (this.db.getMessage(r.messageId)?.text || r.summary).replace(/[*_`#>]/g, '').trim()
+      this.notify(r.agentId, r.ok ? 'Replied' : 'Failed', text, undefined, true)
+      return
+    }
     if (r.needsApproval) this.notifyApproval(r)
     else if (r.handoffTo) this.notify(r.agentId, 'Suggests a handoff', `Pass a task to ${r.handoffTo}? Open NateBot to review and confirm.`)
     // A routine or reminder with nothing to report stays in the chat, without a notification.
@@ -1032,6 +1069,7 @@ export class Backend implements NateBotApi {
     }
     if (next.claudePath !== before.claudePath) void this.recheckEnv()
     if (next.quickCapture !== before.quickCapture) this.applyCaptureShortcut()
+    if (next.phoneInbox !== before.phoneInbox || next.pushTopic !== before.pushTopic) this.syncPhone()
     if (next.theme !== before.theme) {
       for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#0E0E13' : '#FFFFFF')
     }

@@ -282,6 +282,8 @@ export interface AppSettings {
   pushTopic: string | null
   /** Include notification text, not just the title, in phone notifications. */
   pushDetails: boolean
+  /** Accept messages from your phone on "<pushTopic>-in" (needs pushTopic). */
+  phoneInbox: boolean
   /** Hold notifications between these local times ("22:30"–"07:30"); null for off. */
   quietHours: { start: string; end: string } | null
 }

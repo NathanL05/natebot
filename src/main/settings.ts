@@ -42,6 +42,7 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
           ? raw.pushTopic.trim()
           : fallback.pushTopic,
     pushDetails: typeof raw.pushDetails === 'boolean' ? raw.pushDetails : fallback.pushDetails,
+    phoneInbox: typeof raw.phoneInbox === 'boolean' ? raw.phoneInbox : fallback.phoneInbox,
     quietHours:
       raw.quietHours === null
         ? null
@@ -69,6 +70,7 @@ export class SettingsStore {
       aboutMe: '',
       pushTopic: null,
       pushDetails: false,
+      phoneInbox: false,
       quietHours: null
     }
     let raw: Partial<AppSettings> = {}

@@ -338,7 +338,7 @@ export function SettingsView() {
                 />
               </div>
             </Row>
-            <PhoneRow topic={settings.pushTopic} details={settings.pushDetails} onChange={(p) => void patch(p)} />
+            <PhoneRow topic={settings.pushTopic} details={settings.pushDetails} inbox={settings.phoneInbox} onChange={(p) => void patch(p)} />
             <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />
@@ -384,7 +384,17 @@ function QuickCaptureRow({ value, onChange }: { value: string | null; onChange: 
 }
 
 /** Phone notifications through ntfy: the app subscribes to a private topic name. */
-function PhoneRow({ topic, details, onChange }: { topic: string | null; details: boolean; onChange: (p: { pushTopic?: string | null; pushDetails?: boolean }) => void }) {
+function PhoneRow({
+  topic,
+  details,
+  inbox,
+  onChange
+}: {
+  topic: string | null
+  details: boolean
+  inbox: boolean
+  onChange: (p: { pushTopic?: string | null; pushDetails?: boolean; phoneInbox?: boolean }) => void
+}) {
   const [result, setResult] = useState('')
   const generate = (): void => onChange({ pushTopic: `natebot-${Array.from(crypto.getRandomValues(new Uint8Array(9)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 16)}` })
   return (
@@ -417,7 +427,17 @@ function PhoneRow({ topic, details, onChange }: { topic: string | null; details:
           <label className="flex items-center gap-2 text-[12px] text-muted">
             <Toggle label="Include message text" checked={details} onChange={(v) => onChange({ pushDetails: v })} /> Include message text
           </label>
+          <label className="flex items-center gap-2 text-[12px] text-muted">
+            <Toggle label="Message agents from your phone" checked={inbox} onChange={(v) => onChange({ phoneInbox: v, ...(v ? { pushDetails: true } : {}) })} /> Message
+            agents from your phone
+          </label>
           {result && <span className="text-[12px] text-muted">{result}</span>}
+          {inbox && (
+            <div className="w-full text-[12px] text-muted">
+              In the ntfy app, also subscribe to <code className="selectable">{topic}-in</code> and send messages there: “@planner move gym to 8”, or just
+              text for your most recent agent. Replies arrive as notifications with their text.
+            </div>
+          )}
         </div>
       )}
     </div>
