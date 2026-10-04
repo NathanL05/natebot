@@ -197,8 +197,8 @@ export interface NateBotEvents {
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
   navigate: 'settings' | 'routines' | 'today' | 'jobs' | 'newAgent' | 'newRoom'
-  /** The quick-capture box was opened (a timestamp, so every opening is a new event). */
-  captureShown: number
+  /** The quick-capture box was opened, optionally pre-filled from a natebot:// link. */
+  captureShown: { at: number; text?: string; agent?: string }
 }
 
 export const EVENT_NAMES = [

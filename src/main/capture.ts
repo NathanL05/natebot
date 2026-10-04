@@ -11,7 +11,8 @@ const HEIGHT = 196
 export interface Capture {
   /** Registers the shortcut (null turns it off). Returns false if another app already uses it. */
   setShortcut(accelerator: string | null): boolean
-  show(): void
+  /** Opens the box, optionally pre-filled (from a natebot:// link). Nothing is sent until you press Enter. */
+  show(prefill?: { text?: string; agent?: string }): void
   hide(): void
 }
 
@@ -52,7 +53,7 @@ export function createCapture(opts: { load: (win: BrowserWindow, hash: string) =
     return w
   }
 
-  const show = (): void => {
+  const show = (prefill?: { text?: string; agent?: string }): void => {
     if (!win || win.isDestroyed()) win = make()
     wasActive = BrowserWindow.getFocusedWindow() !== null
     // Centred near the top of the screen the pointer is on.
@@ -63,7 +64,7 @@ export function createCapture(opts: { load: (win: BrowserWindow, hash: string) =
       ready.show()
       ready.focus()
       app.focus({ steal: true })
-      emit('captureShown', Date.now())
+      emit('captureShown', { at: Date.now(), ...prefill })
     }
     if (ready.webContents.isLoading()) ready.webContents.once('did-finish-load', reveal)
     else reveal()
