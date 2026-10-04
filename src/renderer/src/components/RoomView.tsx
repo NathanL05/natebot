@@ -1,3 +1,4 @@
+import { PinnedButton } from './PinnedButton'
 import { useMemo } from 'react'
 import type { AgentSummary, RoomSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
@@ -36,6 +37,7 @@ export function RoomView({ room }: { room: RoomSummary }) {
             {speaking ? `${speaking.name} is typing…` : members.map((m) => m.name).join(', ')}
           </div>
         </div>
+        <PinnedButton chatId={room.id} />
         <IconButton label="Group chat settings" onClick={() => useStore.getState().setRoomEditor(room.id)}>
           <SlidersIcon size={17} />
         </IconButton>

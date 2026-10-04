@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { AgentSummary, ChatMessage } from '@shared/types'
 import { agentPicture } from '../lib/avatars'
 import { basename, clockTime, separatorTime } from '../lib/format'
@@ -6,9 +6,9 @@ import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { ReminderCard } from './ReminderCard'
-import { AlertIcon, PaperclipIcon } from './icons'
+import { AlertIcon, CheckIcon, CopyIcon, PaperclipIcon, PinIcon } from './icons'
 import { Markdown } from './Markdown'
-import { useStore } from '../lib/store'
+import { api, useStore } from '../lib/store'
 import { ToolLines } from './ToolLines'
 
 const GAP = 30 * 60_000
@@ -49,6 +49,31 @@ function Speaker({ agent, showName, children }: { agent: AgentSummary | undefine
         )}
         {children}
       </div>
+    </div>
+  )
+}
+
+/** Copy and Pin, shown under an agent reply on hover (Pin stays visible once pinned). */
+function MessageTools({ msg }: { msg: ChatMessage }) {
+  const [copied, setCopied] = useState(false)
+  const btn = 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted transition hover:bg-hover hover:text-fg'
+  return (
+    <div className={`mt-0.5 ml-1 flex gap-0.5 transition-opacity ${msg.pinned ? '' : 'opacity-0 group-hover:opacity-100'}`}>
+      <button
+        type="button"
+        className={btn}
+        onClick={() => {
+          void navigator.clipboard.writeText(msg.text).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1200)
+          })
+        }}
+      >
+        {copied ? <CheckIcon size={11} /> : <CopyIcon size={11} />} {copied ? 'Copied' : 'Copy'}
+      </button>
+      <button type="button" className={`${btn} ${msg.pinned ? 'text-accent' : ''}`} onClick={() => void api.setPinned(msg.id, !msg.pinned)}>
+        <PinIcon size={11} /> {msg.pinned ? 'Pinned' : 'Pin'}
+      </button>
     </div>
   )
 }
@@ -103,7 +128,7 @@ function Message({
   // Agent message
   const waiting = msg.streaming && !msg.text
   const body = (
-    <div className="flex flex-col items-start" title={clockTime(msg.createdAt)}>
+    <div className="group flex flex-col items-start" title={clockTime(msg.createdAt)}>
       {msg.tools && msg.tools.length > 0 && <ToolLines tools={msg.tools} />}
       {waiting ? (
         <Typing />
@@ -114,6 +139,7 @@ function Message({
           </div>
         )
       )}
+      {msg.text && !msg.streaming && <MessageTools msg={msg} />}
       {msg.actions?.map((a) => <ActionCard key={a.id} messageId={msg.id} action={a} />)}
       {msg.handoffs?.map((h) => <HandoffCard key={h.id} messageId={msg.id} handoff={h} />)}
       {msg.reminders?.map((r) => <ReminderCard key={r.id} reminder={r} />)}

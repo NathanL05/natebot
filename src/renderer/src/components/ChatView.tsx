@@ -9,6 +9,7 @@ import { AvatarEditor } from './AvatarEditor'
 import { Composer } from './Composer'
 import { AlertIcon, SlidersIcon } from './icons'
 import { MessageList } from './MessageList'
+import { PinnedButton } from './PinnedButton'
 import { IconButton } from './ui'
 
 export function UsageBanner() {
@@ -79,6 +80,7 @@ export function ChatView() {
             {subtitle}
           </div>
         </div>
+        <PinnedButton chatId={agent.id} />
         <IconButton label="Agent settings" onClick={() => useStore.getState().setDrawerOpen(true)}>
           <SlidersIcon size={17} />
         </IconButton>

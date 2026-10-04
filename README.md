@@ -250,6 +250,8 @@ and you're back in the app you were using. The reply arrives as a
   the Shortcuts app: turn on *Show in Share Sheet* (receiving Text, URLs and Safari web pages), add **URL Encode**
   (Shortcut Input), then **Open URLs** with `natebot://capture?text=` followed by the encoded text. Add `&agent=job-hunter`
   to pick an agent.
+- **Copy and Pin:** hover over a reply to copy it or pin it. Pinned replies (a plan, a draft, a list) are listed under
+  the pin button in the chat header; click one to jump to it.
 - **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every
   message (yours and the agents', at least 2 characters). Click a result to open that chat at the message.
 - **Composer:** Enter sends, Shift+Enter adds a new line, and **+** attaches one or more files: PDFs, images,
