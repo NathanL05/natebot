@@ -289,7 +289,15 @@ export interface AppSettings {
   phoneInbox: boolean
   /** Hold notifications between these local times ("22:30"–"07:30"); null for off. */
   quietHours: { start: string; end: string } | null
+  /** Voice for Listen (a macOS voice name), or null for the best natural voice installed. */
+  voice: string | null
+  /** Speaking speed for Listen (1 = normal). */
+  voiceRate: number
 }
+
+export const VOICE_RATES = [0.9, 1, 1.15, 1.3]
+/** System Settings → Accessibility → Read & Speak (Spoken Content), where better voices are downloaded. */
+export const SPOKEN_CONTENT_SETTINGS = 'x-apple.systempreferences:com.apple.Accessibility-Settings.extension?SpokenContent'
 
 export const MAX_ABOUT_ME = 1200
 

@@ -33,6 +33,7 @@ import type {
 import { isRoomId } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { AgentStore, slugify } from './agents'
+import { SPOKEN_CONTENT_SETTINGS } from '@shared/types'
 import { BOARD_MEMBERS, BOARD_ROOM, BOARD_ROOM_ID } from './board'
 import { avatarVersion, removeAvatar, saveAvatar } from './avatars'
 import { Db } from './db'
@@ -1189,7 +1190,8 @@ export class Backend implements NateBotApi {
   }
 
   async openExternal(url: string): Promise<void> {
-    if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url)) await shell.openExternal(url)
+    if (typeof url !== 'string') return
+    if (/^(https?:|mailto:)/i.test(url) || url === SPOKEN_CONTENT_SETTINGS) await shell.openExternal(url)
   }
 
   async setAvatar(target: string, dataUrl: string | null): Promise<number | null> {

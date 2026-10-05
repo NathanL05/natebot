@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
-import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, MAX_ABOUT_ME, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
+import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, MAX_ABOUT_ME, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, VOICE_RATES, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
 import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
@@ -48,7 +48,9 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
         ? null
         : raw.quietHours && typeof raw.quietHours === 'object' && /^\d{1,2}:\d{2}$/.test(String(raw.quietHours.start)) && /^\d{1,2}:\d{2}$/.test(String(raw.quietHours.end))
           ? { start: String(raw.quietHours.start), end: String(raw.quietHours.end) }
-          : fallback.quietHours
+          : fallback.quietHours,
+    voice: raw.voice === null ? null : typeof raw.voice === 'string' && raw.voice.trim() ? raw.voice.trim().slice(0, 120) : fallback.voice,
+    voiceRate: VOICE_RATES.includes(raw.voiceRate as number) ? (raw.voiceRate as number) : fallback.voiceRate
   }
 }
 
@@ -71,7 +73,9 @@ export class SettingsStore {
       pushTopic: null,
       pushDetails: false,
       phoneInbox: false,
-      quietHours: null
+      quietHours: null,
+      voice: null,
+      voiceRate: 1
     }
     let raw: Partial<AppSettings> = {}
     try {

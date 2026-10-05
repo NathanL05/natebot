@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_ABOUT_ME, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { EFFORTS, MAX_ABOUT_ME, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, SPOKEN_CONTENT_SETTINGS, VOICE_RATES, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
 import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
+import { goodVoices, loadVoices, speak, stopSpeaking } from '../lib/voice'
 import { countdown, LEVEL_COLOR, pct, resetTime, usageLevel } from '../lib/usage'
 import { CheckIcon, RefreshIcon } from './icons'
 import { Button, inputBase, inputClass, Segmented, Toggle } from './ui'
@@ -113,6 +114,70 @@ function AgentUsageRows() {
 
 const resetHint = (w: UsageWindow): string | undefined =>
   w.resetsAt ? `Resets ${resetTime(w.resetsAt)} (in ${countdown(w.resetsAt)})` : undefined
+
+const RATE_LABELS: Record<number, string> = { 0.9: 'Slower', 1: 'Normal', 1.15: 'Faster', 1.3: 'Fast' }
+const SAMPLE = "Hi, I'm reading your agents' replies in this voice. Here's your plan for today, in three steps."
+
+/** The voice and speed for Listen, with a preview. Lists natural English voices only (no novelty voices). */
+function VoiceRows({ voice, rate, onChange }: { voice: string | null; rate: number; onChange: (p: { voice?: string | null; voiceRate?: number }) => void }) {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => {
+    void loadVoices().then((all) => setVoices(goodVoices(all)))
+    return stopSpeaking
+  }, [])
+  const best = voices[0]?.name
+  const premium = voices.some((v) => /premium|enhanced/i.test(v.name))
+  const preview = (next: { voice?: string | null; rate?: number } = {}): void => {
+    setPlaying(true)
+    void speak(SAMPLE, { voice: next.voice !== undefined ? next.voice : voice, rate: next.rate ?? rate, onEnd: () => setPlaying(false) })
+  }
+  return (
+    <>
+      <Row label="Voice" hint="Used by Listen under each reply.">
+        <div className="flex items-center gap-2">
+          <select
+            className={`${inputBase} h-9 w-60 py-0`}
+            value={voice && voices.some((v) => v.name === voice) ? voice : ''}
+            onChange={(e) => {
+              const next = e.target.value || null
+              onChange({ voice: next })
+              preview({ voice: next })
+            }}
+          >
+            <option value="">Automatic{best ? ` (${best})` : ''}</option>
+            {voices.map((v) => (
+              <option key={v.name} value={v.name}>
+                {v.name} · {v.lang}
+              </option>
+            ))}
+          </select>
+          <Button onClick={() => (playing ? stopSpeaking() : preview())}>{playing ? 'Stop' : 'Preview'}</Button>
+        </div>
+      </Row>
+      <Row label="Speed">
+        <Segmented
+          value={String(rate)}
+          options={VOICE_RATES.map((r) => ({ value: String(r), label: RATE_LABELS[r] ?? String(r) }))}
+          onChange={(v) => {
+            onChange({ voiceRate: Number(v) })
+            preview({ rate: Number(v) })
+          }}
+        />
+      </Row>
+      <Row
+        label={premium ? 'More voices' : 'Get a more natural voice'}
+        hint={
+          premium
+            ? 'Download more voices in System Settings → Accessibility → Read & Speak → System voice → Manage Voices.'
+            : "The voices built into macOS sound robotic. Free Premium voices sound far more natural: in Read & Speak, open System voice → Manage Voices, pick English, and download one marked Premium (e.g. Jamie, Serena or Ava). It appears here and is picked automatically."
+        }
+      >
+        <Button onClick={() => void api.openExternal(SPOKEN_CONTENT_SETTINGS)}>Open Read & Speak</Button>
+      </Row>
+    </>
+  )
+}
 
 export function SettingsView() {
   const settings = useStore((s) => s.settings)
@@ -279,6 +344,10 @@ export function SettingsView() {
                 })}
               </div>
             </div>
+          </Section>
+
+          <Section title="Voice">
+            <VoiceRows voice={settings.voice} rate={settings.voiceRate} onChange={(p) => void patch(p)} />
           </Section>
 
           <Section title="General">
