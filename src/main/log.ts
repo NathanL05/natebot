@@ -5,6 +5,9 @@ import { appendFileSync, mkdirSync, statSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 
 let file: string | null = null
+/** Lines written since the size was last checked: NateBot can run for weeks in the menu bar. */
+let sinceCheck = 0
+const CHECK_EVERY = 200
 
 export function log(message: string): void {
   try {
@@ -12,6 +15,10 @@ export function log(message: string): void {
       const dir = app.getPath('logs')
       mkdirSync(dir, { recursive: true })
       file = join(dir, 'main.log')
+      sinceCheck = CHECK_EVERY
+    }
+    if (sinceCheck++ >= CHECK_EVERY) {
+      sinceCheck = 1
       // Keep it small: rotate at 1 MB.
       try {
         if (statSync(file).size > 1_000_000) renameSync(file, `${file}.1`)

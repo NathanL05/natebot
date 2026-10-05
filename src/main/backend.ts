@@ -48,6 +48,7 @@ import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
+import { cleanTmp } from './tmp'
 import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
 import { parsePhoneMessage, PhoneInbox } from './phone'
@@ -122,6 +123,9 @@ export class Backend implements NateBotApi {
     mkdirSync(WORKSPACES_DIR, { recursive: true })
     ensureMcpFile()
     refreshAppleEntry()
+    // Nothing is running yet, so any per-run MCP config left in the temp folder is from a crash.
+    const cleaned = cleanTmp(TMP_DIR)
+    if (cleaned) log(`startup: removed ${cleaned} leftover temp file(s)`)
     this.db = new Db(DB_FILE)
     this.db.repairInterrupted()
 
