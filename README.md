@@ -193,9 +193,11 @@ Deleting an agent moves its workspace to the Trash.
 
 ## Agents
 
-Add agents with **+** in the sidebar. You can start from a template (Study Buddy, Weekly Review, Budget Buddy, Fitness
-Coach, Travel Planner), each set up to be light on your limit (Haiku or low effort, only the tools it needs), or from
-blank. Edit one with the sliders button in the chat header. Each agent is a YAML
+Add agents with **+** in the sidebar. You can start from a template (Straight Talk, Study Buddy, Weekly Review, Budget
+Buddy, Fitness Coach, Travel Planner), each set up to be light on your limit (Haiku or low effort, only the tools it
+needs), or from blank. Straight Talk is a brutally honest mentor, manager and sounding board: verdict first, reasoning
+you can check, one next step, and a log of your commitments in its memory.md. It starts with the folders your other
+agents read, and drops the bluntness and points you to Samaritans (116 123) if you mention a crisis. Edit one with the sliders button in the chat header. Each agent is a YAML
 file:
 
 ```yaml

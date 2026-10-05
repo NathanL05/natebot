@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AgentDraft } from '@shared/types'
+import { MAX_READ_FOLDERS, type AgentDraft } from '@shared/types'
 import { seededColor } from '@shared/mascot'
 import { AGENT_TEMPLATES } from '@shared/templates'
 import { api, useStore } from '../lib/store'
@@ -29,7 +29,11 @@ export function AddAgentModal() {
     const t = AGENT_TEMPLATES.find((x) => x.id === id)
     setTemplate(t ? t.id : null)
     setColorPicked(!!t)
-    setDraft(t ? structuredClone(t.draft) : blankDraft(defaultModel, defaultEffort))
+    if (!t) return setDraft(blankDraft(defaultModel, defaultEffort))
+    const next = structuredClone(t.draft)
+    // Same folders the other agents read, as the Career Board and Job Hunter get.
+    if (t.readsPlan) next.read_folders = [...new Set(useStore.getState().agents.flatMap((a) => a.read_folders))].slice(0, MAX_READ_FOLDERS)
+    setDraft(next)
   }
 
   const problems = validateDraft(draft)
