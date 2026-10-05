@@ -1,7 +1,7 @@
 {
   "name": "natebot",
   "productName": "NateBot",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Personal multi-agent Mac app powered by the Claude Code CLI",
   "author": "Nathan",
   "private": true,
