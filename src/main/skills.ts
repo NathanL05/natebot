@@ -127,9 +127,10 @@ export function removeSource(repo: string): void {
 // ---- GitHub ----
 
 const HEADERS = { 'User-Agent': 'NateBot', Accept: 'application/vnd.github+json' }
+const TIMEOUT_MS = 30_000
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: HEADERS })
+  const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
   if (res.status === 403 || res.status === 429) throw new Error('GitHub rate limit reached. Try again in a while.')
   if (res.status === 404) throw new Error('Repository not found (or private).')
   if (!res.ok) throw new Error(`GitHub returned ${res.status}`)
@@ -168,7 +169,7 @@ async function fetchSource(repo: string): Promise<CachedSource> {
 
   const skills = await pool(dirs, 6, async (dir) => {
     const prefix = dir ? `${dir}/` : ''
-    const text = await fetch(rawUrl(repo, tree.sha, `${prefix}SKILL.md`), { headers: { 'User-Agent': 'NateBot' } }).then((r) =>
+    const text = await fetch(rawUrl(repo, tree.sha, `${prefix}SKILL.md`), { headers: { 'User-Agent': 'NateBot' }, signal: AbortSignal.timeout(TIMEOUT_MS) }).then((r) =>
       r.ok ? r.text() : ''
     )
     const fm = frontmatter(text)
@@ -275,7 +276,7 @@ export async function installSkill(id: string): Promise<void> {
   try {
     const prefix = dir ? `${dir}/` : ''
     await pool(skill.files, 6, async (f) => {
-      const res = await fetch(rawUrl(repo, src.sha, prefix + f.path), { headers: { 'User-Agent': 'NateBot' } })
+      const res = await fetch(rawUrl(repo, src.sha, prefix + f.path), { headers: { 'User-Agent': 'NateBot' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
       if (!res.ok) throw new Error(`Download failed for ${f.path} (${res.status})`)
       const dest = safeJoin(tmp, f.path)
       mkdirSync(dirname(dest), { recursive: true })

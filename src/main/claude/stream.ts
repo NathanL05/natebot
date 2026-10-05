@@ -173,10 +173,10 @@ export class StreamState {
 
 // ---- proposed actions ----
 
-const ACTIONS_BLOCK = /```proposed_actions\s*([\s\S]*?)```/
-const ACTIONS_START = '```proposed_actions'
 // The closing fence is the one on its own line: a JSON string can't contain a raw newline,
-// so a code fence written inside a task never ends the block early. The loose form is a fallback.
+// so a code fence written inside a task or an email body never ends the block early. The loose form is a fallback.
+const ACTIONS_BLOCKS = [/```proposed_actions\s*([\s\S]*?)\n[ \t]*```/, /```proposed_actions\s*([\s\S]*?)```/]
+const ACTIONS_START = '```proposed_actions'
 const HANDOFF_BLOCKS = [/```handoff\s*([\s\S]*?)\n[ \t]*```/, /```handoff\s*([\s\S]*?)```/]
 const HANDOFF_START = '```handoff'
 const REMINDER_BLOCKS = [/```reminders\s*([\s\S]*?)\n[ \t]*```/, /```reminders\s*([\s\S]*?)```/]
@@ -281,7 +281,7 @@ export function extractJobs(text: string): { text: string; jobs: Json[]; error: 
 }
 
 export function extractActions(text: string): { text: string; actions: ProposedAction[]; error: string | null } {
-  const match = ACTIONS_BLOCK.exec(text)
+  const match = ACTIONS_BLOCKS.map((re) => re.exec(text)).find((m) => m !== null)
   if (!match) return { text: cutAt(text, ACTIONS_START), actions: [], error: null }
   const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
   try {

@@ -15,7 +15,9 @@ type Spawn = { args: string[]; env: NodeJS.ProcessEnv; input: string }
 const h = vi.hoisted(() => ({
   spawns: [] as { args: string[]; env: NodeJS.ProcessEnv; input: string }[],
   /** stream-json events the fake claude emits on its next run. */
-  events: [] as Record<string, unknown>[]
+  events: [] as Record<string, unknown>[],
+  /** Makes the next spawn throw instead of starting. */
+  spawnError: null as string | null
 }))
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' }, shell: {} }))
@@ -34,6 +36,7 @@ vi.mock('./mcp', () => ({
 }))
 vi.mock('./claude/process', () => ({
   spawnClaude: (opts: { args: string[]; env: NodeJS.ProcessEnv; input: string; onEvent: (e: Record<string, unknown>) => void }) => {
+    if (h.spawnError) throw new Error(h.spawnError)
     h.spawns.push({ args: opts.args, env: opts.env, input: opts.input })
     for (const e of h.events.splice(0)) opts.onEvent(e)
     return { kill: () => undefined, done: Promise.resolve({ code: 0, reason: 'exit', stderr: '' }) }
@@ -124,6 +127,7 @@ const action = (over: Partial<ProposedAction> = {}): ProposedAction => ({
 beforeEach(() => {
   h.spawns.length = 0
   h.events.length = 0
+  h.spawnError = null
   vi.stubEnv('ANTHROPIC_API_KEY', 'sk-should-never-be-passed')
 })
 afterEach(() => {
@@ -211,6 +215,16 @@ describe('approved actions', () => {
     await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
     expect(a.status).toBe('failed')
     expect(a.result).toMatch(/never called/)
+  })
+
+  it('fails instead of staying on "Working…" when the run throws', async () => {
+    const { engine, notes } = setup()
+    const a = action()
+    h.spawnError = 'EMFILE: too many open files'
+    await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
+    expect(a.status).toBe('failed')
+    expect(a.result).toMatch(/EMFILE/)
+    expect(notes.at(-1)).toMatch(/could not be carried out/)
   })
 })
 
