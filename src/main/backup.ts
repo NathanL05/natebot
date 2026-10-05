@@ -10,7 +10,9 @@ import { AGENTS_DIR, ROOT, SETTINGS_FILE, WORKSPACES_DIR } from './paths'
 export const BACKUPS_DIR = join(ROOT, 'backups')
 const KEEP = 7
 
-const today = (): string => new Date().toISOString().slice(0, 10)
+/** The local date (a UTC date would name the backup after the wrong day around midnight). */
+export const today = (d = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 /** Makes today's backup if there isn't one yet. Returns its folder, or null if it already existed. */
 export function backupIfDue(db: DatabaseSync, dir = BACKUPS_DIR): string | null {

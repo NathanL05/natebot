@@ -22,8 +22,10 @@ if (isDev && cdpPort) app.commandLine.appendSwitch('remote-debugging-port', cdpP
 
 registerAvatarScheme()
 
-// One NateBot at a time; a second launch just shows the existing window.
-if (!app.requestSingleInstanceLock()) app.quit()
+// One NateBot at a time; a second launch just shows the existing window. The second copy
+// must never get as far as opening the database or tidying the temp folder under the first.
+const primary = app.requestSingleInstanceLock()
+if (!primary) app.quit()
 
 // natebot://capture?text=…&agent=… (e.g. from a Shortcuts "Share" action) opens the
 // quick-capture box pre-filled. Any web page can open such a link, so it never sends anything.
@@ -177,6 +179,7 @@ function buildMenu(): void {
 app.on('second-instance', showWindow)
 
 app.whenReady().then(async () => {
+  if (!primary) return
   app.setAboutPanelOptions({
     applicationName: 'NateBot',
     applicationVersion: app.getVersion(),
