@@ -149,6 +149,13 @@ describe('creating and editing group chats', () => {
     expect(rooms.create({ name: 'x', memberIds: ['a', 'b'], maxTurns: 2.5 }).maxTurns).toBe(8)
   })
 
+  it('takes a fixed id for a built-in group, once', () => {
+    const { rooms } = setup()
+    expect(rooms.create({ name: 'Board', memberIds: ['a', 'b'], maxTurns: 6 }, 'room:board').id).toBe('room:board')
+    expect(() => rooms.create({ name: 'Board', memberIds: ['a', 'b'], maxTurns: 6 }, 'room:board')).toThrow(/already exists/)
+    expect(() => rooms.create({ name: 'Board', memberIds: ['a', 'b'], maxTurns: 6 }, 'board')).toThrow()
+  })
+
   it('gives everyone fresh sessions when the line-up changes', () => {
     const { rooms, db } = setup()
     const room = rooms.create({ name: 'Team', memberIds: ['a', 'b'], maxTurns: 8 })

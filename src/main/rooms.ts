@@ -103,8 +103,10 @@ export class Rooms {
     }
   }
 
-  create(draft: RoomDraft): RoomConfig {
-    const room = this.normalize(draft, `${ROOM_PREFIX}${randomUUID().slice(0, 8)}`)
+  /** id: a fixed id for a built-in group (it must not exist yet); random otherwise. */
+  create(draft: RoomDraft, id = `${ROOM_PREFIX}${randomUUID().slice(0, 8)}`): RoomConfig {
+    if (!id.startsWith(ROOM_PREFIX) || this.rooms.has(id)) throw new Error(`Group chat ${id} already exists.`)
+    const room = this.normalize(draft, id)
     this.rooms.set(room.id, room)
     this.deps.db.saveRoom(room)
     this.system(room.id, `Created group chat with ${this.names(room.memberIds)}`)

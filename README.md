@@ -313,6 +313,25 @@ the sidebar (or **⇧⌘N**), pick 2–6 agents, and choose how many replies the
 
 Groups are stored in `~/NateBot/data.db` (table `rooms`). The turn logic is in `src/main/rooms.ts`.
 
+### Career Board
+
+A ready-made group for your long-term career plan. In **New group chat**, **Career Board → Set up** creates four
+agents and a group that holds them:
+
+| Member | Lens |
+|---|---|
+| **Skeptic** | Attacks the premise: destination, route, weakest assumption, the strongest alternative |
+| **Recruiter** | Reads you as a future CV for the plan's target companies and city: would they interview and sponsor you? |
+| **Staff Engineer** | Technical substance: real depth or a tool tour, and skills AI can't already replicate |
+| **Auditor** | What your logs show against what you say: hours, gaps that haven't moved, deadlines at risk |
+
+They read (never change) the folders your other agents already read, or the board asks you to pick your plan folder.
+They're told to be brutally honest: verdict first, weakest point first, no praise, and not to agree with each
+other to be polite. Bring them a decision and each judges it against the plan (what it builds or costs, a verdict,
+and what evidence would change it), and they keep a short decision log in their `memory.md`. They run on Sonnet at
+low effort with up to 6 replies per message, so each message costs about four to six runs. The members are in
+`src/main/board.ts`; edit them like any other agent afterwards.
+
 ## Approvals
 
 Agents never send, delete, post or pay on their own. Instead they end a reply with a block like this:
