@@ -11,6 +11,7 @@ import { RoomView } from './components/RoomView'
 import { RoutinesView } from './components/RoutinesView'
 import { TodayView } from './components/TodayView'
 import { CommandPalette } from './components/CommandPalette'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { JobsView } from './components/JobsView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -30,6 +31,7 @@ export function App() {
   const accent = useStore((s) => s.settings?.accent ?? 'violet')
 
   const paletteOpen = useStore((s) => s.paletteOpen)
+  const selectedId = useStore((s) => s.selectedId)
 
   useEffect(() => {
     void useStore.getState().init()
@@ -60,11 +62,14 @@ export function App() {
     <div className="flex h-full">
       <Sidebar />
       <main className="flex min-w-0 flex-1">
-        {view === 'chat' && (room ? <RoomView room={room} /> : <ChatView />)}
-        {view === 'today' && <TodayView />}
-        {view === 'jobs' && <JobsView />}
-        {view === 'routines' && <RoutinesView />}
-        {view === 'settings' && <SettingsView />}
+        {/* A screen that fails to render leaves the sidebar working; switching chats or screens resets it. */}
+        <ErrorBoundary resetKey={`${view}:${selectedId ?? ''}`}>
+          {view === 'chat' && (room ? <RoomView room={room} /> : <ChatView />)}
+          {view === 'today' && <TodayView />}
+          {view === 'jobs' && <JobsView />}
+          {view === 'routines' && <RoutinesView />}
+          {view === 'settings' && <SettingsView />}
+        </ErrorBoundary>
       </main>
       {addOpen && <AddAgentModal />}
       {gmailOpen && <ConnectGmailModal />}
