@@ -652,27 +652,27 @@ export class Engine extends EventEmitter {
     persist()
     const runId = randomUUID()
     this.deps.db.startRun(runId, agentId, 'action')
-    const mcp = writeRunConfig(agent)
+    let mcp: ReturnType<typeof writeRunConfig> | null = null
     const state = new StreamState()
-    const disallowed = agent.disallowed_tools.filter((t) => t !== tool)
-    const args = [
-      '-p',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--model', MODEL_IDS[agent.model],
-      '--effort', 'low', // carrying out an approved action needs no deep thinking
-      '--append-system-prompt', systemPrompt(agent, agentNotes(agent), null, this.deps.user?.() ?? null),
-      '--no-session-persistence',
-      '--setting-sources', 'project,local',
-      '--strict-mcp-config', '--mcp-config', mcp.path,
-      '--permission-mode', 'default',
-      '--permission-prompts', 'none',
-      '--tools', '',
-      '--allowedTools', tool,
-      ...(disallowed.length ? ['--disallowedTools', disallowed.join(',')] : [])
-    ]
-
     try {
+      mcp = writeRunConfig(agent)
+      const disallowed = agent.disallowed_tools.filter((t) => t !== tool)
+      const args = [
+        '-p',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--model', MODEL_IDS[agent.model],
+        '--effort', 'low', // carrying out an approved action needs no deep thinking
+        '--append-system-prompt', systemPrompt(agent, agentNotes(agent), null, this.deps.user?.() ?? null),
+        '--no-session-persistence',
+        '--setting-sources', 'project,local',
+        '--strict-mcp-config', '--mcp-config', mcp.path,
+        '--permission-mode', 'default',
+        '--permission-prompts', 'none',
+        '--tools', '',
+        '--allowedTools', tool,
+        ...(disallowed.length ? ['--disallowedTools', disallowed.join(',')] : [])
+      ]
       const proc = spawnClaude({
         bin,
         args,
@@ -712,8 +712,12 @@ export class Engine extends EventEmitter {
         this.deps.db.finishRun(runId, false, reason, state.result?.tokens ?? null)
         fail(reason)
       }
+    } catch (e) {
+      // Never leave the card on "Working…".
+      this.deps.db.finishRun(runId, false, (e as Error).message)
+      fail(`Something went wrong: ${(e as Error).message}`)
     } finally {
-      mcp.cleanup()
+      mcp?.cleanup()
       this.deps.emitAgents()
     }
   }

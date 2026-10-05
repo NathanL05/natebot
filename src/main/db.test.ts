@@ -146,3 +146,15 @@ describe('pins', () => {
     expect(db.pinnedMessages('planner').map((m) => m.id)).toEqual(['a'])
   })
 })
+
+describe('repairInterrupted', () => {
+  it('fails an approved action left running by a crash, without touching the others', () => {
+    const db = new Db(':memory:')
+    const action = (id: string, status: 'pending' | 'executing' | 'done') => ({ id, type: 'send_email', summary: id, details: {}, status })
+    db.saveMessage({ id: 'm1', agentId: 'email', role: 'agent', text: 'Draft', createdAt: 1, actions: [action('a1', 'executing'), action('a2', 'pending'), action('a3', 'done')] })
+    db.repairInterrupted()
+    const actions = db.getMessage('m1')?.actions
+    expect(actions?.map((a) => a.status)).toEqual(['failed', 'pending', 'done'])
+    expect(actions?.[0]?.result).toMatch(/closed while this was running/)
+  })
+})

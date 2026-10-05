@@ -3,6 +3,9 @@
 // Access tokens are refreshed in memory only; the file is never rewritten.
 import { readFileSync } from 'node:fs'
 
+/** A Google call that hangs must not stall the trigger watcher or the Today screen for good. */
+const TIMEOUT_MS = 30_000
+
 interface TokenFile {
   token?: string
   expiry?: string
@@ -40,6 +43,7 @@ export class GoogleToken {
     const res = await fetch(f.token_uri || 'https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
       body: new URLSearchParams({ client_id: f.client_id, client_secret: f.client_secret, refresh_token: f.refresh_token, grant_type: 'refresh_token' })
     })
     if (res.status === 400 || res.status === 401) this.onExpired()
@@ -51,7 +55,7 @@ export class GoogleToken {
 
   /** GET a Google API URL as JSON. */
   async fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${await this.get()}` } })
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${await this.get()}` }, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (res.status === 401) this.access = null
     if (!res.ok) throw new Error(`Google returned ${res.status}`)
     return (await res.json()) as T

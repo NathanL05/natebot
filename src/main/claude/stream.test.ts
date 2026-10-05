@@ -20,6 +20,13 @@ describe('proposed actions', () => {
     })
   })
 
+  it('keeps a code fence inside an email body from ending the block early', () => {
+    const { text, actions, error } = extractActions(block('[{"summary":"Send the snippet","details":{"body":"Try:\\n```\\nnpm test\\n```"}}]'))
+    expect(error).toBeNull()
+    expect(text).toBe("Here's a draft.")
+    expect(actions[0]?.details).toEqual({ body: 'Try:\n```\nnpm test\n```' })
+  })
+
   it('accepts a single object instead of a list', () => {
     expect(extractActions(block('{"summary":"Archive it"}')).actions).toHaveLength(1)
   })

@@ -85,8 +85,8 @@ export class Backend implements NateBotApi {
   private emailWatcher: EmailWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected)
   private phone = new PhoneInbox((text) => this.fromPhone(text), log)
-  /** Agents answering a message from your phone: their reply always goes to the phone. */
-  private phoneWaiting = new Set<string>()
+  /** Agents answering messages from your phone (how many): those replies always go to the phone. */
+  private phoneWaiting = new Map<string, number>()
   private backupTimer: NodeJS.Timeout | undefined
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
@@ -300,8 +300,10 @@ export class Backend implements NateBotApi {
     return BrowserWindow.getAllWindows().some((w) => w.isFocused())
   }
 
-  /** chatId: an agent or a group chat. `buttons` adds macOS action buttons (index of the one pressed). */
-  /** chatId: an agent or a group chat. `urgent` rings even in quiet hours (reminders you set). */
+  /**
+   * chatId: an agent or a group chat. `buttons` adds macOS action buttons (index of the one pressed).
+   * `urgent` rings even in quiet hours (reminders you set).
+   */
   private notify(
     chatId: string,
     title: string,
@@ -349,8 +351,17 @@ export class Backend implements NateBotApi {
     }
     log(`phone: message for ${target.id}`)
     this.engine.system(target.id, 'Message from your phone')
-    this.phoneWaiting.add(target.id)
+    this.phoneWaiting.set(target.id, (this.phoneWaiting.get(target.id) ?? 0) + 1)
     void this.sendMessage(target.id, text)
+  }
+
+  /** Whether this chat reply answers a message from your phone (one reply per message sent). */
+  private fromPhoneReply(agentId: string): boolean {
+    const n = this.phoneWaiting.get(agentId) ?? 0
+    if (!n) return false
+    if (n > 1) this.phoneWaiting.set(agentId, n - 1)
+    else this.phoneWaiting.delete(agentId)
+    return true
   }
 
   /** When quiet hours are over, one notification sums up what was held. */
@@ -376,6 +387,7 @@ export class Backend implements NateBotApi {
     return fetch(`https://ntfy.sh/${encodeURIComponent(pushTopic)}`, {
       method: 'POST',
       headers: { Title: ascii, Tags: 'robot' },
+      signal: AbortSignal.timeout(15_000),
       body: pushDetails ? body.slice(0, 1000) : 'Open NateBot to see it.'
     })
       .then((r) => (r.ok ? { ok: true } : { ok: false, error: `ntfy returned ${r.status}` }))
@@ -443,7 +455,7 @@ export class Backend implements NateBotApi {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     void this.usage.refresh()
     // You asked from your phone: answer there, even if the Mac is in front or it's quiet hours.
-    if (r.source === 'chat' && this.phoneWaiting.delete(r.agentId) && !r.needsApproval) {
+    if (r.source === 'chat' && this.fromPhoneReply(r.agentId) && !r.needsApproval) {
       // The whole reply, not just its first line: on a phone this is the conversation.
       const text = (this.db.getMessage(r.messageId)?.text || r.summary).replace(/[*_`#>]/g, '').trim()
       this.notify(r.agentId, r.ok ? 'Replied' : 'Failed', text, undefined, true)

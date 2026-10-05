@@ -301,7 +301,7 @@ export class Db {
       .slice(-count)
   }
 
-  /** Messages left mid-stream by a crash or force-quit. */
+  /** Messages left mid-stream, and approved actions left mid-run, by a crash or force-quit. */
   repairInterrupted(): void {
     const rows = this.db.prepare(`SELECT * FROM messages WHERE data LIKE '%"streaming":true%'`).all() as unknown as MessageRow[]
     for (const row of rows) {
@@ -309,6 +309,16 @@ export class Db {
       m.streaming = false
       m.tools = m.tools?.map((t) => (t.status === 'running' ? { ...t, status: 'error' } : t))
       m.text = m.text ? `${m.text}\n\n_(interrupted)_` : '_(interrupted when NateBot closed)_'
+      this.saveMessage(m)
+    }
+    // It may or may not have gone through, so it's never retried automatically.
+    const executing = this.db.prepare(`SELECT * FROM messages WHERE data LIKE '%"status":"executing"%'`).all() as unknown as MessageRow[]
+    for (const row of executing) {
+      const m = toMessage(row)
+      if (!m.actions?.some((a) => a.status === 'executing')) continue
+      m.actions = m.actions.map((a) =>
+        a.status === 'executing' ? { ...a, status: 'failed', result: 'NateBot closed while this was running. Check whether it went through before asking again.' } : a
+      )
       this.saveMessage(m)
     }
     this.db.prepare(`UPDATE runs SET ended_at = started_at, ok = 0, summary = 'Interrupted' WHERE ended_at IS NULL`).run()
