@@ -10,11 +10,16 @@ export function parsePhoneMessage(raw: string): { agent: string | null; text: st
   return m ? { agent: (m[1] ?? '').toLowerCase(), text: (m[2] ?? '').trim() } : { agent: null, text: raw.trim() }
 }
 
+/** ntfy sends a keepalive about every 45s: this long with nothing means the connection died quietly. */
+export const IDLE_MS = 2 * 60_000
+
 export class PhoneInbox {
   private abort: AbortController | null = null
   private retry: NodeJS.Timeout | undefined
   private topic: string | null = null
   private lastId: string | null = null
+  /** When listening started (epoch seconds): until a message arrives, reconnects ask from here, so none sent in between are lost. */
+  private since = ''
   private backoff = 5_000
 
   constructor(
@@ -28,6 +33,7 @@ export class PhoneInbox {
     this.stop()
     this.topic = topic
     this.lastId = null
+    this.since = String(Math.floor(Date.now() / 1000))
     if (topic) void this.connect()
   }
 
@@ -38,13 +44,34 @@ export class PhoneInbox {
     clearTimeout(this.retry)
   }
 
+  /** Drops the connection and opens a new one (after the Mac wakes, the old one may be dead). */
+  reconnect(): void {
+    const topic = this.topic
+    if (!topic) return
+    this.abort?.abort()
+    clearTimeout(this.retry)
+    this.backoff = 5_000
+    void this.connect()
+  }
+
   private async connect(): Promise<void> {
     const topic = this.topic
     if (!topic) return
     const abort = new AbortController()
     this.abort = abort
     // Only messages from now on (or after the last one seen), never a backlog from before NateBot started.
-    const since = this.lastId ?? String(Math.floor(Date.now() / 1000))
+    const since = this.lastId ?? this.since
+    // A connection that dies without closing (sleep, network change) would otherwise wait forever.
+    let idle = false
+    let idleTimer: NodeJS.Timeout | undefined
+    const resetIdle = (): void => {
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        idle = true
+        abort.abort()
+      }, IDLE_MS)
+    }
+    resetIdle()
     try {
       const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}/json?since=${encodeURIComponent(since)}`, { signal: abort.signal })
       if (!res.ok || !res.body) throw new Error(`ntfy returned ${res.status}`)
@@ -55,6 +82,7 @@ export class PhoneInbox {
       for (;;) {
         const { value, done } = await reader.read()
         if (done) break
+        resetIdle()
         buf += decoder.decode(value, { stream: true })
         let nl: number
         while ((nl = buf.indexOf('\n')) !== -1) {
@@ -71,10 +99,12 @@ export class PhoneInbox {
         }
       }
     } catch (e) {
-      if (abort.signal.aborted) return
-      this.log(`phone inbox: ${(e as Error).message}`)
+      if (abort.signal.aborted && !idle) return
+      this.log(`phone inbox: ${idle ? 'no keepalive, reconnecting' : (e as Error).message}`)
+    } finally {
+      clearTimeout(idleTimer)
     }
-    if (this.topic !== topic || abort.signal.aborted) return
+    if (this.topic !== topic || this.abort !== abort || (abort.signal.aborted && !idle)) return
     // The stream ends now and then (or the network drops): reconnect, backing off up to 5 minutes.
     this.retry = setTimeout(() => void this.connect(), this.backoff)
     this.backoff = Math.min(this.backoff * 2, 5 * 60_000)

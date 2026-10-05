@@ -102,6 +102,8 @@ export class Backend implements NateBotApi {
     this.wakeTimer = setTimeout(() => {
       this.catchUpRoutines()
       this.fireReminders()
+      // The phone inbox's connection may have died while the Mac slept.
+      this.phone.reconnect()
     }, WAKE_DELAY_MS)
   }
   /** Called whenever the agent list changes (tray menu). */
