@@ -23,6 +23,7 @@ export function RoomModal() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const hasBoard = useStore((s) => s.rooms.some((r) => r.id === 'room:career-board'))
   const close = (): void => useStore.getState().setRoomEditor(null)
   const editing = target !== 'new' && !!existing
 
@@ -52,6 +53,20 @@ export function RoomModal() {
     }
   }
 
+  const createBoard = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      const id = await api.createCareerBoard()
+      if (!id) return
+      close()
+      useStore.getState().select(id)
+    } catch (e) {
+      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const remove = async (): Promise<void> => {
     if (!existing) return
     await api.deleteRoom(existing.id)
@@ -67,6 +82,20 @@ export function RoomModal() {
         </IconButton>
       </div>
       <div className="space-y-5 overflow-y-auto px-5 py-5">
+        {!editing && !hasBoard && (
+          <div className="flex items-center gap-4 rounded-2xl border border-dashed border-line-strong p-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-[14px] font-medium">Career Board</div>
+              <div className="text-[12px] text-muted">
+                Skeptic, Recruiter, Staff Engineer and Auditor read your career plan (read-only) and are brutally honest about it
+                and the decisions you bring them. Uses the folders your agents already read, or asks for one.
+              </div>
+            </div>
+            <Button disabled={saving} onClick={() => void createBoard()}>
+              Set up
+            </Button>
+          </div>
+        )}
         <Field label="Name">
           <input
             value={draft.name}

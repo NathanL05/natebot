@@ -32,7 +32,8 @@ import type {
 } from '@shared/types'
 import { isRoomId } from '@shared/types'
 import { describeCron } from '@shared/schedule'
-import { AgentStore } from './agents'
+import { AgentStore, slugify } from './agents'
+import { BOARD_MEMBERS, BOARD_ROOM, BOARD_ROOM_ID } from './board'
 import { avatarVersion, removeAvatar, saveAvatar } from './avatars'
 import { Db } from './db'
 import { Engine, ensureWorkspace, type RunFinished } from './engine'
@@ -858,6 +859,23 @@ export class Backend implements NateBotApi {
     if (existing) return existing.id
     const agent = await this.createAgent({ ...JOB_HUNTER, read_folders: this.sharedFolders() })
     return agent.id
+  }
+
+  async createCareerBoard(): Promise<string | null> {
+    if (this.rooms.get(BOARD_ROOM_ID)) return BOARD_ROOM_ID
+    // The board reads the folders other agents already share; with none yet, ask for the plan folder.
+    let folders = this.sharedFolders()
+    if (!folders.length) {
+      const picked = await this.pickFolder()
+      if (!picked) return null
+      folders = [picked]
+    }
+    const memberIds: string[] = []
+    for (const draft of BOARD_MEMBERS) {
+      const existing = this.store.get(slugify(draft.name))
+      memberIds.push(existing ? existing.id : (await this.createAgent({ ...draft, read_folders: folders })).id)
+    }
+    return this.rooms.create({ ...BOARD_ROOM, memberIds }, BOARD_ROOM_ID).id
   }
 
   async searchMessages(query: string): Promise<MessageHit[]> {
