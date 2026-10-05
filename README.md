@@ -256,7 +256,7 @@ and you're back in the app you were using. The reply arrives as a
   the Shortcuts app: turn on *Show in Share Sheet* (receiving Text, URLs and Safari web pages), add **URL Encode**
   (Shortcut Input), then **Open URLs** with `natebot://capture?text=` followed by the encoded text. Add `&agent=job-hunter`
   to pick an agent.
-- **Reply tools:** hover over a reply to **Copy** it, **Listen** to it (read aloud with your Mac's voice), **Save…** it as a
+- **Reply tools:** hover over a reply to **Copy** it, **Listen** to it (read aloud in the voice and speed set in **Settings → Voice**, which skips macOS's novelty voices and prefers downloaded Premium voices), **Save…** it as a
   Markdown file (a cover letter, a plan), add it to Apple **Notes** (once connected), or **Pin** it. Pinned replies are listed under
   the pin button in the chat header; click one to jump to it.
 - **Search:** the search box at the top of the sidebar filters chats by name and also searches the text of every

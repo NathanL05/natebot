@@ -9,6 +9,7 @@ import { ReminderCard } from './ReminderCard'
 import { AlertIcon, CheckIcon, CopyIcon, DownloadIcon, NoteIcon, PaperclipIcon, PinIcon, SpeakerIcon } from './icons'
 import { Markdown } from './Markdown'
 import { api, useStore } from '../lib/store'
+import { speak, stopSpeaking } from '../lib/voice'
 import { ToolLines } from './ToolLines'
 
 const GAP = 30 * 60_000
@@ -53,15 +54,6 @@ function Speaker({ agent, showName, children }: { agent: AgentSummary | undefine
   )
 }
 
-/** Plain text for reading aloud: no Markdown symbols, links or code fences. */
-function speakable(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[*_`#>|]/g, '')
-    .replace(/https?:\/\/\S+/g, 'link')
-}
-
 /** Copy, Listen, Save, Notes and Pin, shown under an agent reply on hover (Pin stays visible once pinned). */
 function MessageTools({ msg }: { msg: ChatMessage }) {
   const [copied, setCopied] = useState(false)
@@ -71,17 +63,10 @@ function MessageTools({ msg }: { msg: ChatMessage }) {
   const title = (msg.text.split('\n').find((l) => l.trim()) ?? 'Reply').replace(/[*_`#>]/g, '').trim().slice(0, 60)
 
   const listen = (): void => {
-    if (speaking) {
-      speechSynthesis.cancel()
-      setSpeaking(false)
-      return
-    }
-    speechSynthesis.cancel()
-    const u = new SpeechSynthesisUtterance(speakable(msg.text))
-    u.onend = () => setSpeaking(false)
-    u.onerror = () => setSpeaking(false)
-    speechSynthesis.speak(u)
+    if (speaking) return stopSpeaking()
+    const { voice = null, voiceRate = 1 } = useStore.getState().settings ?? {}
     setSpeaking(true)
+    void speak(msg.text, { voice, rate: voiceRate, onEnd: () => setSpeaking(false) })
   }
   const flash = (text: string): void => {
     setNote(text)

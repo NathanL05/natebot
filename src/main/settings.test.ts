@@ -18,7 +18,9 @@ const defaults: AppSettings = {
   pushTopic: null,
   pushDetails: false,
   phoneInbox: false,
-  quietHours: null
+  quietHours: null,
+  voice: null,
+  voiceRate: 1
 }
 
 describe('settings sanitising', () => {
@@ -39,6 +41,12 @@ describe('settings sanitising', () => {
       launchAtLogin: true,
       userName: 'Nate'
     })
+  })
+
+  it('keeps a chosen voice and a known speed only', () => {
+    expect(sanitize({ voice: ' Daniel ', voiceRate: 1.15 }, defaults)).toMatchObject({ voice: 'Daniel', voiceRate: 1.15 })
+    expect(sanitize({ voice: '', voiceRate: 7 }, { ...defaults, voice: 'Moira' })).toMatchObject({ voice: 'Moira', voiceRate: 1 })
+    expect(sanitize({ voice: null }, { ...defaults, voice: 'Moira' }).voice).toBeNull()
   })
 
   it('ignores invalid values from a hand-edited file', () => {
