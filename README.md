@@ -92,10 +92,14 @@ pick one of 18 in **Settings → Appearance → Accent colour** (defined in `src
 
 1. Build and install the new app (`npm run dist`, then replace `/Applications/NateBot.app`).
 2. Unpin the old Dock icon (right-click → Options → uncheck *Keep in Dock*).
-3. Refresh the icon caches:
+3. Refresh the icon caches. Notification Center keeps its own copy of the icon in memory, so restart it too, or
+   notifications keep showing the old one:
    ```bash
-   touch /Applications/NateBot.app && killall Dock && killall Finder
+   touch /Applications/NateBot.app && killall Dock Finder NotificationCenter usernoted
    ```
+   Old copies in the Trash or `dist/` stay registered under the same bundle id. If an old icon still shows, unregister
+   them (`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u
+   <path to the old NateBot.app>`) and empty the Trash.
 4. Open NateBot and pin it again (right-click its Dock icon → Options → *Keep in Dock*).
 
 If the old icon still shows, clear the system icon cache (asks for your password) and restart the Mac:
