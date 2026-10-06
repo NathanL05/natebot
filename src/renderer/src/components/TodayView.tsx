@@ -8,6 +8,7 @@ import { clockTime, dueTime, listTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
+import { InboxCard } from './InboxCard'
 import { Markdown } from './Markdown'
 import { CheckIcon } from './icons'
 import { Button, ConfirmDialog } from './ui'
@@ -82,6 +83,7 @@ export function TodayView() {
 
           <BriefCard />
           {agenda && <YourDay agenda={agenda} onRefresh={() => void api.todayAgenda(true).then(setAgenda)} />}
+          <InboxCard />
 
           <section className="mb-8">
             <div className="mb-2 flex items-center gap-3">

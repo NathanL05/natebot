@@ -69,4 +69,17 @@ export class GoogleToken {
     if (!res.ok) throw new Error(`Google returned ${res.status}`)
     return (await res.json()) as T
   }
+
+  /** POST JSON to a Google API URL (only for changes the user clicked themselves). */
+  async postJson<T>(url: string, body: unknown): Promise<T> {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await this.get()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    })
+    if (res.status === 401) this.access = null
+    if (!res.ok) throw new Error(`Google returned ${res.status}`)
+    return (await res.json()) as T
+  }
 }

@@ -293,6 +293,36 @@ export interface Agenda {
   errors: string[]
 }
 
+/** An email conversation in Today's Inbox, read straight from Gmail (no Claude run). */
+export interface InboxMail {
+  /** The conversation's latest message. */
+  id: string
+  threadId: string
+  /** The sender's name, or their address when there's no name. */
+  from: string
+  fromAddress: string
+  subject: string
+  snippet: string
+  at: number
+  unread: boolean
+}
+
+export interface Inbox {
+  /** Gmail is connected and signed in. */
+  connected: boolean
+  /** The Gmail address (for "Open in Gmail" links). */
+  email: string | null
+  /** Recent inbox conversations (no promotions or social), newest first. */
+  mails: InboxMail[]
+  error: string | null
+}
+
+/** A link that opens a conversation in Gmail, signed in as the right account. */
+export function gmailLink(email: string | null, threadId: string): string {
+  const account = email && /^[^\s/#?%]+@[^\s/#?%]+$/.test(email) ? email : '0'
+  return `https://mail.google.com/mail/u/${account}/#inbox/${encodeURIComponent(threadId)}`
+}
+
 export interface McpServerInfo {
   name: string
   configured: boolean

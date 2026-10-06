@@ -2,12 +2,10 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { AgentSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
+import { drafts } from '../lib/drafts'
 import { basename } from '../lib/format'
 import { Avatar } from './Avatar'
 import { ArrowUpIcon, PlusIcon, ReplyIcon, StopIcon, XIcon } from './icons'
-
-// Unsent text survives switching between chats.
-const drafts = new Map<string, string>()
 
 /** The message box for an agent's chat or a group chat (chatId is either). */
 export function Composer({
