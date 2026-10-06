@@ -145,8 +145,8 @@ export function AgentForm({
         )}
         {unconfigured.length > 0 && (
           <div className="mt-2 rounded-lg bg-warn/10 px-3 py-2 text-[12px] text-warn">
-            {unconfigured.includes('gmail') ? 'Connect Gmail' : `Set up ${unconfigured.join(', ')}`} to use this. See “Connecting Gmail” in the
-            README. Until then the agent runs without it.
+            {unconfigured.includes('gmail') ? 'Connect Gmail' : `Set up ${unconfigured.join(', ')}`} to use this. See the Guide or
+            docs/connections.md. Until then the agent runs without it.
           </div>
         )}
       </Field>

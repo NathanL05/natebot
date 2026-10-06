@@ -30,7 +30,7 @@ const TEMPLATE = {
   mcpServers: {},
   _help:
     'Add MCP servers under "mcpServers" using the same format as Claude Code (command/args/env, or type/url). ' +
-    'NateBot extras: "description", "agent_notes", "require_approval" (tool names only usable via Approve). See the README.'
+    'NateBot extras: "description", "agent_notes", "require_approval" (tool names only usable via Approve). See docs/connections.md.'
 }
 
 export function ensureMcpFile(): void {

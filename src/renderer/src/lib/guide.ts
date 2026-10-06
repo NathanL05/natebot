@@ -580,7 +580,7 @@ export const GUIDE: GuideCategory[] = [
         title: 'Connect Gmail',
         summary: 'Let agents read, search and draft email. Sending always needs your approval.',
         steps: [
-          'Install uv (`brew install uv`) and make a Google OAuth client (see the README).',
+          'Install uv (`brew install uv`) and make a Google OAuth client (see docs/connections.md).',
           'Open **Settings → Connected tools → Connect Gmail…**.',
           'Enter your address, client ID and secret, then click **Connect**.',
           'Sign in to Google in the browser and allow access.'
