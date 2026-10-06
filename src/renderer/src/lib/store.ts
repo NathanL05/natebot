@@ -49,6 +49,10 @@ interface State {
   select(chatId: string): void
   /** Opens a chat at one message. */
   openMessage(chatId: string, messageId: string): void
+  /** Clears a chat's messages (pinned ones stay). Rejects while the chat is working. */
+  clearChat(chatId: string): Promise<void>
+  /** Chat whose "Clear chat?" confirmation is open. */
+  clearingId: string | null
   setView(view: View): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
@@ -119,6 +123,7 @@ export const useStore = create<State>((set, get) => {
     marketplaceOpen: false,
     roomEditor: null,
     renamingFolderId: null,
+    clearingId: null,
 
     async init() {
       api.on('agents', (agents) => {
@@ -187,6 +192,13 @@ export const useStore = create<State>((set, get) => {
     openMessage(chatId, messageId) {
       get().select(chatId)
       set({ focusMessageId: messageId })
+    },
+
+    async clearChat(chatId) {
+      await api.clearMessages(chatId)
+      // Reload rather than empty it: pinned messages are kept.
+      const history = await api.listMessages(chatId)
+      set({ messages: { ...get().messages, [chatId]: history } })
     },
 
     setView: (view) => set({ view, drawerOpen: false }),

@@ -32,6 +32,8 @@ export interface NateBotApi {
   sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
+  /** Deletes a chat's messages (pinned ones stay) and starts a fresh conversation. Refused while it's working. */
+  clearMessages(chatId: string): Promise<void>
   /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
   pendingMessages(): Promise<ChatMessage[]>
   /** Today's events and tasks from connected calendars and task lists (no Claude run). */
@@ -142,6 +144,7 @@ export const API_METHODS = [
   'sendMessage',
   'stop',
   'markRead',
+  'clearMessages',
   'searchMessages',
   'todayAgenda',
   'saveText',

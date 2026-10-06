@@ -5,7 +5,7 @@ import { api, useStore, type View } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { GroupAvatar } from './GroupAvatar'
-import { ArrowUpIcon, CheckIcon, ClockIcon, FolderPlusIcon, GearIcon, PlusIcon, UsersIcon } from './icons'
+import { ArrowUpIcon, CheckIcon, ClockIcon, EraserIcon, FolderPlusIcon, GearIcon, PlusIcon, UsersIcon } from './icons'
 
 interface Item {
   id: string
@@ -18,6 +18,8 @@ interface Item {
 export function CommandPalette() {
   const agents = useStore((s) => s.agents)
   const rooms = useStore((s) => s.rooms)
+  // The chat on screen, which "Clear this chat" applies to.
+  const openChat = useStore((s) => (s.view === 'chat' ? [...s.agents, ...s.rooms].find((c) => c.id === s.selectedId) : undefined))
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const list = useRef<HTMLDivElement>(null)
@@ -48,6 +50,15 @@ export function CommandPalette() {
       { id: 'a:agent', label: 'New agent…', hint: 'Action', icon: <PlusIcon size={16} />, run: () => useStore.getState().setAddOpen(true) },
       { id: 'a:room', label: 'New group chat…', hint: 'Action', icon: <UsersIcon size={16} />, run: () => useStore.getState().setRoomEditor('new') }
     ]
+    if (openChat) {
+      screens.push({
+        id: 'a:clear',
+        label: 'memberIds' in openChat ? `Clear group chat "${openChat.name}"…` : `Clear chat with ${openChat.name}…`,
+        hint: 'Action',
+        icon: <EraserIcon size={16} />,
+        run: () => useStore.setState({ clearingId: openChat.id })
+      })
+    }
     const prompts: Item[] = agents.flatMap((a) =>
       a.quick_prompts.map((p, i) => ({
         id: `p:${a.id}:${i}`,
@@ -61,7 +72,7 @@ export function CommandPalette() {
       }))
     )
     return [...chats, ...screens, ...prompts]
-  }, [agents, rooms])
+  }, [agents, rooms, openChat])
 
   const q = query.trim().toLowerCase()
   const shown = q ? items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(q)) : items

@@ -6,6 +6,7 @@ import { AgentDrawer } from './AgentDrawer'
 import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { AvatarEditor } from './AvatarEditor'
+import { ClearChatButton } from './ClearChatButton'
 import { Composer } from './Composer'
 import { AlertIcon, SlidersIcon } from './icons'
 import { MessageList } from './MessageList'
@@ -81,6 +82,7 @@ export function ChatView() {
           </div>
         </div>
         <PinnedButton chatId={agent.id} />
+        <ClearChatButton chatId={agent.id} name={agent.name} running={agent.status === 'running' || agent.queued > 0} />
         <IconButton label="Agent settings" onClick={() => useStore.getState().setDrawerOpen(true)}>
           <SlidersIcon size={17} />
         </IconButton>

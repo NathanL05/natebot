@@ -158,3 +158,29 @@ describe('repairInterrupted', () => {
     expect(actions?.[0]?.result).toMatch(/closed while this was running/)
   })
 })
+
+describe('clearMessages', () => {
+  it("deletes one chat's messages except pinned ones, and its unread count", () => {
+    const db = new Db(':memory:')
+    db.saveMessage({ id: 'a', agentId: 'planner', role: 'user', text: 'Hi', createdAt: 1 })
+    db.saveMessage({ id: 'b', agentId: 'planner', role: 'agent', text: 'Plan', createdAt: 2, pinned: true })
+    db.saveMessage({ id: 'c', agentId: 'planner', role: 'agent', text: 'More', createdAt: 3, tools: [{ id: 't', name: 'Read', input: '"pinned":true', status: 'done' }] as never })
+    db.saveMessage({ id: 'd', agentId: 'email', role: 'agent', text: 'Mail', createdAt: 4 })
+    db.bumpUnread('planner')
+
+    expect(db.clearMessages('planner')).toBe(2)
+    expect(db.listMessages('planner').map((m) => m.id)).toEqual(['b'])
+    expect(db.listMessages('email').map((m) => m.id)).toEqual(['d'])
+    expect(db.unread('planner')).toBe(0)
+  })
+
+  it('knows when an approved action is still being carried out', () => {
+    const db = new Db(':memory:')
+    const action = (status: string) => ({ id: 'a', type: 'send_email', summary: 'Reply', details: {}, status })
+    db.saveMessage({ id: 'm1', agentId: 'email', role: 'agent', text: 'x', createdAt: 1, actions: [action('pending') as never] })
+    expect(db.hasExecutingAction('email')).toBe(false)
+    db.saveMessage({ id: 'm2', agentId: 'email', role: 'agent', text: 'x', createdAt: 2, actions: [action('executing') as never] })
+    expect(db.hasExecutingAction('email')).toBe(true)
+    expect(db.hasExecutingAction('planner')).toBe(false)
+  })
+})

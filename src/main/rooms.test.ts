@@ -41,6 +41,11 @@ class FakeDb {
   listMessages(chatId: string, limit = 500): ChatMessage[] {
     return this.messages.filter((m) => m.agentId === chatId).slice(-limit)
   }
+  clearMessages(chatId: string): number {
+    const before = this.messages.length
+    this.messages = this.messages.filter((m) => m.agentId !== chatId || m.pinned)
+    return before - this.messages.length
+  }
   lastMessage(chatId: string): ChatMessage | null {
     return this.listMessages(chatId).filter((m) => m.text).at(-1) ?? null
   }
@@ -174,6 +179,29 @@ describe('creating and editing group chats', () => {
     const room = rooms.create({ name: 'Team', memberIds: ['a', 'b', 'c'], maxTurns: 8 })
     rooms.removeMember('b')
     expect(rooms.get(room.id)?.memberIds).toEqual(['a', 'c'])
+  })
+})
+
+describe('clearing', () => {
+  it('deletes the conversation except pins, and gives everyone a fresh session', async () => {
+    const { rooms, db, say } = setup()
+    const room = rooms.create({ name: 'Team', memberIds: ['a', 'b'], maxTurns: 8 })
+    await say(room.id, 'Hello')
+    db.saveMessage({ id: 'keep', agentId: room.id, role: 'agent', speakerId: 'a', text: 'Plan', createdAt: Date.now(), pinned: true })
+    expect(Object.keys(db.seats(room.id))).toEqual(['a', 'b'])
+
+    rooms.clear(room.id)
+    expect(db.listMessages(room.id).map((m) => m.id)).toEqual(['keep'])
+    expect(db.seats(room.id)).toEqual({})
+  })
+
+  it('refuses while the group is talking', async () => {
+    const { rooms, db, say } = setup()
+    const room = rooms.create({ name: 'Team', memberIds: ['a', 'b'], maxTurns: 8 })
+    const done = say(room.id, 'Hello')
+    expect(() => rooms.clear(room.id)).toThrow(/still talking/)
+    await done
+    expect(db.listMessages(room.id).length).toBeGreaterThan(0)
   })
 })
 

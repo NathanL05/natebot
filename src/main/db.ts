@@ -278,6 +278,23 @@ export class Db {
     return rows.map(toMessage).filter((m) => m.pinned)
   }
 
+  /** Deletes a chat's messages except pinned ones. Returns how many were removed. */
+  clearMessages(chatId: string): number {
+    const res = this.db
+      .prepare(`DELETE FROM messages WHERE agent_id = ? AND COALESCE(json_extract(data, '$.pinned'), 0) != 1`)
+      .run(chatId)
+    this.clearUnread(chatId)
+    return Number(res.changes)
+  }
+
+  /** Whether an approved action in this chat is being carried out right now. */
+  hasExecutingAction(chatId: string): boolean {
+    const rows = this.db
+      .prepare(`SELECT * FROM messages WHERE agent_id = ? AND data LIKE '%"status":"executing"%'`)
+      .all(chatId) as unknown as MessageRow[]
+    return rows.map(toMessage).some((m) => m.actions?.some((a) => a.status === 'executing'))
+  }
+
   /** Agent messages with a proposed action or handoff still waiting for the user, newest first. */
   pendingMessages(): ChatMessage[] {
     const rows = this.db
