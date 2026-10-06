@@ -184,6 +184,73 @@ select:focus-visible {
   animation: nb-pop 0.14s ease-out;
 }
 
+/* Sidebar menu. The button's four tiles fold into a × of dots, and the tray of tiles above it
+   unfolds out of the button: height via grid rows, then each tile rises in, nearest the button first. */
+.launcher-icon {
+  transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.launcher-icon rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.5, 1), rx 0.32s ease;
+}
+.launcher-icon[data-open='true'] {
+  transform: rotate(45deg);
+}
+.launcher-icon[data-open='true'] rect { rx: 3.25px; }
+.launcher-icon[data-open='true'] rect:nth-child(1) { transform: translate(2.2px, 2.2px) scale(0.55); }
+.launcher-icon[data-open='true'] rect:nth-child(2) { transform: translate(-2.2px, 2.2px) scale(0.55); }
+.launcher-icon[data-open='true'] rect:nth-child(3) { transform: translate(2.2px, -2.2px) scale(0.55); }
+.launcher-icon[data-open='true'] rect:nth-child(4) { transform: translate(-2.2px, -2.2px) scale(0.55); }
+
+.launcher {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.launcher[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.launcher-tile {
+  opacity: 0;
+  transform: translateY(10px) scale(0.92);
+  transform-origin: bottom right;
+  transition: opacity 0.16s ease, transform 0.2s ease, background-color 0.15s ease;
+}
+.launcher[data-open='true'] .launcher-tile {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.22s ease, transform 0.34s cubic-bezier(0.3, 1.35, 0.5, 1), background-color 0.15s ease;
+  transition-delay: calc(var(--i) * 40ms), calc(var(--i) * 40ms), 0s;
+}
+
+@keyframes nb-rise {
+  from { transform: translateY(6px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.rise {
+  animation: nb-rise 0.22s ease-out;
+}
+/* Guide steps rise in one after another. */
+.rise-step {
+  animation: nb-rise 0.3s ease-out both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launcher,
+  .launcher-tile,
+  .launcher-icon,
+  .launcher-icon rect {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+  .rise,
+  .rise-step {
+    animation: none;
+  }
+}
+
 /* Markdown inside chat bubbles. */
 .md {
   line-height: 1.45;

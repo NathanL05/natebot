@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { promptLabel } from '@shared/types'
 import { api, useStore, type View } from '../lib/store'
+import { searchGuide } from '../lib/guide'
 import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
 import { GroupAvatar } from './GroupAvatar'
-import { ArrowUpIcon, CheckIcon, ClockIcon, EraserIcon, FolderPlusIcon, GearIcon, PlusIcon, UsersIcon } from './icons'
+import { ArrowUpIcon, BookIcon, BriefcaseIcon, CheckIcon, ClockIcon, EraserIcon, GearIcon, GridIcon, PlusIcon, UsersIcon } from './icons'
 
 interface Item {
   id: string
@@ -45,9 +46,11 @@ export function CommandPalette() {
       }))
     const screens: Item[] = [
       { id: 'v:today', label: 'Today', hint: 'Screen', icon: <CheckIcon size={16} />, run: view('today') },
-      { id: 'v:jobs', label: 'Jobs', hint: 'Screen', icon: <FolderPlusIcon size={16} />, run: view('jobs') },
+      { id: 'v:jobs', label: 'Jobs', hint: 'Screen', icon: <BriefcaseIcon size={16} />, run: view('jobs') },
       { id: 'v:routines', label: 'Routines & reminders', hint: 'Screen', icon: <ClockIcon size={16} />, run: view('routines') },
       { id: 'v:settings', label: 'Settings', hint: 'Screen', icon: <GearIcon size={16} />, run: view('settings') },
+      { id: 'v:guide', label: 'Guide', hint: 'Screen', icon: <BookIcon size={16} />, run: view('guide') },
+      { id: 'v:marketplace', label: 'Marketplace', hint: 'Skills', icon: <GridIcon size={16} />, run: () => useStore.getState().setMarketplaceOpen(true) },
       { id: 'a:agent', label: 'New agent…', hint: 'Action', icon: <PlusIcon size={16} />, run: () => useStore.getState().setAddOpen(true) },
       { id: 'a:room', label: 'New group chat…', hint: 'Action', icon: <UsersIcon size={16} />, run: () => useStore.getState().setRoomEditor('new') }
     ]
@@ -76,7 +79,18 @@ export function CommandPalette() {
   }, [agents, rooms, openChat])
 
   const q = query.trim().toLowerCase()
-  const shown = q ? items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(q)) : items
+  // While typing, how-to entries from the Guide follow the chats and screens that match.
+  const howTo = useMemo<Item[]>(
+    () =>
+      q
+        ? searchGuide(q)
+            .flatMap((c) => c.features)
+            .slice(0, 6)
+            .map((f) => ({ id: `g:${f.id}`, label: f.title, hint: 'How to', icon: <BookIcon size={16} />, run: () => useStore.getState().openGuide(f.id) }))
+        : [],
+    [q]
+  )
+  const shown = q ? [...items.filter((i) => `${i.label} ${i.hint}`.toLowerCase().includes(q)), ...howTo] : items
   const pick = (item: Item | undefined): void => {
     if (!item) return
     close()
@@ -113,7 +127,7 @@ export function CommandPalette() {
               pick(shown[index])
             }
           }}
-          placeholder="Go to a chat or screen, or send a quick prompt…"
+          placeholder="Go to a chat or screen, send a quick prompt, or find how to do something…"
           className="w-full border-b border-line bg-transparent px-4 py-3.5 text-[15px] text-fg outline-none placeholder:text-muted"
         />
         <div ref={list} className="max-h-[50vh] overflow-y-auto p-1.5">

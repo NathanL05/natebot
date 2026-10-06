@@ -1,21 +1,56 @@
-import { useStore } from '../lib/store'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useStore, type View } from '../lib/store'
 import { initials } from '../lib/format'
 import { userPicture } from '../lib/avatars'
 import { AvatarEditor } from './AvatarEditor'
 import { ChatList, newFolder } from './ChatList'
 import { UsageMenu } from './UsageMenu'
-import { CheckIcon, ClockIcon, FolderPlusIcon, GearIcon, GridIcon, PlusIcon, SearchIcon, UsersIcon } from './icons'
+import {
+  BookIcon,
+  BriefcaseIcon,
+  CheckIcon,
+  ClockIcon,
+  FolderPlusIcon,
+  GearIcon,
+  GridIcon,
+  LauncherIcon,
+  PlusIcon,
+  SearchIcon,
+  UsersIcon
+} from './icons'
 import { IconButton } from './ui'
 
 export function Sidebar() {
   const search = useStore((s) => s.search)
   const pendingTotal = useStore((s) => s.agents.reduce((n, x) => n + x.pending, 0))
   const view = useStore((s) => s.view)
+  const selectedId = useStore((s) => s.selectedId)
   const settings = useStore((s) => s.settings)
   const userAvatarVersion = useStore((s) => s.userAvatarVersion)
   const { setSearch, setAddOpen, setView, setRoomEditor } = useStore.getState()
 
   const userName = settings?.userName ?? ''
+
+  // The menu (Today, Jobs, Marketplace, Guide) folds away like a hamburger menu: it closes once you
+  // go somewhere, click elsewhere or press Esc.
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => setMenuOpen(false), [view, selectedId])
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e: MouseEvent): void => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menuOpen])
 
   return (
     <aside className="flex w-[300px] shrink-0 flex-col border-r border-line bg-sidebar">
@@ -47,82 +82,121 @@ export function Sidebar() {
 
       <ChatList />
 
-      {/* Marketplace and profile share the agent rows' columns: a 44px leading slot
-          (centred on the agent avatars) and the label where agent names start. */}
-      <div className="px-2">
-        <button
-          type="button"
-          onClick={() => useStore.getState().setMarketplaceOpen(true)}
-          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover"
-        >
-          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
-            <GridIcon size={19} />
-          </span>
-          Marketplace
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('today')}
-          className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover ${view === 'today' ? 'bg-selected' : ''}`}
-        >
-          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
-            <CheckIcon size={19} />
-          </span>
-          Today
-          {pendingTotal > 0 && (
-            <span className="ml-auto rounded-full bg-warn/20 px-2 py-0.5 text-[11px] font-semibold text-warn" title="Waiting for your OK">
-              {pendingTotal}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('jobs')}
-          className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-1.5 text-left text-[14px] font-medium transition hover:bg-hover ${view === 'jobs' ? 'bg-selected' : ''}`}
-        >
-          <span className="flex h-8 w-11 shrink-0 items-center justify-center text-muted">
-            <FolderPlusIcon size={19} />
-          </span>
-          Jobs
-        </button>
-      </div>
+      <div ref={menuRef}>
+        <SidebarMenu open={menuOpen} view={view} pending={pendingTotal} onPick={() => setMenuOpen(false)} />
 
-      <div className="flex items-center gap-3 px-2 pt-1 pb-2.5 pl-4.5">
-        <div className="flex h-8 w-11 shrink-0 justify-center">
-          <AvatarEditor
-            target="user"
-            hasPicture={!!userAvatarVersion}
-            onChanged={(v) => useStore.setState({ userAvatarVersion: v })}
-            label="Change your picture"
-            placement="above"
+        {/* The profile row shares the agent rows' columns: a 44px leading slot (centred on the agent
+            avatars) and the name where agent names start. */}
+        <div className="flex items-center gap-1 px-2 pt-1 pb-2.5 pl-4.5">
+          <div className="mr-2 flex h-8 w-11 shrink-0 justify-center">
+            <AvatarEditor
+              target="user"
+              hasPicture={!!userAvatarVersion}
+              onChanged={(v) => useStore.setState({ userAvatarVersion: v })}
+              label="Change your picture"
+              placement="above"
+            >
+              {userPicture(userAvatarVersion) ? (
+                <img src={userPicture(userAvatarVersion) ?? ''} alt="" className="h-8 w-8 rounded-full object-cover shadow-[0_2px_5px_rgb(0_0_0/0.22)]" draggable={false} />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold shadow-[0_1px_3px_rgb(0_0_0/0.15)]">
+                  {initials(userName)}
+                </div>
+              )}
+            </AvatarEditor>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[14px] font-medium">{userName}</div>
+          </div>
+          <IconButton
+            label={menuOpen ? 'Hide menu' : `Today, Jobs, Marketplace, Guide${pendingTotal > 0 ? ` (${pendingTotal} waiting for your OK)` : ''}`}
+            aria-expanded={menuOpen}
+            aria-controls="sidebar-menu"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`relative ${menuOpen ? 'bg-selected text-fg' : ''}`}
           >
-            {userPicture(userAvatarVersion) ? (
-              <img src={userPicture(userAvatarVersion) ?? ''} alt="" className="h-8 w-8 rounded-full object-cover shadow-[0_2px_5px_rgb(0_0_0/0.22)]" draggable={false} />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-elev-2 text-[12px] font-semibold shadow-[0_1px_3px_rgb(0_0_0/0.15)]">
-                {initials(userName)}
-              </div>
+            <LauncherIcon size={17} open={menuOpen} />
+            {!menuOpen && pendingTotal > 0 && (
+              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-warn ring-2 ring-sidebar" aria-hidden="true" />
             )}
-          </AvatarEditor>
+          </IconButton>
+          <IconButton
+            label="Routines (⇧⌘R)"
+            onClick={() => setView('routines')}
+            className={view === 'routines' ? 'bg-selected text-fg' : ''}
+          >
+            <ClockIcon size={17} />
+          </IconButton>
+          <IconButton
+            label="Settings (⌘,)"
+            onClick={() => setView('settings')}
+            className={view === 'settings' ? 'bg-selected text-fg' : ''}
+          >
+            <GearIcon size={17} />
+          </IconButton>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[14px] font-medium">{userName}</div>
-        </div>
-        <IconButton
-          label="Routines (⇧⌘R)"
-          onClick={() => setView('routines')}
-          className={view === 'routines' ? 'bg-selected text-fg' : ''}
-        >
-          <ClockIcon size={17} />
-        </IconButton>
-        <IconButton
-          label="Settings (⌘,)"
-          onClick={() => setView('settings')}
-          className={view === 'settings' ? 'bg-selected text-fg' : ''}
-        >
-          <GearIcon size={17} />
-        </IconButton>
       </div>
     </aside>
+  )
+}
+
+interface Tile {
+  label: string
+  icon: ReactNode
+  /** The screen this tile opens, which marks it as current. */
+  view?: View
+  run: () => void
+}
+
+/** A tray of tiles that unfolds out of the menu button (animated in app.css). */
+function SidebarMenu({ open, view, pending, onPick }: { open: boolean; view: View; pending: number; onPick: () => void }) {
+  const { setView, setMarketplaceOpen } = useStore.getState()
+  const tiles: Tile[] = [
+    { label: 'Today', icon: <CheckIcon size={15} />, view: 'today', run: () => setView('today') },
+    { label: 'Jobs', icon: <BriefcaseIcon size={15} />, view: 'jobs', run: () => setView('jobs') },
+    { label: 'Marketplace', icon: <GridIcon size={15} />, run: () => setMarketplaceOpen(true) },
+    { label: 'Guide', icon: <BookIcon size={15} />, view: 'guide', run: () => setView('guide') }
+  ]
+
+  return (
+    <div id="sidebar-menu" className="launcher px-3" data-open={open} inert={!open}>
+      <div className="min-h-0 overflow-hidden">
+        <div className="grid grid-cols-2 gap-1.5 pt-2 pb-1">
+          {tiles.map((t, i) => {
+            const current = !!t.view && t.view === view
+            return (
+              <button
+                key={t.label}
+                type="button"
+                // Tiles nearest the button (bottom right) arrive first.
+                style={{ '--i': tiles.length - 1 - i } as CSSProperties}
+                onClick={() => {
+                  t.run()
+                  onPick()
+                }}
+                aria-current={current ? 'page' : undefined}
+                className={`launcher-tile relative flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left text-[13px] font-medium ${
+                  current ? 'border-accent/40 bg-selected' : 'border-line bg-elev/60 hover:bg-elev'
+                }`}
+              >
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                    current ? 'bg-accent-strong text-on-accent' : 'bg-accent-strong/15 text-accent'
+                  }`}
+                >
+                  {t.icon}
+                </span>
+                {t.label}
+                {t.view === 'today' && pending > 0 && (
+                  <span className="ml-auto rounded-full bg-warn/20 px-1.5 py-0.5 text-[11px] font-semibold text-warn" title="Waiting for your OK">
+                    {pending}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }

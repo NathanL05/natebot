@@ -199,3 +199,23 @@ export const ExternalIcon = (p: IconProps) => (
     <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
   </Icon>
 )
+export const BookIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 6.5C10.3 5.2 8 4.5 4 4.5v13c4 0 6.3.7 8 2 1.7-1.3 4-2 8-2v-13c-4 0-6.3.7-8 2ZM12 6.5v13" />
+  </Icon>
+)
+/** Four tiles that fold into a × of dots while the sidebar menu is open (animated in app.css). */
+export const LauncherIcon = ({ open, ...p }: IconProps & { open: boolean }) => (
+  <Icon {...p} className={`launcher-icon ${p.className ?? ''}`} data-open={open}>
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1.6" />
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6" />
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6" />
+    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6" />
+  </Icon>
+)
+export const BriefcaseIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="7" width="18" height="13" rx="2" />
+    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18" />
+  </Icon>
+)

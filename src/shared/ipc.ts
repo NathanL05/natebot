@@ -247,7 +247,7 @@ export interface NateBotEvents {
   /** Main asks the renderer to navigate (e.g. from a notification click). */
   focusAgent: string
   /** Menu shortcuts: Cmd+, / Cmd+N / Cmd+Shift+N / Routines. */
-  navigate: 'settings' | 'routines' | 'today' | 'jobs' | 'newAgent' | 'newRoom'
+  navigate: 'settings' | 'routines' | 'today' | 'jobs' | 'guide' | 'newAgent' | 'newRoom'
   /** The quick-capture box was opened, optionally pre-filled from a natebot:// link. */
   captureShown: { at: number; text?: string; agent?: string }
 }
