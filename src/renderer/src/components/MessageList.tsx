@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { AgentSummary, ChatMessage } from '@shared/types'
+import { promptLabel, type AgentSummary, type ChatMessage } from '@shared/types'
 import { agentPicture } from '../lib/avatars'
 import { basename, clockTime, separatorTime } from '../lib/format'
 import { ActionCard } from './ActionCard'
@@ -140,6 +140,7 @@ function Message({
   }
 
   if (msg.role === 'user') {
+    const shown = promptLabel(msg.text)
     return (
       <div className={`flex flex-col items-end ${spaced ? 'mt-2' : ''}`} title={clockTime(msg.createdAt)}>
         {msg.attachments?.map((a) => (
@@ -157,9 +158,14 @@ function Message({
             <span className="font-medium">{msg.replyTo.who}:</span> {msg.replyTo.excerpt}
           </button>
         )}
-        {msg.text && (
+        {shown.attached.map((label) => (
+          <div key={label} className="mb-1 inline-flex items-center gap-1.5 rounded-lg bg-elev px-2.5 py-1 text-[12px] text-muted" title="Filled in by NateBot when sent">
+            + {label}
+          </div>
+        ))}
+        {shown.text && (
           <div className="selectable max-w-[70%] rounded-2xl rounded-br-md bg-me px-3.5 py-2 text-[14px] whitespace-pre-wrap text-me-fg">
-            {withMentions(msg.text, memberNames)}
+            {withMentions(shown.text, memberNames)}
           </div>
         )}
       </div>

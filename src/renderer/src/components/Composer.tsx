@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import type { AgentSummary } from '@shared/types'
+import { promptLabel, type AgentSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
 import { drafts } from '../lib/drafts'
@@ -182,7 +182,7 @@ export function Composer({
                 onClick={() => void api.sendMessage(chatId, p)}
                 className="max-w-full truncate rounded-full border border-line-strong bg-elev/70 px-3 py-1 text-[12px] text-muted transition hover:border-accent/50 hover:text-fg"
               >
-                {p}
+                {promptLabel(p).text}
               </button>
             ))}
           </div>

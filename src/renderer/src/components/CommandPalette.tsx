@@ -1,6 +1,7 @@
 // ⌘K: jump to any chat or screen, send a quick prompt, or start something new,
 // without the mouse. Type to filter; ↑/↓ and Enter to pick; Esc to close.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { promptLabel } from '@shared/types'
 import { api, useStore, type View } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
 import { Avatar } from './Avatar'
@@ -62,7 +63,7 @@ export function CommandPalette() {
     const prompts: Item[] = agents.flatMap((a) =>
       a.quick_prompts.map((p, i) => ({
         id: `p:${a.id}:${i}`,
-        label: p,
+        label: promptLabel(p).text,
         hint: `Send to ${a.name}`,
         icon: <ArrowUpIcon size={16} />,
         run: () => {

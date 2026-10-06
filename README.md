@@ -279,8 +279,18 @@ one web search for the weather). Every day at 7:30 it writes a short brief: your
 deadlines, emails that need you, and one suggestion. The brief shows at the top of Today.
 
 Its routine prompt contains `{{today}}`, which NateBot fills in, just before the run, with today's calendar, tasks,
-reminders, job deadlines and waiting approvals, so the agent doesn't spend tool calls fetching them. You can use
-`{{today}}` in any routine prompt.
+reminders, job deadlines and waiting approvals, so the agent doesn't spend tool calls fetching them, and `{{inbox}}`,
+your recent Gmail (the same list as Today's Inbox). The brief reads email only from that list, so it doesn't load the
+Gmail connector at all.
+
+`{{today}}` and `{{inbox}}` work in any message, quick prompt, routine or reminder task. In the chat they show as a
+small "+ Today's agenda" / "+ Inbox" tag instead of the placeholder.
+
+**Email questions are cheaper automatically.** When you ask an agent that has Gmail about your email (a message or
+routine mentioning email, mail, inbox or unread), NateBot attaches the inbox list itself. The agent answers in one turn
+instead of paging through Gmail with tool calls, each of which re-reads the whole conversation: a typical "Give me a
+summary of my emails" went from 90k–120k tokens to about 28k. It can still open a message (by its id) when it needs the
+full text.
 
 ## Today
 

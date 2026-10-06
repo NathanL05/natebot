@@ -32,7 +32,10 @@ describe('morning brief', () => {
 
   it('only mentions Gmail when it is connected', () => {
     expect(briefDraft([]).instructions).not.toContain('Gmail')
-    expect(briefDraft(['gmail']).mcp_servers).toEqual(['gmail'])
+    // Email comes from {{inbox}}, so the brief doesn't load the Gmail connector.
+    expect(briefDraft(['gmail', 'gcal']).mcp_servers).toEqual(['gcal'])
+    expect(briefDraft(['gmail']).routines[0]?.prompt).toContain('{{inbox}}')
     expect(briefDraft([]).routines[0]?.prompt).toContain('{{today}}')
+    expect(briefDraft([]).routines[0]?.prompt).not.toContain('{{inbox}}')
   })
 })

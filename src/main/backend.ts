@@ -49,7 +49,7 @@ import { log } from './log'
 import * as skills from './skills'
 import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailAddress, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
 import { AgendaReader } from './agenda'
-import { InboxReader } from './inbox'
+import { INBOX_TOKEN, inboxContext, InboxReader, wantsInbox } from './inbox'
 import { approvalOnlyTools, configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -108,6 +108,8 @@ export class Backend implements NateBotApi {
   private phone = new PhoneInbox((text) => this.fromPhone(text), log)
   /** Agents answering messages from your phone (how many): those replies always go to the phone. */
   private phoneWaiting = new Map<string, number>()
+  /** Chat messages still being prepared (prompt tokens filled), per agent, so they're queued in order. */
+  private sending = new Map<string, Promise<void>>()
   private backupTimer: NodeJS.Timeout | undefined
   private rooms: Rooms
   private env: EnvStatus = { checking: true, claudeFound: false, claudePath: null, version: null, loggedIn: false, subscriptionType: null, error: 'Checking…' }
@@ -656,7 +658,7 @@ export class Backend implements NateBotApi {
       return
     }
     this.engine.system(agentId, `Routine${which} ran at ${time}${dueText}`)
-    void this.expandPrompt(routine.prompt).then((prompt) =>
+    void this.expandPrompt(routine.prompt, agent).then((prompt) =>
       this.engine.enqueue(agentId, { source: 'routine', routineId, prompt, attachments: [], ...(late ? { dueAt: due } : {}) })
     )
   }
@@ -719,7 +721,10 @@ export class Backend implements NateBotApi {
         this.notify(r.agentId, 'Reminder', r.text, undefined, true)
       } else {
         this.engine.system(r.agentId, `Reminder ran at ${clock(now)}${now - r.at > LATE_AFTER_MS ? ` (it was due at ${due})` : ''}`)
-        this.engine.enqueue(r.agentId, { source: 'reminder', prompt: r.text, attachments: [], dueAt: r.at })
+        const agent = this.store.get(r.agentId)
+        void this.expandPrompt(r.text, agent ?? undefined).then((prompt) =>
+          this.engine.enqueue(r.agentId, { source: 'reminder', prompt, attachments: [], dueAt: r.at })
+        )
       }
     }
     this.reminderClock.arm()
@@ -805,20 +810,32 @@ export class Backend implements NateBotApi {
     }
   }
 
-  /** Fills {{today}} in a routine prompt with today's calendar, tasks, reminders and deadlines. */
-  private async expandPrompt(prompt: string): Promise<string> {
-    if (!prompt.includes(TODAY_TOKEN)) return prompt
-    const agenda = await this.agenda.today(true).catch(() => null)
-    const context = agenda
-      ? todayContext({
-          agenda,
-          reminders: this.db.scheduledReminders(),
-          jobs: this.db.listJobs(),
-          pending: this.summaries().reduce((n, a) => n + a.pending, 0),
-          now: Date.now()
-        })
-      : '[Today, from NateBot]\n(could not be read)'
-    return prompt.split(TODAY_TOKEN).join(context)
+  /**
+   * Fills {{today}} (calendar, tasks, reminders, deadlines) and {{inbox}} (recent Gmail) in a prompt.
+   * When a Gmail agent is asked about email without {{inbox}}, the inbox is attached anyway: one
+   * turn with the list costs far less than the agent fetching it with several tool calls.
+   */
+  private async expandPrompt(prompt: string, agent?: AgentConfig): Promise<string> {
+    let out = prompt
+    if (out.includes(TODAY_TOKEN)) {
+      const agenda = await this.agenda.today(true).catch(() => null)
+      const context = agenda
+        ? todayContext({
+            agenda,
+            reminders: this.db.scheduledReminders(),
+            jobs: this.db.listJobs(),
+            pending: this.summaries().reduce((n, a) => n + a.pending, 0),
+            now: Date.now()
+          })
+        : '[Today, from NateBot]\n(could not be read)'
+      out = out.split(TODAY_TOKEN).join(context)
+    }
+    const attach = !!agent && this.inboxReader.connected() && wantsInbox(agent.mcp_servers, out)
+    if (out.includes(INBOX_TOKEN) || attach) {
+      const inbox = await this.inboxReader.list(true)
+      out = attach ? `${out}\n\n${inboxContext(inbox)}` : out.split(INBOX_TOKEN).join(inboxContext(inbox))
+    }
+    return out
   }
 
   /** Why unattended runs are paused this week (Settings → Usage), or null if they aren't. */
@@ -915,7 +932,13 @@ export class Backend implements NateBotApi {
     this.db.saveMessage(msg)
     emit('message', msg)
     const quoted = reply ? `${replyNote(reply)}\n\n${body}` : body
-    this.engine.enqueue(agentId, { source: 'chat', prompt: quoted, attachments: saved })
+    // Filling {{today}} / {{inbox}} may wait on Google: chain per chat so messages keep their order.
+    const queued = (this.sending.get(agent.id) ?? Promise.resolve())
+      .then(() => this.expandPrompt(quoted, agent))
+      .catch(() => quoted)
+      .then((prompt) => this.engine.enqueue(agent.id, { source: 'chat', prompt, attachments: saved }))
+    this.sending.set(agent.id, queued)
+    await queued
   }
 
   async stop(agentId: string): Promise<void> {
@@ -1332,7 +1355,7 @@ export class Backend implements NateBotApi {
     const routine = agent.routines.find((r) => r.id === routineId)
     if (!routine) return
     this.engine.system(agentId, 'Routine started manually')
-    const prompt = await this.expandPrompt(routine.prompt)
+    const prompt = await this.expandPrompt(routine.prompt, agent)
     this.engine.enqueue(agentId, { source: 'routine', routineId, prompt, attachments: [] })
   }
 

@@ -4,6 +4,8 @@
 import type { Agenda, AgentDraft, Job, Reminder } from '@shared/types'
 
 export const TODAY_TOKEN = '{{today}}'
+/** Same as INBOX_TOKEN in inbox.ts (kept here so the brief has no Gmail dependency). */
+const INBOX = '{{inbox}}'
 export const BRIEF_ID = 'morning-brief'
 
 const time = (ts: number): string => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -31,8 +33,12 @@ export function todayContext(input: { agenda: Agenda; reminders: Reminder[]; job
   return lines.join('\n')
 }
 
-/** The Morning Brief agent, given the tools that are connected. */
+/**
+ * The Morning Brief agent, given the tools that are connected. Its email comes from {{inbox}}
+ * (read by NateBot), so it doesn't need the Gmail connector and its ~10k tokens of tool definitions.
+ */
 export function briefDraft(servers: string[]): AgentDraft {
+  const gmail = servers.includes('gmail')
   return {
     name: 'Morning Brief',
     shape: 'circle',
@@ -43,17 +49,17 @@ export function briefDraft(servers: string[]): AgentDraft {
       'Every morning you write my brief: at most 12 short lines, warm but to the point.',
       '1. The day at a glance, including the weather if you know my city (one web search at most).',
       '2. My schedule, tasks, reminders and deadlines from the [Today, from NateBot] block. Use it as given and do not fetch them again.',
-      servers.includes('gmail') ? '3. Emails that need me: one Gmail search for unread mail from the last day, skipping promotions and newsletters.' : '',
+      gmail ? '3. Emails that need me, from the [Inbox, from NateBot] block: skip newsletters, alerts and receipts. Do not search Gmail.' : '',
       "4. One concrete suggestion for the day (what to tackle first, or a gap to use). If you can read my plan folders, base it on today's step there (read at most two files).",
       'Use ✓ checklists. Never send anything or change anything yourself.'
     ]
       .filter(Boolean)
       .join('\n'),
-    mcp_servers: servers,
+    mcp_servers: servers.filter((s) => s !== 'gmail'),
     allowed_tools: ['WebSearch'],
     disallowed_tools: [],
-    quick_prompts: ['Write my morning brief'],
-    routines: [{ id: 'main', enabled: true, cron: '30 7 * * *', prompt: `Write my morning brief.\n\n${TODAY_TOKEN}` }],
+    quick_prompts: [`Write my morning brief ${TODAY_TOKEN}${gmail ? ` ${INBOX}` : ''}`],
+    routines: [{ id: 'main', enabled: true, cron: '30 7 * * *', prompt: `Write my morning brief.\n\n${TODAY_TOKEN}${gmail ? `\n\n${INBOX}` : ''}` }],
     email_triggers: [],
     read_folders: []
   }
