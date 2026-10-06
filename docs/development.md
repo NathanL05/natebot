@@ -105,3 +105,19 @@ build/          icon sources, .icns
 
 Tech: Electron 44, React 19, TypeScript (strict), Vite via electron-vite, Tailwind 4, node:sqlite, node-cron,
 electron-builder.
+
+## Screenshots
+
+The README's screenshots come from a demo data folder with made-up agents, chats, calendar and inbox, never your real
+`~/NateBot`. To retake them:
+
+```bash
+npm run demo:data -- /tmp/natebot-demo
+NATEBOT_HOME=/tmp/natebot-demo npm run dev
+```
+
+`NATEBOT_HOME` points NateBot at another data folder, with its own window state and single-instance lock, so this runs
+next to the installed app. The demo copy reads Today's calendar and inbox from `demo-today.json` in that folder instead
+of Google. Its routines are on but never catch up on launch, so nothing runs unless you leave it open past 7:30 or 8:00.
+Capture at 1280px wide (`docs/images/`). The demo content is in `scripts/demo-data.ts`.
+

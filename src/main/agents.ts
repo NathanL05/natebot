@@ -133,7 +133,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
   }
 }
 
-function serialize(a: AgentConfig): string {
+export function serialize(a: AgentConfig): string {
   // Key order matches the documented format.
   const doc = {
     id: a.id,

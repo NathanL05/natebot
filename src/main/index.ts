@@ -9,8 +9,12 @@ import { createCapture } from './capture'
 import { parseShareLink } from './share'
 import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
+import { CUSTOM_HOME, ROOT } from './paths'
 
 app.setName('NateBot')
+// A copy run with NATEBOT_HOME keeps its window state, pictures and single-instance lock there too,
+// so it can run next to the installed app without touching it.
+if (CUSTOM_HOME) app.setPath('userData', join(CUSTOM_HOME, '.app-data'))
 
 const isDev = !app.isPackaged
 const devServerUrl = isDev ? process.env['ELECTRON_RENDERER_URL'] : undefined
@@ -145,7 +149,7 @@ function buildMenu(): void {
         { label: 'Jobs', accelerator: 'Cmd+Shift+J', click: nav('jobs') },
         { label: 'Routines', accelerator: 'Cmd+Shift+R', click: nav('routines') },
         { type: 'separator' },
-        { label: 'Show Data Folder', click: () => void shell.openPath(join(app.getPath('home'), 'NateBot')) },
+        { label: 'Show Data Folder', click: () => void shell.openPath(ROOT) },
         { type: 'separator' },
         { role: 'close' }
       ]

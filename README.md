@@ -7,6 +7,10 @@ Helper, a brutally honest mentor. You chat with them, they work on schedules and
 **never send, delete or pay without your OK**. It runs locally on your Mac through the Claude Code CLI you're already
 signed in to, so there's **no API key and no extra bill**.
 
+<p align="center">
+  <img src="docs/images/chat.png" alt="The Email Agent's chat: it flags two urgent emails and proposes a reply, shown as a card with Approve, Edit, Always allow and Reject" width="880">
+</p>
+
 ## What it does
 
 - **Agents you message.** Start from a template or write your own. Each agent has its own model, tools, folders it
@@ -29,6 +33,21 @@ signed in to, so there's **no API key and no extra bill**.
   chats, and routines that pause automatically as your weekly limit fills up.
 
 Everything is listed with short steps in the app's **Guide** (sidebar menu, or **⌘/**).
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/today.png" alt="Today: the morning brief, today's calendar and tasks, and a people-first inbox, with the sidebar menu open"></td>
+    <td width="33%"><img src="docs/images/group-chat.png" alt="A group chat where a Travel Planner, Budget Buddy and Planner plan a weekend in Lisbon"></td>
+    <td width="33%"><img src="docs/images/guide.png" alt="The Guide: every feature in categories, with numbered steps for the one selected"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Today</b>: your day, inbox and approvals</td>
+    <td align="center"><b>Group chats</b>: agents work it out together</td>
+    <td align="center"><b>Guide</b>: steps for every feature</td>
+  </tr>
+</table>
+
+<sub>Screenshots use made-up demo data (see <a href="docs/development.md#screenshots">Screenshots</a>).</sub>
 
 ## How it's built
 

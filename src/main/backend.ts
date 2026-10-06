@@ -51,7 +51,7 @@ import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailAddr
 import { AgendaReader } from './agenda'
 import { INBOX_TOKEN, inboxContext, InboxReader, wantsInbox } from './inbox'
 import { approvalOnlyTools, configuredServersFor, ensureMcpFile, listServers } from './mcp'
-import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
+import { AGENTS_DIR, CUSTOM_HOME, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
 import { APPROVAL_BUTTONS, APPROVE, approvalNotice, autoApprovable, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
@@ -962,11 +962,21 @@ export class Backend implements NateBotApi {
   }
 
   async todayAgenda(refresh?: boolean): Promise<Agenda> {
-    return this.agenda.today(refresh === true)
+    return this.demoToday()?.agenda ?? this.agenda.today(refresh === true)
   }
 
   async inbox(refresh?: boolean): Promise<Inbox> {
-    return this.inboxReader.list(refresh === true)
+    return this.demoToday()?.inbox ?? this.inboxReader.list(refresh === true)
+  }
+
+  /** Made-up calendar and inbox items for a demo folder (NATEBOT_HOME, see scripts/demo-data.ts), for screenshots. */
+  private demoToday(): { agenda?: Agenda; inbox?: Inbox } | null {
+    if (!CUSTOM_HOME) return null
+    try {
+      return JSON.parse(readFileSync(join(ROOT, 'demo-today.json'), 'utf8')) as { agenda?: Agenda; inbox?: Inbox }
+    } catch {
+      return null
+    }
   }
 
   async inboxAction(threadId: string, change: 'archive' | 'read'): Promise<{ ok: boolean; error?: string }> {

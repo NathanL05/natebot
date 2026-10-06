@@ -18,7 +18,8 @@
     "dist": "npm run build && electron-builder --mac --arm64",
     "dist:universal": "npm run build && electron-builder --mac --universal",
     "postinstall": "node scripts/brand-dev-electron.mjs",
-    "icons": "sh scripts/make-icons.sh"
+    "icons": "sh scripts/make-icons.sh",
+    "demo:data": "esbuild scripts/demo-data.ts --bundle --platform=node --format=esm --packages=external --alias:@shared=./src/shared --outfile=out/demo-data.mjs --log-level=warning && node out/demo-data.mjs"
   },
   "dependencies": {
     "node-cron": "^4.6.0",
