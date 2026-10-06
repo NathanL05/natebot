@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import type { AgentSummary, RoomSummary } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { UsageBanner } from './ChatView'
+import { ClearChatButton } from './ClearChatButton'
 import { Composer } from './Composer'
 import { GroupAvatar } from './GroupAvatar'
 import { SlidersIcon } from './icons'
@@ -38,6 +39,7 @@ export function RoomView({ room }: { room: RoomSummary }) {
           </div>
         </div>
         <PinnedButton chatId={room.id} />
+        <ClearChatButton chatId={room.id} name={room.name} running={running} group />
         <IconButton label="Group chat settings" onClick={() => useStore.getState().setRoomEditor(room.id)}>
           <SlidersIcon size={17} />
         </IconButton>
