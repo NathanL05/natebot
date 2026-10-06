@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MODELS, type EmailTrigger, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
+import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MAX_WATCH_RUNS_PER_DAY, MAX_WEB_WATCHES, MODELS, WATCH_INTERVALS, type EmailTrigger, type WebWatch, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { toolLabel } from '@shared/tools'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
@@ -35,6 +35,7 @@ export function validateDraft(d: AgentDraft): string[] {
   if (on.some((r) => !isValidCron(r.cron))) problems.push('A routine schedule is not valid.')
   if (on.some((r) => !r.prompt.trim())) problems.push('Tell each routine what to do.')
   if (d.email_triggers.some((t) => !t.query.trim())) problems.push('Give each email trigger a Gmail search.')
+  if ((d.web_watches ?? []).some((w) => !/^https?:\/\/\S+$/i.test(w.url))) problems.push('Give each page watch a web address (https://…).')
   return problems
 }
 
@@ -198,6 +199,8 @@ export function AgentForm({
         <TriggersEditor triggers={draft.email_triggers} onChange={(email_triggers) => set('email_triggers', email_triggers)} />
       )}
 
+      <WatchesEditor watches={draft.web_watches ?? []} onChange={(web_watches) => set('web_watches', web_watches)} />
+
       {(draft.auto_approve ?? []).length > 0 && (
         <Field label="Approved without asking" hint="Added with Always allow on a proposal. Remove one to be asked again.">
           <div className="space-y-1.5">
@@ -357,6 +360,63 @@ const TRIGGER_PRESETS: { label: string; query: string; prompt: string }[] = [
 ]
 
 /** Runs the agent when new email matches a Gmail search. NateBot checks Gmail itself, so waiting costs nothing. */
+const EVERY_LABEL: Record<number, string> = { 1: 'Hourly', 3: 'Every 3 h', 6: 'Every 6 h', 24: 'Daily' }
+
+function WatchesEditor({ watches, onChange }: { watches: WebWatch[]; onChange: (w: WebWatch[]) => void }) {
+  const update = (id: string, patch: Partial<WebWatch>): void => onChange(watches.map((w) => (w.id === id ? { ...w, ...patch } : w)))
+  const add = (): void => onChange([...watches, { id: `w${Math.random().toString(36).slice(2, 8)}`, enabled: true, url: '', every: 6, match: '', prompt: '' }])
+  return (
+    <div className="rounded-xl border border-line p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <div className="text-[14px] font-medium">Page watches</div>
+          <div className="text-[12px] text-muted">
+            NateBot re-reads a web page itself and runs this agent only when new text appears, so checking uses none of your limit
+            (at most {MAX_WATCH_RUNS_PER_DAY} runs a day per page). Good for careers pages, deadlines or a listing you're waiting on.
+          </div>
+        </div>
+        {watches.length < MAX_WEB_WATCHES && (
+          <Button variant="ghost" onClick={add}>
+            <PlusIcon size={13} /> Add
+          </Button>
+        )}
+      </div>
+      {watches.map((w, i) => (
+        <div key={w.id} className={`mt-4 space-y-2.5 ${i > 0 ? 'border-t border-line pt-4' : ''}`}>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-[13px] font-medium">Page {i + 1}</div>
+            <Toggle label={`Page watch ${i + 1} enabled`} checked={w.enabled} onChange={(enabled) => update(w.id, { enabled })} />
+            <IconButton label={`Remove page watch ${i + 1}`} onClick={() => onChange(watches.filter((x) => x.id !== w.id))}>
+              <TrashIcon size={14} />
+            </IconButton>
+          </div>
+          <Field label="Page address">
+            <input className={`${inputClass} font-mono text-[12px]`} value={w.url} onChange={(e) => update(w.id, { url: e.target.value.trim() })} placeholder="https://careers.example.com/jobs" />
+          </Field>
+          <Field label="Check">
+            <Segmented
+              value={String(w.every)}
+              options={WATCH_INTERVALS.map((h) => ({ value: String(h), label: EVERY_LABEL[h] ?? `${h} h` }))}
+              onChange={(v) => update(w.id, { every: Number(v) })}
+            />
+          </Field>
+          <Field label="Only when the new text mentions" hint="Optional. Comma separated, e.g. graduate, platform engineer. Empty = any change.">
+            <input className={inputClass} value={w.match} onChange={(e) => update(w.id, { match: e.target.value })} placeholder="graduate, cloud" />
+          </Field>
+          <Field label="What should it do?">
+            <textarea
+              className={`${inputClass} min-h-[56px] resize-y`}
+              value={w.prompt}
+              onChange={(e) => update(w.id, { prompt: e.target.value })}
+              placeholder="Tell me which new roles appeared and whether any fit my plan."
+            />
+          </Field>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TriggersEditor({ triggers, onChange }: { triggers: EmailTrigger[]; onChange: (t: EmailTrigger[]) => void }) {
   const update = (id: string, patch: Partial<EmailTrigger>): void => onChange(triggers.map((t) => (t.id === id ? { ...t, ...patch } : t)))
   const add = (): void => onChange([...triggers, { id: `t${Math.random().toString(36).slice(2, 8)}`, enabled: true, query: '', prompt: '' }])

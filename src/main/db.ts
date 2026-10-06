@@ -189,6 +189,11 @@ export class Db {
         seen_at INTEGER NOT NULL,
         PRIMARY KEY (trigger_key, message_id)
       );
+      CREATE TABLE IF NOT EXISTS web_watch (
+        watch_key TEXT PRIMARY KEY,
+        text TEXT NOT NULL,
+        checked_at INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS folders (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -587,6 +592,20 @@ export class Db {
     return !!this.db.prepare('SELECT 1 FROM trigger_seen WHERE trigger_key = ? AND message_id = ?').get(triggerKey, TRIGGER_START)
   }
 
+  // ---- web page watches ----
+
+  /** The page text a watch last saw, and when. */
+  watchState(key: string): { text: string; checkedAt: number } | null {
+    const row = this.db.prepare('SELECT text, checked_at FROM web_watch WHERE watch_key = ?').get(key) as { text: string; checked_at: number } | undefined
+    return row ? { text: row.text, checkedAt: row.checked_at } : null
+  }
+
+  setWatchState(key: string, text: string, at: number): void {
+    this.db
+      .prepare('INSERT INTO web_watch (watch_key, text, checked_at) VALUES (?, ?, ?) ON CONFLICT(watch_key) DO UPDATE SET text = excluded.text, checked_at = excluded.checked_at')
+      .run(key, text, at)
+  }
+
   // ---- reminders ----
 
   saveReminder(r: Reminder): void {
@@ -629,6 +648,8 @@ export class Db {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM reminders WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
+    // Agent ids can't contain LIKE wildcards (a-z, 0-9 and -), so this only matches its own watches.
+    this.db.prepare('DELETE FROM web_watch WHERE watch_key LIKE ?').run(`${agentId}#%`)
     // Keep what the agent used, so usage totals don't shift onto the others.
     this.db.prepare('UPDATE runs SET agent_id = ? WHERE agent_id = ?').run(DELETED_AGENT_ID, agentId)
   }

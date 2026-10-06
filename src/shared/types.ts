@@ -40,6 +40,24 @@ export interface Routine {
  * Wakes an agent when new email matches a Gmail search. NateBot checks Gmail itself
  * every few minutes (no Claude run), and only runs the agent when something matches.
  */
+/** Re-reads a web page on a schedule and runs the agent when new text appears. */
+export interface WebWatch {
+  id: string
+  enabled: boolean
+  url: string
+  /** Hours between checks: one of WATCH_INTERVALS. */
+  every: number
+  /** Comma-separated words: only run when the new text mentions one. Empty = any change. */
+  match: string
+  /** What the agent should do with the change. */
+  prompt: string
+}
+
+export const MAX_WEB_WATCHES = 3
+/** Most runs one page watch may start per day, however often the page changes. */
+export const MAX_WATCH_RUNS_PER_DAY = 4
+export const WATCH_INTERVALS = [1, 3, 6, 24] as const
+
 export interface EmailTrigger {
   id: string
   enabled: boolean
@@ -75,6 +93,8 @@ export interface AgentConfig {
   read_folders: string[]
   /** Approval-only tools (mcp__server__tool) whose proposals NateBot approves for you ("Always allow"). */
   auto_approve?: string[]
+  /** Web pages NateBot re-reads itself, running the agent when they change, up to MAX_WEB_WATCHES. */
+  web_watches?: WebWatch[]
   session_id: string | null
 }
 
