@@ -484,6 +484,15 @@ export class Backend implements NateBotApi {
           if (!latest || action?.status !== 'pending') continue
           log(`action: agent=${r.agentId} auto-approved ${action.tool}`)
           await this.engine.executeAction(r.agentId, latest, action).catch((e: Error) => log(`auto-approve failed: ${e.message}`))
+          // Still pending (e.g. the usage limit was reached): hand it back to the user with its buttons.
+          const after = this.db.getMessage(msg.id)
+          const left = after?.actions?.find((a) => a.id === id)
+          if (after && left?.status === 'pending' && left.auto) {
+            delete left.auto
+            this.db.saveMessage(after)
+            emit('message', after)
+            this.emitAgents()
+          }
         }
       })()
     }
