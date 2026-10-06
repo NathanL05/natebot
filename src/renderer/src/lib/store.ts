@@ -11,7 +11,7 @@ import type {
   UsageInfo
 } from '@shared/types'
 
-export type View = 'chat' | 'today' | 'jobs' | 'routines' | 'settings'
+export type View = 'chat' | 'today' | 'jobs' | 'routines' | 'settings' | 'guide'
 
 interface State {
   ready: boolean
@@ -62,6 +62,10 @@ interface State {
   replying: Record<string, ChatMessage | undefined>
   setReplying(chatId: string, msg: ChatMessage | null): void
   setView(view: View): void
+  /** The Guide feature to show next time the Guide renders (from ⌘K). */
+  guideFocus: string | null
+  /** Opens the Guide, at one feature if given. */
+  openGuide(featureId?: string): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
   setAddOpen(open: boolean, folderId?: string | null): void
@@ -252,6 +256,8 @@ export const useStore = create<State>((set, get) => {
     },
 
     setView: (view) => set({ view, drawerOpen: false }),
+    guideFocus: null,
+    openGuide: (featureId) => set({ view: 'guide', drawerOpen: false, guideFocus: featureId ?? null }),
     setSearch: (search) => set({ search }),
     setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
     setAddOpen: (addOpen, folderId = null) => set({ addOpen, addFolderId: addOpen ? folderId : null }),

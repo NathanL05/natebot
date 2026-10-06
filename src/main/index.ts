@@ -162,7 +162,11 @@ function buildMenu(): void {
         { role: 'togglefullscreen' }
       ]
     },
-    { role: 'windowMenu' }
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [{ label: 'NateBot Guide', accelerator: 'Cmd+/', click: nav('guide') }]
+    }
   ]
   if (isDev) {
     template.push({

@@ -249,6 +249,12 @@ irreversible actions without approval.
 - **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
   drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
+- **Sidebar menu:** Today, Jobs, Marketplace and the Guide live in a tray at the bottom of the sidebar. Click the
+  four-squares button next to your name to unfold it; it folds away again once you pick something, click elsewhere or
+  press Esc. A dot on the button means approvals are waiting.
+- **Guide:** every feature with a few short steps, searchable (sidebar menu → **Guide**, or **⌘/**). Many have a button
+  that opens the right screen. Typing in ⌘K also lists matching how-tos. The content is in
+  `src/renderer/src/lib/guide.ts`; add an entry there when you add a feature.
 - **Command palette:** press **⌘K** anywhere in the window to jump to a chat or screen, start a new agent or group
   chat, or send any agent's quick prompt. Type to filter, use ↑/↓ and Enter, and Esc to close.
 - **Quick capture:** press **⌥ Space** in any app (or choose **Message an agent…** in the menu-bar menu) to open a
@@ -298,7 +304,7 @@ full text.
 
 ## Today
 
-**Today** (in the sidebar above Marketplace, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
+**Today** (in the sidebar menu, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
 proposed actions and handoffs waiting for your OK (with **Approve all** when there are several, after a confirmation
 listing each one), reminders and routines due in the next day, and what routines found in the last day. At the top, **Your day** lists today's Google Calendar events and the tasks due from Google Tasks and Apple Reminders,
 once those are connected. NateBot reads them directly, so this uses no Claude usage.
@@ -468,7 +474,7 @@ sidebar) and choose **Choose picture…**. PNG, JPG and GIF work; the image is c
 
 ## Skills marketplace
 
-**Marketplace** (above your profile in the sidebar) lets you browse [Agent Skills](https://github.com/anthropics/skills)
+**Marketplace** (in the sidebar menu) lets you browse [Agent Skills](https://github.com/anthropics/skills)
 and install or remove them with one click. It starts with Anthropic's official `anthropics/skills` repo. Use
 **+ Source** to add any GitHub repo that contains `SKILL.md` folders (`owner/repo` or its URL).
 

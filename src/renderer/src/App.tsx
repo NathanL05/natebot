@@ -12,6 +12,7 @@ import { RoutinesView } from './components/RoutinesView'
 import { TodayView } from './components/TodayView'
 import { CommandPalette } from './components/CommandPalette'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { GuideView } from './components/GuideView'
 import { JobsView } from './components/JobsView'
 import { SettingsView } from './components/SettingsView'
 import { SetupScreen } from './components/SetupScreen'
@@ -69,6 +70,7 @@ export function App() {
           {view === 'jobs' && <JobsView />}
           {view === 'routines' && <RoutinesView />}
           {view === 'settings' && <SettingsView />}
+          {view === 'guide' && <GuideView />}
         </ErrorBoundary>
       </main>
       {addOpen && <AddAgentModal />}
