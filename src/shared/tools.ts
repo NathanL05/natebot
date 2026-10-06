@@ -23,6 +23,12 @@ const BUILTIN_NAMES: Record<string, string> = {
   TodoWrite: 'Update checklist'
 }
 
+/** "mcp__gmail__send_gmail_message" → "Gmail · send gmail message" */
+export function toolLabel(name: string): string {
+  const { source, action } = describeTool(name)
+  return action ? `${source} · ${action.replace(/_/g, ' ')}` : source
+}
+
 /** "mcp__gmail__search_threads" → { source: "Gmail", action: "search_threads" } */
 export function describeTool(name: string): { source: string; action: string | null } {
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name)

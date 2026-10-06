@@ -40,7 +40,7 @@ export function TodayView() {
   useEffect(() => void api.todayAgenda().then(setAgenda), [])
 
   const byId = Object.fromEntries(agents.map((a) => [a.id, a]))
-  const actions = pending.flatMap((m) => (m.actions ?? []).filter((a) => a.status === 'pending').map((a) => ({ m, a })))
+  const actions = pending.flatMap((m) => (m.actions ?? []).filter((a) => a.status === 'pending' && !a.auto).map((a) => ({ m, a })))
   const now = Date.now()
   const soon = reminders.filter((r) => r.at < now + 2 * DAY)
   const upcoming = routines.filter((r) => r.nextRun && r.nextRun < now + DAY).sort((a, b) => (a.nextRun ?? 0) - (b.nextRun ?? 0))
@@ -102,7 +102,7 @@ export function TodayView() {
                       {who(m.agentId)}
                       <span className="ml-auto text-[11px] text-muted">{listTime(m.createdAt)}</span>
                     </div>
-                    {m.actions?.filter((a) => a.status === 'pending').map((a) => <ActionCard key={a.id} messageId={m.id} action={a} />)}
+                    {m.actions?.filter((a) => a.status === 'pending').map((a) => <ActionCard key={a.id} messageId={m.id} agentId={m.agentId} action={a} />)}
                     {m.handoffs?.filter((h) => h.status === 'pending').map((h) => <HandoffCard key={h.id} messageId={m.id} handoff={h} />)}
                   </div>
                 ))}

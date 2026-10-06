@@ -16,6 +16,7 @@ const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
   '# model: sonnet | haiku | opus   effort: low | medium | high | xhigh | max\n' +
   '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 5\n' +
+  '# auto_approve: approval-only tools (mcp__server__tool) approved without asking\n' +
   '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 
 export function slugify(name: string): string {
@@ -110,6 +111,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     routines: normalizeRoutines(r['routines'], r['routine']),
     email_triggers: normalizeTriggers(r['email_triggers']),
     read_folders: normalizeFolders(r['read_folders']),
+    auto_approve: [...new Set(strList(r['auto_approve']).filter((t) => /^mcp__[^_].*__.+$/.test(t)))],
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
 }
@@ -131,6 +133,7 @@ function serialize(a: AgentConfig): string {
     routines: a.routines,
     email_triggers: a.email_triggers,
     read_folders: a.read_folders,
+    ...(a.auto_approve?.length ? { auto_approve: a.auto_approve } : {}),
     session_id: a.session_id
   }
   return HEADER + stringify(doc, { lineWidth: 0, blockQuote: 'literal' })
@@ -215,7 +218,8 @@ export class AgentStore extends EventEmitter {
 
   update(next: AgentConfig): AgentConfig {
     const current = this.require(next.id)
-    const agent = normalize({ ...next, session_id: current.session_id }, current.id)
+    // An update that leaves out the Always allow rules keeps them (only removing them in the form clears them).
+    const agent = normalize({ ...next, auto_approve: next.auto_approve ?? current.auto_approve, session_id: current.session_id }, current.id)
     this.write(agent)
     return agent
   }

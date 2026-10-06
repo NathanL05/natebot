@@ -22,7 +22,8 @@ function toDraft(a: AgentSummary): AgentDraft {
     quick_prompts: [...a.quick_prompts],
     routines: a.routines.map((r) => ({ ...r })),
     email_triggers: a.email_triggers.map((t) => ({ ...t })),
-    read_folders: [...a.read_folders]
+    read_folders: [...a.read_folders],
+    auto_approve: [...(a.auto_approve ?? [])]
   }
 }
 
