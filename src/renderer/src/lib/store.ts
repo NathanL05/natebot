@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { HISTORY_PAGE } from '@shared/types'
 import type {
   AgentSummary,
   AppSettings,
@@ -23,6 +24,10 @@ interface State {
   usage: UsageInfo | null
   userAvatarVersion: number | null
   messages: Record<string, ChatMessage[]>
+  /** Chats with older messages than those loaded. */
+  moreHistory: Record<string, boolean>
+  /** Adds the next page of older messages to a chat. Returns false when there are none left. */
+  loadOlder(chatId: string): Promise<boolean>
 
   view: View
   selectedId: string | null
@@ -81,6 +86,10 @@ export function sortAgents(agents: AgentSummary[]): AgentSummary[] {
 
 /** Chats whose history is loading, with the live messages that arrived meanwhile. */
 const loading = new Map<string, ChatMessage[]>()
+/** The history load in progress per chat, for opening a message once it's there. */
+const loads = new Map<string, Promise<void>>()
+/** Older-page requests in progress, so a double click doesn't load the same page twice. */
+const olderLoads = new Map<string, Promise<boolean>>()
 
 export const useStore = create<State>((set, get) => {
   /** Keep the open chat marked read while the user is looking at it. */
@@ -110,6 +119,7 @@ export const useStore = create<State>((set, get) => {
     usage: null,
     userAvatarVersion: null,
     messages: {},
+    moreHistory: {},
     view: 'chat',
     selectedId: null,
     search: '',
@@ -178,20 +188,55 @@ export const useStore = create<State>((set, get) => {
         // Keep live events aside while history loads. The chat stays undefined (blank) until then,
         // so it doesn't flash its empty-chat intro first.
         loading.set(chatId, [])
-        api.listMessages(chatId).then(
+        const load = api.listMessages(chatId).then(
           (history) => {
             const merged = (loading.get(chatId) ?? []).reduce(upsertMessage, history)
             loading.delete(chatId)
-            set({ messages: { ...get().messages, [chatId]: merged } })
+            set({
+              messages: { ...get().messages, [chatId]: merged },
+              moreHistory: { ...get().moreHistory, [chatId]: history.length >= HISTORY_PAGE }
+            })
           },
-          () => loading.delete(chatId) // tried again next time it's opened
+          () => void loading.delete(chatId) // tried again next time it's opened
         )
+        loads.set(chatId, load)
+        void load.finally(() => loads.delete(chatId))
       }
     },
 
     openMessage(chatId, messageId) {
       get().select(chatId)
       set({ focusMessageId: messageId })
+      // An older message than the chat opened with: load back until it's there.
+      void (async () => {
+        await loads.get(chatId)
+        for (let page = 0; page < 25; page++) {
+          if (get().focusMessageId !== messageId || get().messages[chatId]?.some((m) => m.id === messageId)) return
+          if (!(await get().loadOlder(chatId))) return
+        }
+      })()
+    },
+
+    loadOlder(chatId) {
+      const running = olderLoads.get(chatId)
+      if (running) return running
+      const first = get().messages[chatId]?.[0]
+      if (!first || !get().moreHistory[chatId]) return Promise.resolve(false)
+      const load = api
+        .olderMessages(chatId, first.id)
+        .then(({ messages, more }) => {
+          const current = get().messages[chatId] ?? []
+          const known = new Set(current.map((m) => m.id))
+          set({
+            messages: { ...get().messages, [chatId]: [...messages.filter((m) => !known.has(m.id)), ...current] },
+            moreHistory: { ...get().moreHistory, [chatId]: more }
+          })
+          return messages.length > 0
+        })
+        .catch(() => false)
+        .finally(() => olderLoads.delete(chatId))
+      olderLoads.set(chatId, load)
+      return load
     },
 
     async clearChat(chatId) {

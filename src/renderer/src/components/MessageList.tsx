@@ -197,6 +197,10 @@ export function MessageList({
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
+  const more = useStore((s) => !!s.moreHistory[agentId])
+  const [loadingOlder, setLoadingOlder] = useState(false)
+  /** First message and scroll height before the last render, to keep the view still when older ones are added above. */
+  const top = useRef<{ id: string | undefined; height: number }>({ id: undefined, height: 0 })
 
   // Jump to the bottom when switching chats.
   useLayoutEffect(() => {
@@ -204,6 +208,21 @@ export function MessageList({
     const el = scroller.current
     if (el) el.scrollTop = el.scrollHeight
   }, [agentId])
+
+  // Older messages added above: keep what you were looking at in place.
+  useLayoutEffect(() => {
+    const el = scroller.current
+    const firstId = messages[0]?.id
+    if (el && top.current.id && firstId !== top.current.id && messages.some((m) => m.id === top.current.id)) {
+      el.scrollTop += el.scrollHeight - top.current.height
+    }
+    top.current = { id: firstId, height: el?.scrollHeight ?? 0 }
+  }, [messages])
+
+  const loadOlder = (): void => {
+    setLoadingOlder(true)
+    void useStore.getState().loadOlder(agentId).finally(() => setLoadingOlder(false))
+  }
 
   // Follow new content only if the user hasn't scrolled up.
   useEffect(() => {
@@ -233,8 +252,18 @@ export function MessageList({
   }
 
   return (
-    <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-6 pt-2 pb-4">
+    <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto px-6 pt-2 pb-4 [overflow-anchor:none]">
       <div className="mx-auto flex max-w-[860px] flex-col gap-1.5">
+        {more && (
+          <button
+            type="button"
+            disabled={loadingOlder}
+            onClick={loadOlder}
+            className="mx-auto mt-2 rounded-full border border-line-strong px-3 py-1 text-[12px] text-muted transition hover:text-fg disabled:opacity-60"
+          >
+            {loadingOlder ? 'Loading…' : 'Load older messages'}
+          </button>
+        )}
         {messages.map((msg, i) => {
           const prev = messages[i - 1]
           const showTime = !prev || msg.createdAt - prev.createdAt > GAP

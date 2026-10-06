@@ -11,11 +11,17 @@ export function PinnedButton({ chatId }: { chatId: string }) {
   const [open, setOpen] = useState(false)
   const [pins, setPins] = useState<ChatMessage[]>([])
   const box = useRef<HTMLDivElement>(null)
-  const count = messages?.filter((m) => m.pinned).length ?? 0
+  const loadedPins = messages?.filter((m) => m.pinned).length ?? 0
+  // Pins can be older than the messages loaded, so the list comes from the database.
+  const count = Math.max(loadedPins, pins.length)
 
   useEffect(() => {
-    if (open) void api.pinnedMessages(chatId).then(setPins)
-  }, [open, chatId, count])
+    let live = true
+    void api.pinnedMessages(chatId).then((p) => live && setPins(p))
+    return () => {
+      live = false
+    }
+  }, [open, chatId, loadedPins])
 
   useEffect(() => {
     if (!open) return

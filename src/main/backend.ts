@@ -31,7 +31,7 @@ import type {
   UsageInfo,
   UsageWindow
 } from '@shared/types'
-import { isRoomId } from '@shared/types'
+import { isRoomId, OLDER_PAGE } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { toolLabel } from '@shared/tools'
 import { AgentStore, slugify } from './agents'
@@ -823,6 +823,13 @@ export class Backend implements NateBotApi {
     const list = this.db.listMessages(agentId)
     const live = this.engine.liveMessage(agentId)
     return live ? list.map((m) => (m.id === live.id ? { ...live } : m)) : list
+  }
+
+  async olderMessages(chatId: string, beforeId: string): Promise<{ messages: ChatMessage[]; more: boolean }> {
+    if (isRoomId(String(chatId))) this.rooms.require(chatId)
+    else this.requireAgent(chatId)
+    const page = this.db.olderMessages(chatId, String(beforeId), OLDER_PAGE + 1)
+    return { messages: page.slice(-OLDER_PAGE), more: page.length > OLDER_PAGE }
   }
 
   /** Copies picked files into each agent's workspace (attachments/). Returns their workspace-relative paths. */

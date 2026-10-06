@@ -215,3 +215,15 @@ describe('routineRuns', () => {
     expect(db.routineRuns('brief', 'main', 1)).toHaveLength(1)
   })
 })
+
+describe('olderMessages', () => {
+  it('pages back from a message without skipping ones saved in the same millisecond', () => {
+    const db = new Db(':memory:')
+    for (let i = 0; i < 7; i++) db.saveMessage({ id: `m${i}`, agentId: 'planner', role: 'user', text: `${i}`, createdAt: i < 4 ? 100 : 100 + i })
+    db.saveMessage({ id: 'other', agentId: 'email', role: 'user', text: 'x', createdAt: 50 })
+    expect(db.olderMessages('planner', 'm5', 3).map((m) => m.id)).toEqual(['m2', 'm3', 'm4'])
+    expect(db.olderMessages('planner', 'm2', 3).map((m) => m.id)).toEqual(['m0', 'm1'])
+    expect(db.olderMessages('planner', 'm0', 3)).toEqual([])
+    expect(db.olderMessages('email', 'm5', 3)).toEqual([]) // the anchor must be in that chat
+  })
+})
