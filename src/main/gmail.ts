@@ -408,7 +408,7 @@ async function signIn(
   const { label, server } = service
   const uvx = findOnPath('uvx')
   if (!uvx) {
-    return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv  (or see the README), then try again.' }
+    return { ok: false, error: 'uv is not installed. In Terminal run: brew install uv  (or see docs/connections.md), then try again.' }
   }
   if (!(await portFree(CALLBACK_PORT))) {
     log(`${server}: port ${CALLBACK_PORT} busy`)

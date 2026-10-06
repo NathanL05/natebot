@@ -259,7 +259,7 @@ export function SettingsView() {
               <Button onClick={() => useStore.getState().setGoogleOpen('gdrive')}>{drive?.configured ? 'Reconnect…' : 'Connect Drive…'}</Button>
             </Row>
             <AppleRow />
-            <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see README). They appear in each agent's settings.">
+            <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see docs/connections.md). They appear in each agent's settings.">
               <Button onClick={() => void api.openExternal('https://github.com/NathanL05/natebot#adding-mcp-servers')}>How-to</Button>
             </Row>
           </Section>
