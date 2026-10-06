@@ -79,6 +79,10 @@ export interface AgentConfig {
 }
 
 export const MAX_ROUTINES = 20
+/** How many messages a chat opens with; older ones load on request. */
+export const HISTORY_PAGE = 500
+/** How many older messages each "Load older messages" adds. */
+export const OLDER_PAGE = 200
 export const MAX_QUICK_PROMPTS = 6
 
 export type AgentStatus = 'idle' | 'running'

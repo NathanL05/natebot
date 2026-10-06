@@ -2,6 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
+import { HISTORY_PAGE } from '@shared/types'
 import type { AgentUsage, ChatMessage, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
@@ -241,10 +242,25 @@ export class Db {
     return row ? toMessage(row) : null
   }
 
-  listMessages(agentId: string, limit = 500): ChatMessage[] {
+  listMessages(agentId: string, limit = HISTORY_PAGE): ChatMessage[] {
     const rows = this.db
       .prepare('SELECT * FROM messages WHERE agent_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?')
       .all(agentId, limit) as unknown as MessageRow[]
+    return rows.reverse().map(toMessage)
+  }
+
+  /** Up to `limit` messages from just before `beforeId`, oldest first (exact order, so none are skipped at the cut). */
+  olderMessages(chatId: string, beforeId: string, limit: number): ChatMessage[] {
+    const anchor = this.db.prepare('SELECT created_at, rowid FROM messages WHERE id = ? AND agent_id = ?').get(beforeId, chatId) as
+      | { created_at: number; rowid: number }
+      | undefined
+    if (!anchor) return []
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM messages WHERE agent_id = ? AND (created_at < ? OR (created_at = ? AND rowid < ?))
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`
+      )
+      .all(chatId, anchor.created_at, anchor.created_at, anchor.rowid, limit) as unknown as MessageRow[]
     return rows.reverse().map(toMessage)
   }
 

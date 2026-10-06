@@ -29,7 +29,10 @@ import type {
 export interface NateBotApi {
   bootstrap(): Promise<Bootstrap>
   // The chat methods take an agent id or a group chat (room) id.
+  /** The latest HISTORY_PAGE messages, oldest first. */
   listMessages(chatId: string): Promise<ChatMessage[]>
+  /** Up to OLDER_PAGE messages from before `beforeId`, oldest first; `more` if there are older ones still. */
+  olderMessages(chatId: string, beforeId: string): Promise<{ messages: ChatMessage[]; more: boolean }>
   sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
@@ -145,6 +148,7 @@ export interface NateBotApi {
 export const API_METHODS = [
   'bootstrap',
   'listMessages',
+  'olderMessages',
   'sendMessage',
   'stop',
   'markRead',
