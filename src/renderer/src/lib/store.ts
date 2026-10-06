@@ -75,6 +75,9 @@ export function sortAgents(agents: AgentSummary[]): AgentSummary[] {
   return [...agents].sort((a, b) => b.lastActivity - a.lastActivity)
 }
 
+/** Chats whose history is loading, with the live messages that arrived meanwhile. */
+const loading = new Map<string, ChatMessage[]>()
+
 export const useStore = create<State>((set, get) => {
   /** Keep the open chat marked read while the user is looking at it. */
   const markOpenChatRead = (): void => {
@@ -129,6 +132,8 @@ export const useStore = create<State>((set, get) => {
         markOpenChatRead()
       })
       api.on('message', (msg) => {
+        const early = loading.get(msg.agentId)
+        if (early) return void early.push(msg)
         const loaded = get().messages[msg.agentId]
         if (!loaded) return
         set({ messages: { ...get().messages, [msg.agentId]: upsertMessage(loaded, msg) } })
@@ -164,14 +169,18 @@ export const useStore = create<State>((set, get) => {
     select(chatId) {
       set({ selectedId: chatId, view: 'chat', drawerOpen: false, focusMessageId: null })
       void api.markRead(chatId)
-      if (!get().messages[chatId]) {
-        // Start with an empty list so live events are captured while history loads.
-        set({ messages: { ...get().messages, [chatId]: [] } })
-        void api.listMessages(chatId).then((history) => {
-          const live = get().messages[chatId] ?? []
-          const merged = live.reduce(upsertMessage, history)
-          set({ messages: { ...get().messages, [chatId]: merged } })
-        })
+      if (!get().messages[chatId] && !loading.has(chatId)) {
+        // Keep live events aside while history loads. The chat stays undefined (blank) until then,
+        // so it doesn't flash its empty-chat intro first.
+        loading.set(chatId, [])
+        api.listMessages(chatId).then(
+          (history) => {
+            const merged = (loading.get(chatId) ?? []).reduce(upsertMessage, history)
+            loading.delete(chatId)
+            set({ messages: { ...get().messages, [chatId]: merged } })
+          },
+          () => loading.delete(chatId) // tried again next time it's opened
+        )
       }
     },
 
