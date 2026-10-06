@@ -5,6 +5,7 @@ import { CheckIcon, SpinnerIcon, XIcon } from './icons'
 import { Button, Field, IconButton, inputClass, Modal } from './ui'
 
 const GUIDE = 'https://github.com/NathanL05/natebot#connecting-gmail'
+const AUDIENCE = 'https://console.cloud.google.com/auth/audience'
 
 export function ConnectGmailModal() {
   const close = (): void => useStore.getState().setGmailOpen(false)
@@ -48,6 +49,23 @@ export function ConnectGmailModal() {
         {status?.connected && !progress && (
           <div className="rounded-lg bg-success/10 px-3 py-2 text-success">
             ✓ Gmail is connected{status.email ? ` as ${status.email}` : ''}. You can reconnect below if needed.
+          </div>
+        )}
+        {status?.expired && !progress && (
+          <div className="rounded-lg bg-warn/10 px-3 py-2 leading-relaxed text-warn">
+            Gmail's sign-in expired. Google does this every 7 days while your Google Cloud app is in <em>Testing</em>. To
+            make it permanent, open{' '}
+            <a
+              href={AUDIENCE}
+              className="underline"
+              onClick={(e) => {
+                e.preventDefault()
+                void api.openExternal(AUDIENCE)
+              }}
+            >
+              Google Auth Platform → Audience
+            </a>{' '}
+            and click <strong>Publish app</strong> (it stays private to you). Then click Connect below.
           </div>
         )}
         {status && !status.uvInstalled && (

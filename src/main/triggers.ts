@@ -51,7 +51,7 @@ export class EmailWatcher {
       tokenPath: () => string | null
       onMatch: (agentId: string, trigger: EmailTrigger, hits: EmailHit[]) => void
       /** Gmail's sign-in can no longer be refreshed (expired or revoked). */
-      onSignInExpired: () => void
+      onSignInExpired: (path: string) => void
       log: (line: string) => void
     }
   ) {

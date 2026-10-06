@@ -79,6 +79,11 @@ export function ConnectGoogleModal({ server }: { server: ExtraGoogle }) {
       </div>
 
       <div className="space-y-4 px-5 py-5 text-[13px] leading-relaxed">
+        {status?.expired && !progress && (
+          <div className="rounded-lg bg-warn/10 px-3 py-2 text-warn">
+            {copy.short}'s sign-in expired. Click Connect to sign in again (publishing your Google app stops the weekly expiry).
+          </div>
+        )}
         {status?.connected && !progress && (
           <div className="rounded-lg bg-success/10 px-3 py-2 text-success">✓ {copy.short} is connected. You can reconnect below if needed.</div>
         )}

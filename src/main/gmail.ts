@@ -11,7 +11,7 @@
 // happen here (where we keep the process running until the token lands),
 // never inside a short-lived agent run.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { createInterface } from 'node:readline'
 import { join } from 'node:path'
@@ -213,6 +213,25 @@ export function googleReady(server: string): boolean {
   }
 }
 
+/**
+ * Google refused to refresh this token file (invalid_grant): set it aside as <file>.expired so the
+ * service shows as not connected (agents stop getting a broken server, Settings says Connect again).
+ * The refresh token in it is dead, so nothing usable is lost.
+ */
+export function markSignInExpired(path: string): void {
+  try {
+    if (existsSync(path)) renameSync(path, `${path}.expired`)
+    log(`google: sign-in expired (${path.split('/').slice(-2).join('/')})`)
+  } catch (e) {
+    log(`google: could not mark sign-in expired: ${(e as Error).message}`)
+  }
+}
+
+function signInExpired(server: GoogleServer): boolean {
+  const { email } = savedEntry(server)
+  return !!email && !googleReady(server) && existsSync(`${tokenFile(email, SERVICES[server].credentialsDir)}.expired`)
+}
+
 /** A Google service's sign-in token file once it's connected (for NateBot's own API calls). */
 export function googleTokenPath(server: string): string | null {
   if (!isGoogle(server)) return null
@@ -243,7 +262,8 @@ export function googleStatus(server: string): GmailStatus {
     email: gmail.email,
     clientId: gmail.clientId,
     hasSecret: !!gmail.clientSecret,
-    uvInstalled: findOnPath('uvx') !== null
+    uvInstalled: findOnPath('uvx') !== null,
+    expired: signInExpired(s)
   }
 }
 
@@ -255,7 +275,8 @@ export function gmailStatus(): GmailStatus {
     email: saved.email,
     clientId: saved.clientId,
     hasSecret: !!saved.clientSecret,
-    uvInstalled: findOnPath('uvx') !== null
+    uvInstalled: findOnPath('uvx') !== null,
+    expired: signInExpired('gmail')
   }
 }
 
@@ -449,6 +470,7 @@ async function signIn(
     if (res.isError || AUTH_NEEDED.test(res.text)) {
       throw new Error(res.text.split('\n').slice(0, 3).join(' ').slice(0, 300) || `${label} did not respond as expected.`)
     }
+    rmSync(`${token}.expired`, { force: true })
     log(`${server}: connected`)
     onProgress({ stage: 'done', message: `${label} connected (${email}).` })
     return { ok: true }

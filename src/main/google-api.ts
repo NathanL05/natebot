@@ -20,8 +20,8 @@ export class GoogleToken {
 
   constructor(
     private path: () => string | null,
-    /** The sign-in can no longer be refreshed (expired or revoked). */
-    private onExpired: () => void = () => undefined
+    /** The sign-in at this token file can no longer be refreshed (expired or revoked). */
+    private onExpired: (path: string) => void = () => undefined
   ) {}
 
   /** Whether a sign-in exists at all. */
@@ -46,8 +46,17 @@ export class GoogleToken {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       body: new URLSearchParams({ client_id: f.client_id, client_secret: f.client_secret, refresh_token: f.refresh_token, grant_type: 'refresh_token' })
     })
-    if (res.status === 400 || res.status === 401) this.onExpired()
-    if (!res.ok) throw new Error(`Google sign-in refresh failed (${res.status}); reconnect if this keeps happening`)
+    if (!res.ok) {
+      // Only invalid_grant means the refresh token itself is dead (Google expires it after 7 days
+      // while the OAuth app is in Testing). Other errors may be passing, so keep the sign-in.
+      const error = await res.json().then((b) => (b as { error?: unknown }).error, () => undefined)
+      if (error === 'invalid_grant') {
+        this.access = null
+        this.onExpired(path)
+        throw new Error('the Google sign-in expired or was revoked; reconnect it in Settings')
+      }
+      throw new Error(`Google sign-in refresh failed (${res.status}); reconnect if this keeps happening`)
+    }
     const body = (await res.json()) as { access_token: string; expires_in: number }
     this.access = { token: body.access_token, until: Date.now() + body.expires_in * 1000 }
     return body.access_token

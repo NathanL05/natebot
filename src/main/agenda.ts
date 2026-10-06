@@ -57,10 +57,11 @@ export class AgendaReader {
 
   constructor(
     tokenPath: (server: string) => string | null,
-    private remindersConnected: () => boolean
+    private remindersConnected: () => boolean,
+    onExpired: (path: string) => void = () => undefined
   ) {
-    this.calendar = new GoogleToken(() => tokenPath('gcal'))
-    this.tasks = new GoogleToken(() => tokenPath('gtasks'))
+    this.calendar = new GoogleToken(() => tokenPath('gcal'), onExpired)
+    this.tasks = new GoogleToken(() => tokenPath('gtasks'), onExpired)
   }
 
   async today(refresh = false): Promise<Agenda> {
