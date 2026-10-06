@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_EFFORT } from '@shared/types'
+import { DEFAULT_EFFORT, MAX_ROUTINES } from '@shared/types'
 import { AgentStore, normalize, slugify } from './agents'
 
 describe('agent YAML normalisation', () => {
@@ -97,12 +97,14 @@ describe('agent YAML normalisation', () => {
           { cron: '' },
           { cron: '0 14 * * *' },
           { cron: '0 15 * * *' },
-          { cron: '0 16 * * *' }
+          { cron: '0 16 * * *' },
+          ...Array.from({ length: 20 }, (_, i) => ({ cron: `0 ${i} * * 1` }))
         ]
       },
       'x'
     ).routines
-    expect(routines.map((r) => r.id)).toEqual(['main', 'evening', 'evening-2', 'r4', 'r6'])
+    expect(routines).toHaveLength(MAX_ROUTINES)
+    expect(routines.slice(0, 7).map((r) => r.id)).toEqual(['main', 'evening', 'evening-2', 'r4', 'r6', 'r7', 'r8'])
     expect(routines[1]).toEqual({ id: 'evening', enabled: true, cron: '0 19 * * *', prompt: 'Evening' })
   })
 

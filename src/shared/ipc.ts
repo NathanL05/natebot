@@ -21,6 +21,7 @@ import type {
   RoomDraft,
   RoomSummary,
   RoutineInfo,
+  RoutineRun,
   UsageBreakdown,
   UsageInfo
 } from './types'
@@ -96,6 +97,8 @@ export interface NateBotApi {
   resolveHandoff(messageId: string, handoffId: string, decision: 'send' | 'dismiss'): Promise<void>
 
   listRoutines(): Promise<RoutineInfo[]>
+  /** A routine's last 20 runs, newest first. */
+  routineHistory(agentId: string, routineId: string): Promise<RoutineRun[]>
   setRoutineEnabled(agentId: string, routineId: string, enabled: boolean): Promise<void>
   runRoutineNow(agentId: string, routineId: string): Promise<void>
   /** Reminders still waiting to go off, soonest first. */
@@ -177,6 +180,7 @@ export const API_METHODS = [
   'resolveAction',
   'resolveHandoff',
   'listRoutines',
+  'routineHistory',
   'setRoutineEnabled',
   'runRoutineNow',
   'listReminders',

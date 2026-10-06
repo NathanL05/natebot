@@ -15,7 +15,7 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/
 const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
   '# model: sonnet | haiku | opus   effort: low | medium | high | xhigh | max\n' +
-  '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 5\n' +
+  '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 20\n' +
   '# auto_approve: approval-only tools (mcp__server__tool) approved without asking\n' +
   '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 

@@ -78,7 +78,7 @@ export interface AgentConfig {
   session_id: string | null
 }
 
-export const MAX_ROUTINES = 5
+export const MAX_ROUTINES = 20
 export const MAX_QUICK_PROMPTS = 6
 
 export type AgentStatus = 'idle' | 'running'
@@ -367,6 +367,17 @@ export interface EnvStatus {
 }
 
 /** One routine, for the Routines view. */
+/** One finished run of a routine, for its history. */
+export interface RoutineRun {
+  at: number
+  ok: boolean
+  summary: string
+  /** The reply it produced (null for runs from before this was recorded). */
+  messageId: string | null
+  /** Input + output tokens, when the run reported them. */
+  tokens: number | null
+}
+
 export interface RoutineInfo {
   agentId: string
   agentName: string
