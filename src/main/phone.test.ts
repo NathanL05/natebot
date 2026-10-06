@@ -1,11 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { IDLE_MS, parsePhoneMessage, PhoneInbox } from './phone'
+import { approvalButtons, IDLE_MS, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
 
 describe('phone messages', () => {
   it('reads an @agent prefix, or none', () => {
     expect(parsePhoneMessage('@Planner move gym to 8')).toEqual({ agent: 'planner', text: 'move gym to 8' })
     expect(parsePhoneMessage('  anything urgent?  ')).toEqual({ agent: null, text: 'anything urgent?' })
     expect(parsePhoneMessage('@planner')).toEqual({ agent: null, text: '@planner' })
+  })
+})
+
+describe('phone approvals', () => {
+  it('builds Approve and Reject buttons that post a one-time code to the -in topic', () => {
+    expect(approvalButtons('nb-x7-in', '0123456789abcdef')).toBe(
+      'http, Approve, https://ntfy.sh/nb-x7-in, method=POST, body=natebot-approve-0123456789abcdef, clear=true; ' +
+        'http, Reject, https://ntfy.sh/nb-x7-in, method=POST, body=natebot-reject-0123456789abcdef, clear=true'
+    )
+  })
+
+  it('recognises only an exact button message', () => {
+    expect(parsePhoneDecision('natebot-approve-0123456789abcdef')).toEqual({ decision: 'approve', code: '0123456789abcdef' })
+    expect(parsePhoneDecision(' natebot-reject-0123456789abcdef\n')).toEqual({ decision: 'reject', code: '0123456789abcdef' })
+    expect(parsePhoneDecision('natebot-approve-123')).toBeNull()
+    expect(parsePhoneDecision('please natebot-approve-0123456789abcdef')).toBeNull()
+    expect(parsePhoneDecision('@planner approve it')).toBeNull()
   })
 })
 

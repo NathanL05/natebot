@@ -10,6 +10,23 @@ export function parsePhoneMessage(raw: string): { agent: string | null; text: st
   return m ? { agent: (m[1] ?? '').toLowerCase(), text: (m[2] ?? '').trim() } : { agent: null, text: raw.trim() }
 }
 
+/**
+ * ntfy action buttons for an approval notification. Tapping one posts "natebot-approve-<code>"
+ * (or reject) to your "-in" topic, which NateBot is listening on. No server needed.
+ */
+export function approvalButtons(inTopic: string, code: string): string {
+  const url = `https://ntfy.sh/${encodeURIComponent(inTopic)}`
+  return (['approve', 'reject'] as const)
+    .map((d) => `http, ${d === 'approve' ? 'Approve' : 'Reject'}, ${url}, method=POST, body=natebot-${d}-${code}, clear=true`)
+    .join('; ')
+}
+
+/** What a tapped Approve / Reject button sent, or null for an ordinary message. */
+export function parsePhoneDecision(raw: string): { decision: 'approve' | 'reject'; code: string } | null {
+  const m = /^natebot-(approve|reject)-([a-f0-9]{16})$/.exec(raw.trim())
+  return m ? { decision: m[1] as 'approve' | 'reject', code: m[2] as string } : null
+}
+
 /** ntfy sends a keepalive about every 45s: this long with nothing means the connection died quietly. */
 export const IDLE_MS = 2 * 60_000
 

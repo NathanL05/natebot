@@ -504,7 +504,8 @@ function PhoneRow({
           {inbox && (
             <div className="w-full text-[12px] text-muted">
               In the ntfy app, also subscribe to <code className="selectable">{topic}-in</code> and send messages there: “@planner move gym to 8”, or just
-              text for your most recent agent. Replies arrive as notifications with their text.
+              text for your most recent agent. Replies arrive as notifications with their text, and approval requests get Approve and
+              Reject buttons (each works once, for 24 hours).
             </div>
           )}
         </div>
