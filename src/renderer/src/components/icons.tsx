@@ -88,6 +88,11 @@ export const TrashIcon = (p: IconProps) => (
     <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
   </Icon>
 )
+export const ReplyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </Icon>
+)
 export const EraserIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M7 21h13M5.5 14.5l7-7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L13 19H8.5l-3-3a1 1 0 0 1 0-1.5ZM9 11l6 6" />

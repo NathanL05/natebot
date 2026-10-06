@@ -6,7 +6,7 @@ import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { ReminderCard } from './ReminderCard'
-import { AlertIcon, CheckIcon, CopyIcon, DownloadIcon, NoteIcon, PaperclipIcon, PinIcon, SpeakerIcon } from './icons'
+import { AlertIcon, CheckIcon, CopyIcon, DownloadIcon, NoteIcon, PaperclipIcon, PinIcon, ReplyIcon, SpeakerIcon } from './icons'
 import { Markdown } from './Markdown'
 import { api, useStore } from '../lib/store'
 import { speak, stopSpeaking } from '../lib/voice'
@@ -75,6 +75,9 @@ function MessageTools({ msg }: { msg: ChatMessage }) {
   const btn = 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted transition hover:bg-hover hover:text-fg'
   return (
     <div className={`mt-0.5 ml-1 flex gap-0.5 transition-opacity ${msg.pinned ? '' : 'opacity-0 group-hover:opacity-100'}`}>
+      <button type="button" className={btn} onClick={() => useStore.getState().setReplying(msg.agentId, msg)}>
+        <ReplyIcon size={11} /> Reply
+      </button>
       <button
         type="button"
         className={btn}
@@ -144,6 +147,16 @@ function Message({
             <PaperclipIcon size={12} /> {basename(a)}
           </div>
         ))}
+        {msg.replyTo && (
+          <button
+            type="button"
+            onClick={() => useStore.getState().openMessage(msg.agentId, msg.replyTo!.id)}
+            className="mb-1 max-w-[60%] truncate rounded-lg border-l-2 border-accent/60 bg-elev px-2.5 py-1 text-left text-[12px] text-muted hover:text-fg"
+            title="Show the message this replies to"
+          >
+            <span className="font-medium">{msg.replyTo.who}:</span> {msg.replyTo.excerpt}
+          </button>
+        )}
         {msg.text && (
           <div className="selectable max-w-[70%] rounded-2xl rounded-br-md bg-me px-3.5 py-2 text-[14px] whitespace-pre-wrap text-me-fg">
             {withMentions(msg.text, memberNames)}
