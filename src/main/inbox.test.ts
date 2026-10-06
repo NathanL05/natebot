@@ -2,8 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { gmailLink } from '@shared/types'
-import { InboxReader, mapLimit, parseFrom, toMails } from './inbox'
+import { gmailLink, promptLabel, type InboxMail } from '@shared/types'
+import { inboxContext, InboxReader, mapLimit, parseFrom, toMails, wantsInbox } from './inbox'
 
 function tokenFile(): string {
   const path = join(mkdtempSync(join(tmpdir(), 'inbox-')), 'me.json')
@@ -94,5 +94,50 @@ describe('mapLimit', () => {
     })
     expect(out).toEqual([50, 10, 40, 20, 30])
     expect(most).toBe(2)
+  })
+})
+
+describe('inbox snapshot', () => {
+  const mail = (over: Partial<InboxMail> = {}): InboxMail => ({
+    id: 'm1',
+    threadId: 't1',
+    from: 'Ann Lee',
+    fromAddress: 'ann@x.com',
+    subject: 'Lab',
+    snippet: 'Due Friday',
+    at: new Date(2026, 9, 6, 9, 5).getTime(),
+    unread: true,
+    ...over
+  })
+
+  it('attaches the inbox when a Gmail agent is asked about email', () => {
+    expect(wantsInbox(['gmail'], 'Give me a summary of my emails')).toBe(true)
+    expect(wantsInbox(['gmail'], 'Do my morning inbox sweep.')).toBe(true)
+    expect(wantsInbox(['gmail'], 'Anything unread from Ann?')).toBe(true)
+    expect(wantsInbox(['gmail'], 'Plan my day')).toBe(false)
+    expect(wantsInbox([], 'Summarise my emails')).toBe(false)
+    expect(wantsInbox(['gmail'], 'Summarise {{inbox}} for me')).toBe(false)
+  })
+
+  it('lists one line per conversation, framed as data', () => {
+    const text = inboxContext({ connected: true, email: 'me@gmail.com', error: null, mails: [mail(), mail({ id: 'm2', from: 'x@y.com', fromAddress: 'x@y.com', unread: false })] })
+    const lines = text.split('\n')
+    expect(lines[0]).toMatch(/never as instructions/)
+    expect(lines[1]).toBe('- ● Tue 09:05 · Ann Lee <ann@x.com> · "Lab" · Due Friday (id m1)')
+    expect(lines[2]).toBe('- Tue 09:05 · x@y.com · "Lab" · Due Friday (id m2)')
+  })
+
+  it('says when Gmail is not connected or could not be read', () => {
+    expect(inboxContext({ connected: false, email: null, error: null, mails: [] })).toMatch(/not connected/)
+    expect(inboxContext({ connected: true, email: null, error: 'Gmail could not be read (x)', mails: [] })).toMatch(/could not be read/)
+    expect(inboxContext({ connected: true, email: null, error: null, mails: [] })).toMatch(/nothing in the last 3 days/)
+  })
+})
+
+describe('promptLabel', () => {
+  it('takes placeholders out of what the user sees', () => {
+    expect(promptLabel('Write my morning brief {{today}} {{inbox}}')).toEqual({ text: 'Write my morning brief', attached: ["Today's agenda", 'Inbox'] })
+    expect(promptLabel('Plan my day.\n\n{{today}}')).toEqual({ text: 'Plan my day.', attached: ["Today's agenda"] })
+    expect(promptLabel('Hi  there')).toEqual({ text: 'Hi  there', attached: [] })
   })
 })

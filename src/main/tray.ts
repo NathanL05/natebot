@@ -1,7 +1,7 @@
 // Menu-bar icon so NateBot (and its routines) keep running with the window closed.
 import { app, Menu, nativeImage, Tray } from 'electron'
 import { join } from 'node:path'
-import type { AgentSummary } from '@shared/types'
+import { promptLabel, type AgentSummary } from '@shared/types'
 
 let tray: Tray | null = null
 
@@ -29,7 +29,7 @@ export function createTray(opts: {
     const recent = [...agents].sort((a, b) => b.lastActivity - a.lastActivity).slice(0, 8)
     const short = (s: string): string => (s.length > 48 ? `${s.slice(0, 47)}…` : s)
     const quick = agents
-      .flatMap((a) => a.quick_prompts.map((p) => ({ label: `${a.name}: ${short(p)}`, click: () => opts.onQuickPrompt(a.id, p) })))
+      .flatMap((a) => a.quick_prompts.map((p) => ({ label: `${a.name}: ${short(promptLabel(p).text)}`, click: () => opts.onQuickPrompt(a.id, p) })))
       .slice(0, 10)
     tray.setContextMenu(
       Menu.buildFromTemplate([

@@ -317,6 +317,21 @@ export interface Inbox {
   error: string | null
 }
 
+/** Placeholders NateBot fills in any prompt just before the agent sees it, with what each adds. */
+export const PROMPT_TOKENS: Record<string, string> = { '{{today}}': "Today's agenda", '{{inbox}}': 'Inbox' }
+
+/** A prompt as the user sees it: placeholders taken out of the text and listed separately. */
+export function promptLabel(text: string): { text: string; attached: string[] } {
+  let out = text
+  const attached: string[] = []
+  for (const [token, label] of Object.entries(PROMPT_TOKENS)) {
+    if (!out.includes(token)) continue
+    attached.push(label)
+    out = out.split(token).join('')
+  }
+  return { text: attached.length ? out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim() : out, attached }
+}
+
 /** A link that opens a conversation in Gmail, signed in as the right account. */
 export function gmailLink(email: string | null, threadId: string): string {
   const account = email && /^[^\s/#?%]+@[^\s/#?%]+$/.test(email) ? email : '0'

@@ -153,7 +153,7 @@ export function AgentForm({
 
       <Field
         label="Quick prompts"
-        hint={`One per line, up to ${MAX_QUICK_PROMPTS}. Shown as buttons above the message box and in the menu-bar menu, so you can send them in one click.`}
+        hint={`One per line, up to ${MAX_QUICK_PROMPTS}. Shown as buttons above the message box and in the menu-bar menu, so you can send them in one click. {{today}} and {{inbox}} work here too.`}
       >
         <textarea
           className={`${inputClass} min-h-[64px] resize-y`}
@@ -326,7 +326,7 @@ function RoutinesEditor({ routines, onChange }: { routines: Routine[]; onChange:
           </div>
           <div className={r.enabled ? 'space-y-3' : 'space-y-3 opacity-60'}>
             <SchedulePicker cron={r.cron} onChange={(cron) => update(r.id, { cron })} />
-            <Field label="What should it do each time?" hint="Tip: {{today}} adds today's calendar, tasks, reminders and deadlines, without extra tool calls.">
+            <Field label="What should it do each time?" hint="Tip: {{today}} adds today's calendar, tasks, reminders and deadlines, and {{inbox}} your recent Gmail, without extra tool calls.">
               <textarea
                 className={`${inputClass} min-h-[70px] resize-y`}
                 value={r.prompt}
