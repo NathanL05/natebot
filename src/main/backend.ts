@@ -2,7 +2,7 @@
 // store (YAML), the database (SQLite), the claude engine and the scheduler.
 import { app, BrowserWindow, clipboard, dialog, Notification, powerMonitor, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, statSync, unwatchFile, watchFile, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, unwatchFile, watchFile, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { NateBotApi } from '@shared/ipc'
@@ -64,6 +64,7 @@ import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from '
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
 import { watchPrompt, WebWatcher } from './webwatch'
+import { draftFromShare, shareFile } from './agent-share'
 import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
@@ -1107,6 +1108,31 @@ export class Backend implements NateBotApi {
       if (this.db.getMessage(messageId)) continue
       n.close()
       this.approvalNotices.delete(messageId)
+    }
+  }
+
+  async exportAgent(agentId: string): Promise<{ ok: boolean; path?: string }> {
+    const agent = this.requireAgent(agentId)
+    const win = BrowserWindow.getFocusedWindow()
+    const name = agent.name.replace(/[/\\:*?"<>|]+/g, ' ').trim() || agent.id
+    const opts = { defaultPath: join(homedir(), 'Desktop', `${name}.natebot.json`), filters: [{ name: 'NateBot agent', extensions: ['json'] }] }
+    const res = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+    if (res.canceled || !res.filePath) return { ok: false }
+    writeFileSync(res.filePath, shareFile(agent))
+    return { ok: true, path: res.filePath }
+  }
+
+  async importAgentFile(): Promise<{ draft?: AgentDraft; error?: string } | null> {
+    const win = BrowserWindow.getFocusedWindow()
+    const opts = { properties: ['openFile' as const], filters: [{ name: 'NateBot agent', extensions: ['json'] }], message: 'Choose a shared NateBot agent (.natebot.json)' }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    const file = res.canceled ? undefined : res.filePaths[0]
+    if (!file) return null
+    try {
+      if (statSync(file).size > 1_000_000) throw new Error("That file is too big to be a NateBot agent.")
+      return { draft: draftFromShare(readFileSync(file, 'utf8')) }
+    } catch (e) {
+      return { error: (e as Error).message }
     }
   }
 

@@ -5,7 +5,7 @@ import { agentPicture } from '../lib/avatars'
 import { AgentForm, validateDraft } from './AgentForm'
 import { Avatar } from './Avatar'
 import { AvatarEditor } from './AvatarEditor'
-import { RefreshIcon, TrashIcon, XIcon } from './icons'
+import { DownloadIcon, RefreshIcon, TrashIcon, XIcon } from './icons'
 import { Button, ConfirmDialog, IconButton, inputClass } from './ui'
 
 function toDraft(a: AgentSummary): AgentDraft {
@@ -35,6 +35,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
   const [draft, setDraft] = useState<AgentDraft>(() => toDraft(agent))
   const [confirm, setConfirm] = useState<'reset' | 'delete' | null>(null)
   const [saving, setSaving] = useState(false)
+  const [shared, setShared] = useState<string | null>(null)
 
   useEffect(() => {
     setDraft(toDraft(agent))
@@ -103,6 +104,17 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
               </div>
               <Button onClick={() => setConfirm('reset')}>
                 <RefreshIcon size={13} /> Reset
+              </Button>
+            </div>
+            <div className="flex items-center gap-3 rounded-xl bg-elev px-3 py-2.5">
+              <div className="flex-1">
+                <div className="text-[13px] font-medium">Share as a file</div>
+                <div className="text-[12px] text-muted">
+                  {shared ?? 'Its instructions, routines and watches, to import in another NateBot. Never its memory, chats or folders.'}
+                </div>
+              </div>
+              <Button onClick={() => void api.exportAgent(agent.id).then((r) => r.ok && setShared(`Saved to ${r.path?.replace(/^\/Users\/[^/]+/, '~')}`))}>
+                <DownloadIcon size={13} /> Save…
               </Button>
             </div>
             <div className="flex items-center gap-3 rounded-xl bg-elev px-3 py-2.5">

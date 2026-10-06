@@ -73,6 +73,10 @@ export interface NateBotApi {
   updateAgent(agent: AgentConfig): Promise<AgentConfig>
   deleteAgent(agentId: string): Promise<void>
   resetMemory(agentId: string): Promise<void>
+  /** Saves the agent as a shareable .natebot.json file (no memory, chat or personal settings). */
+  exportAgent(agentId: string): Promise<{ ok: boolean; path?: string }>
+  /** Reads a shared agent file the user picks, as a draft for the New agent form (null if cancelled). */
+  importAgentFile(): Promise<{ draft?: AgentDraft; error?: string } | null>
   /** The agent's lasting notes (memory.md in its workspace). */
   getMemory(agentId: string): Promise<string>
   setMemory(agentId: string, text: string): Promise<void>
@@ -173,6 +177,8 @@ export const API_METHODS = [
   'updateAgent',
   'deleteAgent',
   'resetMemory',
+  'exportAgent',
+  'importAgentFile',
   'getMemory',
   'setMemory',
   'createRoom',

@@ -16,6 +16,7 @@ export function AddAgentModal() {
   const [touched, setTouched] = useState(false)
   const [colorPicked, setColorPicked] = useState(false)
   const [template, setTemplate] = useState<string | null>(null)
+  const [importNote, setImportNote] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Until a colour is picked by hand, it follows the name (same seed as the mascot).
   const change = (next: AgentDraft): void => {
@@ -26,6 +27,7 @@ export function AddAgentModal() {
   const close = (): void => useStore.getState().setAddOpen(false)
 
   const pick = (id: string | null): void => {
+    setImportNote(null)
     const t = AGENT_TEMPLATES.find((x) => x.id === id)
     setTemplate(t ? t.id : null)
     setColorPicked(!!t)
@@ -34,6 +36,20 @@ export function AddAgentModal() {
     // Same folders the other agents read, as the Career Board and Job Hunter get.
     if (t.readsPlan) next.read_folders = [...new Set(useStore.getState().agents.flatMap((a) => a.read_folders))].slice(0, MAX_READ_FOLDERS)
     setDraft(next)
+  }
+
+  const importFile = async (): Promise<void> => {
+    const res = await api.importAgentFile()
+    if (!res) return
+    if (!res.draft) return setImportNote({ ok: false, text: res.error ?? "Couldn't read that file." })
+    setTemplate('import')
+    setColorPicked(true)
+    setDraft(res.draft)
+    const off = res.draft.routines.length + res.draft.email_triggers.length + (res.draft.web_watches?.length ?? 0)
+    setImportNote({
+      ok: true,
+      text: `Imported "${res.draft.name}". Check it below before creating it.${off ? ' Its routines, triggers and page watches are off until you turn them on.' : ''}`
+    })
   }
 
   const problems = validateDraft(draft)
@@ -78,8 +94,22 @@ export function AddAgentModal() {
                 {t.label}
               </button>
             ))}
+            <button
+              type="button"
+              title="Open an agent someone shared as a .natebot.json file"
+              onClick={() => void importFile()}
+              className={`rounded-full border border-dashed px-3 py-1 text-[12px] transition ${
+                template === 'import' ? 'border-accent bg-selected text-fg' : 'border-line-strong text-muted hover:text-fg'
+              }`}
+            >
+              Import file…
+            </button>
           </div>
-          {template && <div className="mt-2 text-[12px] text-muted">{AGENT_TEMPLATES.find((t) => t.id === template)?.hint}. Change anything below.</div>}
+          {importNote ? (
+            <div className={`mt-2 text-[12px] ${importNote.ok ? 'text-muted' : 'text-danger'}`}>{importNote.text}</div>
+          ) : (
+            template && <div className="mt-2 text-[12px] text-muted">{AGENT_TEMPLATES.find((t) => t.id === template)?.hint}. Change anything below.</div>
+          )}
         </div>
         {/* Remounted per template: some fields keep their own text until they lose focus. */}
         <AgentForm key={template ?? 'blank'} draft={draft} onChange={change} mcpServers={mcpServers} />
