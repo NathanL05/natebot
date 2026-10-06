@@ -1,6 +1,9 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_EFFORT } from '@shared/types'
-import { normalize, slugify } from './agents'
+import { AgentStore, normalize, slugify } from './agents'
 
 describe('agent YAML normalisation', () => {
   it('fills every field from an empty or broken file', () => {
@@ -20,9 +23,15 @@ describe('agent YAML normalisation', () => {
         routines: [],
         email_triggers: [],
         read_folders: [],
+        auto_approve: [],
         session_id: null
       })
     }
+  })
+
+  it('keeps only MCP tool names as Always allow rules, once each', () => {
+    const a = normalize({ auto_approve: ['mcp__gtasks__create_task', 'mcp__gtasks__create_task', 'Bash', 'mcp____x', '', 3] }, 'p')
+    expect(a.auto_approve).toEqual(['mcp__gtasks__create_task'])
   })
 
   it('keeps valid values', () => {
@@ -126,5 +135,17 @@ describe('slugify', () => {
     expect(slugify('  Café — Planner!! ')).toBe('cafe-planner')
     expect(slugify('***')).toBe('agent')
     expect(slugify('a'.repeat(100))).toHaveLength(48)
+  })
+})
+
+describe('AgentStore', () => {
+  it('keeps Always allow rules through an update that leaves them out', () => {
+    const store = new AgentStore(mkdtempSync(join(tmpdir(), 'agents-')))
+    store.init()
+    const a = store.create({ ...store.list()[0]!, name: 'Rules', auto_approve: ['mcp__gtasks__create_task'] })
+    const { auto_approve: _omit, ...withoutRules } = a
+    expect(store.update({ ...withoutRules, instructions: 'New' }).auto_approve).toEqual(['mcp__gtasks__create_task'])
+    expect(store.update({ ...a, auto_approve: [] }).auto_approve).toEqual([])
+    store.close()
   })
 })

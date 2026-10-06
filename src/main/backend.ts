@@ -32,6 +32,7 @@ import type {
 } from '@shared/types'
 import { isRoomId } from '@shared/types'
 import { describeCron } from '@shared/schedule'
+import { toolLabel } from '@shared/tools'
 import { AgentStore, slugify } from './agents'
 import { SPOKEN_CONTENT_SETTINGS } from '@shared/types'
 import { BOARD_MEMBERS, BOARD_ROOM, BOARD_ROOM_ID } from './board'
@@ -44,10 +45,10 @@ import { log } from './log'
 import * as skills from './skills'
 import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
 import { AgendaReader } from './agenda'
-import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
+import { approvalOnlyTools, configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
-import { APPROVAL_BUTTONS, APPROVE, approvalNotice, REJECT } from './notices'
+import { APPROVAL_BUTTONS, APPROVE, approvalNotice, autoApprovable, REJECT } from './notices'
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { cleanTmp } from './tmp'
@@ -268,7 +269,7 @@ export class Backend implements NateBotApi {
   private summaries(): AgentSummary[] {
     const pending = new Map<string, number>()
     for (const m of this.db.pendingMessages()) {
-      const n = (m.actions?.filter((a) => a.status === 'pending').length ?? 0) + (m.handoffs?.filter((h) => h.status === 'pending').length ?? 0)
+      const n = (m.actions?.filter((a) => a.status === 'pending' && !a.auto).length ?? 0) + (m.handoffs?.filter((h) => h.status === 'pending').length ?? 0)
       pending.set(m.agentId, (pending.get(m.agentId) ?? 0) + n)
     }
     return this.store.list().map((a) => {
@@ -462,9 +463,48 @@ export class Backend implements NateBotApi {
     this.approvalNotices.delete(messageId)
   }
 
+  /**
+   * Approves the run's proposals that an "Always allow" rule covers, one at a time.
+   * Returns whether anything is still waiting for the user.
+   */
+  private autoApprove(r: RunFinished): boolean {
+    const msg = this.db.getMessage(r.messageId)
+    const rules = this.store.get(r.agentId)?.auto_approve ?? []
+    if (!msg) return r.needsApproval
+    const covered = autoApprovable(msg.actions, rules)
+    if (covered.length) {
+      // Marked up front, so the approval notification and the cards leave them out while they wait their turn.
+      for (const a of msg.actions ?? []) if (covered.includes(a.id)) a.auto = true
+      this.db.saveMessage(msg)
+      emit('message', msg)
+      void (async () => {
+        for (const id of covered) {
+          const latest = this.db.getMessage(msg.id)
+          const action = latest?.actions?.find((a) => a.id === id)
+          if (!latest || action?.status !== 'pending') continue
+          log(`action: agent=${r.agentId} auto-approved ${action.tool}`)
+          await this.engine.executeAction(r.agentId, latest, action).catch((e: Error) => log(`auto-approve failed: ${e.message}`))
+          // Still pending (e.g. the usage limit was reached): hand it back to the user with its buttons.
+          const after = this.db.getMessage(msg.id)
+          const left = after?.actions?.find((a) => a.id === id)
+          if (after && left?.status === 'pending' && left.auto) {
+            delete left.auto
+            this.db.saveMessage(after)
+            emit('message', after)
+            this.emitAgents()
+          }
+        }
+      })()
+    }
+    // Handoffs have their own notification (runFinished's handoffTo).
+    return (msg.actions ?? []).some((a) => a.status === 'pending' && !covered.includes(a.id))
+  }
+
   private onRunFinished(r: RunFinished): void {
     log(`run: agent=${r.agentId} source=${r.source} ok=${r.ok}`)
     void this.usage.refresh()
+    // Proposals covered by "Always allow" go ahead now; only the rest need the user.
+    if (r.needsApproval) r = { ...r, needsApproval: this.autoApprove(r) }
     // You asked from your phone: answer there, even if the Mac is in front or it's quiet hours.
     if (r.source === 'chat' && this.fromPhoneReply(r.agentId) && !r.needsApproval) {
       // The whole reply, not just its first line: on a phone this is the conversation.
@@ -1038,11 +1078,20 @@ export class Backend implements NateBotApi {
     else this.emitAgents()
   }
 
-  async resolveAction(messageId: string, actionId: string, decision: 'approve' | 'reject', details?: Record<string, unknown>): Promise<void> {
+  async resolveAction(messageId: string, actionId: string, decision: 'approve' | 'reject' | 'always', details?: Record<string, unknown>): Promise<void> {
     const msg = typeof messageId === 'string' ? this.db.getMessage(messageId) : null
     const action = msg?.actions?.find((a) => a.id === actionId)
     if (!msg || !action || action.status !== 'pending') return
-    if (!this.store.get(msg.agentId)) return
+    const agent = this.store.get(msg.agentId)
+    if (!agent) return
+    if (decision === 'always' && action.tool && approvalOnlyTools(agent).includes(action.tool)) {
+      const rules = agent.auto_approve ?? []
+      if (!rules.includes(action.tool)) {
+        this.store.update({ ...agent, auto_approve: [...rules, action.tool] })
+        this.engine.system(agent.id, `Always allowed: ${toolLabel(action.tool)}. ${agent.name} won't ask before this from now on (change it in its settings).`)
+        this.emitAgents()
+      }
+    }
 
     if (decision === 'reject') {
       action.status = 'rejected'

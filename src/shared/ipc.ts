@@ -84,10 +84,11 @@ export interface NateBotApi {
   /** chatId: an agent or group chat; folderId null = "No folder". */
   moveToFolder(chatId: string, folderId: string | null): Promise<void>
 
+  /** 'always' approves it and lets this agent use the same tool without asking from now on. */
   resolveAction(
     messageId: string,
     actionId: string,
-    decision: 'approve' | 'reject',
+    decision: 'approve' | 'reject' | 'always',
     details?: Record<string, unknown>
   ): Promise<void>
 

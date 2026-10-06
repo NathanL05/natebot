@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MODELS, type EmailTrigger, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
+import { toolLabel } from '@shared/tools'
 import { splitToolRules } from '@shared/toolRules'
 import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
 import { api } from '../lib/store'
@@ -195,6 +196,23 @@ export function AgentForm({
 
       {draft.mcp_servers.includes('gmail') && (
         <TriggersEditor triggers={draft.email_triggers} onChange={(email_triggers) => set('email_triggers', email_triggers)} />
+      )}
+
+      {(draft.auto_approve ?? []).length > 0 && (
+        <Field label="Approved without asking" hint="Added with Always allow on a proposal. Remove one to be asked again.">
+          <div className="space-y-1.5">
+            {(draft.auto_approve ?? []).map((t) => (
+              <div key={t} className="flex items-center gap-2 rounded-lg bg-elev px-3 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-[12px]" title={t}>
+                  {toolLabel(t)}
+                </span>
+                <IconButton label={`Ask again before ${toolLabel(t)}`} onClick={() => set('auto_approve', (draft.auto_approve ?? []).filter((x) => x !== t))}>
+                  <TrashIcon size={13} />
+                </IconButton>
+              </div>
+            ))}
+          </div>
+        </Field>
       )}
 
       {/* Advanced */}

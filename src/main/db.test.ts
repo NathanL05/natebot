@@ -157,6 +157,14 @@ describe('repairInterrupted', () => {
     expect(actions?.map((a) => a.status)).toEqual(['failed', 'pending', 'done'])
     expect(actions?.[0]?.result).toMatch(/closed while this was running/)
   })
+
+  it('asks again about auto-approved actions that never started', () => {
+    const db = new Db(':memory:')
+    const action = (id: string, status: 'pending' | 'done', auto: boolean) => ({ id, type: 't', summary: id, details: {}, status, auto })
+    db.saveMessage({ id: 'm1', agentId: 'email', role: 'agent', text: 'x', createdAt: 1, actions: [action('a1', 'pending', true), action('a2', 'done', true)] })
+    db.repairInterrupted()
+    expect(db.getMessage('m1')?.actions?.map((a) => [a.status, !!a.auto])).toEqual([['pending', false], ['done', true]])
+  })
 })
 
 describe('clearMessages', () => {

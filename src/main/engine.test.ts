@@ -88,6 +88,7 @@ function setup(agent: AgentConfig = emailAgent) {
     store: { get: () => agent, require: () => agent, list: () => [agent, helper], setSession: vi.fn() } as unknown as AgentStore,
     db: {
       saveMessage: (m: ChatMessage) => saved.push(structuredClone(m)),
+      getMessage: (id: string) => structuredClone(saved.findLast((m) => m.id === id) ?? null),
       startRun: vi.fn(),
       finishRun: vi.fn(),
       takeNotes: () => [],
@@ -215,6 +216,23 @@ describe('approved actions', () => {
     await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
     expect(a.status).toBe('failed')
     expect(a.result).toMatch(/never called/)
+  })
+
+  it('keeps both results when two actions on one message run at once', async () => {
+    const { engine, saved } = setup()
+    const a1 = action()
+    const a2 = action({ id: 'act-2', summary: 'Reply to Tom' })
+    const msg = (): ChatMessage => ({ id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0, actions: [structuredClone(a1), structuredClone(a2)] })
+    saved.push(msg())
+    // Each approval loads its own copy of the message, like two quick clicks.
+    const m1 = msg()
+    const m2 = msg()
+    h.events.push(...reply('✓ Sent', [{ id: 't1', name: SEND, ok: true }]))
+    const first = engine.executeAction('email-agent', m1, m1.actions![0]!)
+    h.events.push(...reply('✓ Sent', [{ id: 't2', name: SEND, ok: true }]))
+    const second = engine.executeAction('email-agent', m2, m2.actions![1]!)
+    await Promise.all([first, second])
+    expect(saved.findLast((m) => m.id === 'm1')?.actions?.map((a) => a.status)).toEqual(['done', 'done'])
   })
 
   it('fails instead of staying on "Working…" when the run throws', async () => {

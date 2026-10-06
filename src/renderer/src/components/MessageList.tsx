@@ -168,7 +168,7 @@ function Message({
         )
       )}
       {msg.text && !msg.streaming && <MessageTools msg={msg} />}
-      {msg.actions?.map((a) => <ActionCard key={a.id} messageId={msg.id} action={a} />)}
+      {msg.actions?.map((a) => <ActionCard key={a.id} messageId={msg.id} agentId={msg.agentId} action={a} />)}
       {msg.handoffs?.map((h) => <HandoffCard key={h.id} messageId={msg.id} handoff={h} />)}
       {msg.reminders?.map((r) => <ReminderCard key={r.id} reminder={r} />)}
     </div>

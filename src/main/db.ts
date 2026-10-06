@@ -338,6 +338,14 @@ export class Db {
       )
       this.saveMessage(m)
     }
+    // Auto-approved but never started: ask the user again rather than run them unattended after a restart.
+    const queued = this.db.prepare(`SELECT * FROM messages WHERE data LIKE '%"auto":true%'`).all() as unknown as MessageRow[]
+    for (const row of queued) {
+      const m = toMessage(row)
+      if (!m.actions?.some((a) => a.status === 'pending' && a.auto)) continue
+      m.actions = m.actions.map((a) => (a.status === 'pending' && a.auto ? { ...a, auto: undefined } : a))
+      this.saveMessage(m)
+    }
     this.db.prepare(`UPDATE runs SET ended_at = started_at, ok = 0, summary = 'Interrupted' WHERE ended_at IS NULL`).run()
   }
 

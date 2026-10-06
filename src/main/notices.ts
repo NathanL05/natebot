@@ -45,8 +45,14 @@ function textOf(v: unknown): string {
 }
 
 /** The body of a "Needs your approval" notification, and the action its buttons would resolve (if any). */
+/** Ids of the pending actions an "Always allow" rule (a tool name) covers. */
+export function autoApprovable(actions: ProposedAction[] | undefined, rules: string[]): string[] {
+  return (actions ?? []).filter((a) => a.status === 'pending' && !!a.tool && rules.includes(a.tool)).map((a) => a.id)
+}
+
 export function approvalNotice(actions: ProposedAction[] | undefined): { body: string; action: ProposedAction | null } | null {
-  const pending = (actions ?? []).filter((a) => a.status === 'pending')
+  // Ones an "Always allow" rule is about to run don't need the user.
+  const pending = (actions ?? []).filter((a) => a.status === 'pending' && !a.auto)
   const first = pending[0]
   if (!first) return null
   if (pending.length > 1) {

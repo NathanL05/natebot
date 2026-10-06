@@ -623,7 +623,12 @@ export class Engine extends EventEmitter {
 
   async executeAction(agentId: string, msg: ChatMessage, action: ProposedAction): Promise<void> {
     const agent = this.deps.store.require(agentId)
-    const persist = (): void => this.save(msg)
+    // Other actions on the same message may be running too: update only this one, in the latest copy.
+    const persist = (): void => {
+      const latest = this.deps.db.getMessage(msg.id) ?? msg
+      latest.actions = (latest.actions ?? msg.actions)?.map((a) => (a.id === action.id ? { ...action } : a))
+      this.save(latest)
+    }
 
     const fail = (reason: string): void => {
       action.status = 'failed'

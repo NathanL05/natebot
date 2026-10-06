@@ -2,7 +2,7 @@
 // to know what Approve will do.
 import { describe, expect, it } from 'vitest'
 import type { ProposedAction } from '@shared/types'
-import { approvalNotice } from './notices'
+import { approvalNotice, autoApprovable } from './notices'
 
 const action = (over: Partial<ProposedAction> = {}): ProposedAction => ({
   id: 'a1',
@@ -68,5 +68,21 @@ describe('approvalNotice', () => {
     const body = approvalNotice([action({ details: { to: ['a@x.com', 'b@x.com'], subject: 'x'.repeat(100) } })])?.body ?? ''
     expect(body).toContain('To: a@x.com, b@x.com')
     expect(body).toMatch(/Subject: x{59}…$/)
+  })
+})
+
+describe('Always allow', () => {
+  const act = (id: string, tool: string | undefined, status: ProposedAction['status'] = 'pending'): ProposedAction => ({ id, type: 't', summary: id, tool, details: {}, status })
+
+  it('covers only pending actions whose tool has a rule', () => {
+    const actions = [act('a', 'mcp__gtasks__create_task'), act('b', 'mcp__gmail__send_gmail_message'), act('c', 'mcp__gtasks__create_task', 'done'), act('d', undefined)]
+    expect(autoApprovable(actions, ['mcp__gtasks__create_task'])).toEqual(['a'])
+    expect(autoApprovable(actions, [])).toEqual([])
+  })
+
+  it("leaves auto-approved actions out of the approval notification", () => {
+    const auto = { ...act('a', 'mcp__gtasks__create_task'), auto: true }
+    expect(approvalNotice([auto])).toBeNull()
+    expect(approvalNotice([auto, act('b', 'mcp__gmail__send_gmail_message')])?.body).toMatch(/^b/)
   })
 })

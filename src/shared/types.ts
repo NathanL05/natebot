@@ -73,6 +73,8 @@ export interface AgentConfig {
   email_triggers: EmailTrigger[]
   /** Folders on this Mac the agent may read (never change), e.g. a career-plans folder. Absolute paths. */
   read_folders: string[]
+  /** Approval-only tools (mcp__server__tool) whose proposals NateBot approves for you ("Always allow"). */
+  auto_approve?: string[]
   session_id: string | null
 }
 
@@ -125,6 +127,8 @@ export interface ProposedAction {
   details: Record<string, unknown>
   status: ActionStatus
   result?: string
+  /** Approved by an "Always allow" rule rather than by a click. */
+  auto?: boolean
 }
 
 export type HandoffStatus = 'pending' | 'sent' | 'dismissed'
