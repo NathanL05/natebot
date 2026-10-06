@@ -28,6 +28,7 @@ import type {
   RoutineInfo,
   ReplyRef,
   RoutineRun,
+  WebWatch,
   UsageBreakdown,
   UsageInfo,
   UsageWindow
@@ -62,6 +63,7 @@ import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
+import { watchPrompt, WebWatcher } from './webwatch'
 import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
@@ -92,6 +94,7 @@ export class Backend implements NateBotApi {
   private scheduler: Scheduler
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
+  private webWatcher: WebWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected, markSignInExpired)
   /** One-time codes behind the Approve / Reject buttons on phone notifications. */
   private phoneCodes = new Map<string, { messageId: string; actionId: string; at: number }>()
@@ -190,6 +193,13 @@ export class Backend implements NateBotApi {
       log
     })
 
+    this.webWatcher = new WebWatcher({
+      db: this.db,
+      agents: () => this.store.list(),
+      onChange: (agentId, watch, lines) => this.fireWatch(agentId, watch, lines),
+      log
+    })
+
     this.usage.on('changed', () => {
       const info = this.usage.get()
       if (info) emit('usage', info)
@@ -230,6 +240,7 @@ export class Backend implements NateBotApi {
     this.catchUpRoutines()
     this.fireReminders()
     this.emailWatcher.start()
+    this.webWatcher.start()
     this.backup()
     this.backupTimer = setInterval(() => this.backup(), 60 * 60_000)
     this.quietTimer = setInterval(() => this.endQuiet(), 60_000)
@@ -249,6 +260,7 @@ export class Backend implements NateBotApi {
     this.scheduler.stopAll()
     this.reminderClock.stop()
     this.emailWatcher.stop()
+    this.webWatcher.stop()
     clearInterval(this.backupTimer)
     clearInterval(this.quietTimer)
     this.phone.stop()
@@ -570,7 +582,7 @@ export class Backend implements NateBotApi {
     else if (r.quiet) log(`run: agent=${r.agentId} had nothing to report, no notification`)
     else if (r.source === 'routine') this.notify(r.agentId, r.ok ? 'Routine finished' : 'Routine failed', r.summary)
     else if (r.source === 'reminder') this.notify(r.agentId, 'Reminder', r.summary)
-    else if (r.source === 'trigger') this.notify(r.agentId, 'New email', r.summary)
+    else if (r.source === 'trigger') this.notify(r.agentId, r.trigger === 'page' ? 'Page changed' : 'New email', r.summary)
     else if (!this.focused() && r.ok) this.notify(r.agentId, 'Replied', r.summary)
   }
 
@@ -758,7 +770,22 @@ export class Backend implements NateBotApi {
       return
     }
     this.engine.system(agentId, `Email trigger: ${what} (search: ${trigger.query})`)
-    this.engine.enqueue(agentId, { source: 'trigger', prompt: triggerPrompt(trigger, hits), attachments: [] })
+    this.engine.enqueue(agentId, { source: 'trigger', trigger: 'email', prompt: triggerPrompt(trigger, hits), attachments: [] })
+  }
+
+  private fireWatch(agentId: string, watch: WebWatch, lines: string[]): void {
+    const host = new URL(watch.url).host
+    const what = `${host} has ${lines.length} new line${lines.length === 1 ? '' : 's'}`
+    log(`page watch: agent=${agentId} watch=${watch.id} new=${lines.length}`)
+    const paused = this.weekPaused()
+    if (paused) {
+      this.engine.system(agentId, `Page watch: ${what}, but the agent didn't run: ${paused}`)
+      this.notify(agentId, 'Page changed', what)
+      this.emitAgents()
+      return
+    }
+    this.engine.system(agentId, `Page watch: ${what}${watch.match ? ` mentioning ${watch.match}` : ''}`)
+    this.engine.enqueue(agentId, { source: 'trigger', trigger: 'page', prompt: watchPrompt(watch, lines), attachments: [] })
   }
 
   /** Today's backup of ~/NateBot (checked hourly; does nothing once it exists). */

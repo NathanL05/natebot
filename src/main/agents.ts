@@ -4,8 +4,8 @@ import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, watch, writeFileSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
-import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES } from '@shared/types'
-import type { AgentConfig, AgentDraft, EffortLevel, EmailTrigger, MascotShape, ModelId, Routine } from '@shared/types'
+import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MAX_WEB_WATCHES, WATCH_INTERVALS } from '@shared/types'
+import type { AgentConfig, AgentDraft, EffortLevel, EmailTrigger, MascotShape, ModelId, Routine, WebWatch } from '@shared/types'
 import { MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
 
@@ -16,6 +16,7 @@ const HEADER =
   '# NateBot agent. Edit here or in the app; changes are picked up automatically.\n' +
   '# model: sonnet | haiku | opus   effort: low | medium | high | xhigh | max\n' +
   '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 20\n' +
+  '# web_watches: id, enabled, url, every (hours: 1 | 3 | 6 | 24), match (words, optional), prompt; up to 3\n' +
   '# auto_approve: approval-only tools (mcp__server__tool) approved without asking\n' +
   '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
 
@@ -77,6 +78,21 @@ export function normalizeTriggers(v: unknown): EmailTrigger[] {
   return out
 }
 
+export function normalizeWatches(v: unknown): WebWatch[] {
+  const out: WebWatch[] = []
+  for (const [i, w] of (Array.isArray(v) ? v : []).entries()) {
+    if (!w || typeof w !== 'object' || out.length >= MAX_WEB_WATCHES) continue
+    const r = w as Record<string, unknown>
+    const url = str(r['url']).trim().slice(0, 500)
+    if (!/^https?:\/\/\S+$/i.test(url)) continue
+    let id = typeof r['id'] === 'string' && ROUTINE_ID_RE.test(r['id']) ? r['id'] : `w${i + 1}`
+    while (out.some((o) => o.id === id)) id = `${id}-2`
+    const every = WATCH_INTERVALS.includes(r['every'] as 1) ? (r['every'] as number) : 6
+    out.push({ id, enabled: r['enabled'] === true, url, every, match: str(r['match']).replace(/\s+/g, ' ').trim().slice(0, 200), prompt: str(r['prompt']).trim().slice(0, 2000) })
+  }
+  return out
+}
+
 /** Absolute folder paths (~ expanded), without commas (they'd split a tool rule), deduplicated. */
 export function normalizeFolders(v: unknown): string[] {
   const home = process.env['HOME'] ?? ''
@@ -112,6 +128,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     email_triggers: normalizeTriggers(r['email_triggers']),
     read_folders: normalizeFolders(r['read_folders']),
     auto_approve: [...new Set(strList(r['auto_approve']).filter((t) => /^mcp__[^_].*__.+$/.test(t)))],
+    web_watches: normalizeWatches(r['web_watches']),
     session_id: typeof r['session_id'] === 'string' && r['session_id'] ? r['session_id'] : null
   }
 }
@@ -134,6 +151,7 @@ function serialize(a: AgentConfig): string {
     email_triggers: a.email_triggers,
     read_folders: a.read_folders,
     ...(a.auto_approve?.length ? { auto_approve: a.auto_approve } : {}),
+    ...(a.web_watches?.length ? { web_watches: a.web_watches } : {}),
     session_id: a.session_id
   }
   return HEADER + stringify(doc, { lineWidth: 0, blockQuote: 'literal' })
@@ -219,7 +237,15 @@ export class AgentStore extends EventEmitter {
   update(next: AgentConfig): AgentConfig {
     const current = this.require(next.id)
     // An update that leaves out the Always allow rules keeps them (only removing them in the form clears them).
-    const agent = normalize({ ...next, auto_approve: next.auto_approve ?? current.auto_approve, session_id: current.session_id }, current.id)
+    const agent = normalize(
+      {
+        ...next,
+        auto_approve: next.auto_approve ?? current.auto_approve,
+        web_watches: next.web_watches ?? current.web_watches,
+        session_id: current.session_id
+      },
+      current.id
+    )
     this.write(agent)
     return agent
   }

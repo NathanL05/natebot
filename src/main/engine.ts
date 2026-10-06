@@ -43,6 +43,8 @@ export interface Job {
   routineId?: string
   /** Routines and reminders: when they were due (routines only set it when running late). */
   dueAt?: number
+  /** Trigger runs: what set it off. */
+  trigger?: 'email' | 'page'
 }
 
 interface Running {
@@ -65,6 +67,8 @@ export interface RunFinished {
   handoffTo?: string
   /** A routine or reminder run that found nothing needing the user: no notification. */
   quiet?: boolean
+  /** Trigger runs: what set it off. */
+  trigger?: 'email' | 'page'
 }
 
 /** One agent's turn in a group chat. */
@@ -500,7 +504,8 @@ export class Engine extends EventEmitter {
       needsApproval: !!msg.actions?.length,
       messageId: msg.id,
       handoffTo: msg.handoffs?.[0]?.toName,
-      quiet: ok && quiet
+      quiet: ok && quiet,
+      ...(job.trigger ? { trigger: job.trigger } : {})
     }
     this.emit('runFinished', finished)
     this.pump()

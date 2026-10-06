@@ -24,6 +24,7 @@ describe('agent YAML normalisation', () => {
         email_triggers: [],
         read_folders: [],
         auto_approve: [],
+        web_watches: [],
         session_id: null
       })
     }
