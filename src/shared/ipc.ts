@@ -12,6 +12,7 @@ import type {
   Folder,
   GmailProgress,
   GmailStatus,
+  Inbox,
   Job,
   MarketplaceData,
   McpServerInfo,
@@ -43,6 +44,10 @@ export interface NateBotApi {
   pendingMessages(): Promise<ChatMessage[]>
   /** Today's events and tasks from connected calendars and task lists (no Claude run). */
   todayAgenda(refresh?: boolean): Promise<Agenda>
+  /** Recent Gmail conversations for Today's Inbox, read directly (no Claude run). */
+  inbox(refresh?: boolean): Promise<Inbox>
+  /** Archives or marks read a Gmail conversation the user clicked. */
+  inboxAction(threadId: string, change: 'archive' | 'read'): Promise<{ ok: boolean; error?: string }>
   /** Saves text to a file the user picks (Markdown by default). */
   saveText(suggestedName: string, text: string): Promise<{ ok: boolean; path?: string }>
   /** Saves text as a new Apple note. */
@@ -160,6 +165,8 @@ export const API_METHODS = [
   'clearMessages',
   'searchMessages',
   'todayAgenda',
+  'inbox',
+  'inboxAction',
   'saveText',
   'saveToNotes',
   'setPinned',

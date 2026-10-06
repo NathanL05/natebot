@@ -243,6 +243,11 @@ export function gmailTokenPath(): string | null {
   return googleTokenPath('gmail')
 }
 
+/** The connected Gmail address, if Gmail was ever set up. */
+export function gmailAddress(): string | null {
+  return savedEntry('gmail').email
+}
+
 export function gmailReady(): boolean {
   return googleReady('gmail')
 }

@@ -18,6 +18,7 @@ import type {
   Folder,
   GmailStatus,
   EmailTrigger,
+  Inbox,
   Job,
   MarketplaceData,
   MessageHit,
@@ -46,8 +47,9 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailAddress, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
 import { AgendaReader } from './agenda'
+import { InboxReader } from './inbox'
 import { approvalOnlyTools, configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
 import { handoffPrompt } from './handoff'
@@ -97,6 +99,10 @@ export class Backend implements NateBotApi {
   private emailWatcher: EmailWatcher
   private webWatcher: WebWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected, markSignInExpired)
+  private inboxReader = new InboxReader(gmailTokenPath, gmailAddress, (path) => {
+    markSignInExpired(path)
+    this.signInExpired()
+  })
   /** One-time codes behind the Approve / Reject buttons on phone notifications. */
   private phoneCodes = new Map<string, { messageId: string; actionId: string; at: number }>()
   private phone = new PhoneInbox((text) => this.fromPhone(text), log)
@@ -934,6 +940,23 @@ export class Backend implements NateBotApi {
 
   async todayAgenda(refresh?: boolean): Promise<Agenda> {
     return this.agenda.today(refresh === true)
+  }
+
+  async inbox(refresh?: boolean): Promise<Inbox> {
+    return this.inboxReader.list(refresh === true)
+  }
+
+  async inboxAction(threadId: string, change: 'archive' | 'read'): Promise<{ ok: boolean; error?: string }> {
+    if (typeof threadId !== 'string' || !/^[\w-]{1,64}$/.test(threadId) || (change !== 'archive' && change !== 'read')) {
+      return { ok: false, error: 'Unknown email.' }
+    }
+    try {
+      await this.inboxReader.modify(threadId, change)
+      log(`inbox: ${change}`)
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, error: `Gmail didn't accept that (${(e as Error).message}).` }
+    }
   }
 
   async saveText(suggestedName: string, text: string): Promise<{ ok: boolean; path?: string }> {

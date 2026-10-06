@@ -184,3 +184,18 @@ export const NoteIcon = (p: IconProps) => (
     <path d="M9 8h6M9 12h6M9 16h4" />
   </Icon>
 )
+export const ArchiveIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 4h18v4H3zM5 8v11h14V8M10 12h4" />
+  </Icon>
+)
+export const MailOpenIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M3 10v10h18V10l-9-6-9 6ZM3 10l9 6 9-6" />
+  </Icon>
+)
+export const ExternalIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" />
+  </Icon>
+)
