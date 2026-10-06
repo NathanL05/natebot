@@ -42,7 +42,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
 import { AgendaReader } from './agenda'
 import { configuredServersFor, ensureMcpFile, listServers } from './mcp'
 import { AGENTS_DIR, DB_FILE, MCP_FILE, ROOT, TMP_DIR, WORKSPACES_DIR, workspaceOf } from './paths'
@@ -86,7 +86,7 @@ export class Backend implements NateBotApi {
   private scheduler: Scheduler
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
-  private agenda = new AgendaReader(googleTokenPath, appleConnected)
+  private agenda = new AgendaReader(googleTokenPath, appleConnected, markSignInExpired)
   private phone = new PhoneInbox((text) => this.fromPhone(text), log)
   /** Agents answering messages from your phone (how many): those replies always go to the phone. */
   private phoneWaiting = new Map<string, number>()
@@ -175,7 +175,10 @@ export class Backend implements NateBotApi {
       agents: () => this.store.list(),
       tokenPath: gmailTokenPath,
       onMatch: (agentId, trigger, hits) => this.fireTrigger(agentId, trigger, hits),
-      onSignInExpired: () => this.signInExpired(),
+      onSignInExpired: (path) => {
+        markSignInExpired(path)
+        this.signInExpired()
+      },
       log
     })
 

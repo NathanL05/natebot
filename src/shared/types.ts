@@ -399,6 +399,8 @@ export interface GmailStatus {
   clientId: string | null
   hasSecret: boolean
   uvInstalled: boolean
+  /** It was connected, but Google expired or revoked the sign-in: Connect again. */
+  expired: boolean
 }
 
 export interface MarketplaceSkill {
