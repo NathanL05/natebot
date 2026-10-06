@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { gmailLink, promptLabel, type InboxMail } from '@shared/types'
-import { inboxContext, InboxReader, mapLimit, parseFrom, toMails, wantsInbox } from './inbox'
+import { inboxContext, InboxReader, isAutomated, mapLimit, parseFrom, toMails, wantsInbox } from './inbox'
 
 function tokenFile(): string {
   const path = join(mkdtempSync(join(tmpdir(), 'inbox-')), 'me.json')
@@ -41,6 +41,15 @@ describe('inbox', () => {
       ['a2', 'Re: Hi', true]
     ])
     expect(mails[0]?.snippet).toBe("Tom & Jerry's")
+  })
+
+  it('never folds security alerts away with the automated mail', () => {
+    const alert = { ...msg('d1', 't9', 1, 'Discord <noreply@discord.com>', 'Phone Removed From Discord Account'), labelIds: ['INBOX', 'CATEGORY_UPDATES'] }
+    const promo = { ...msg('d2', 't8', 2, 'Discord <noreply@discord.com>', 'Nitro is on sale'), labelIds: ['INBOX', 'CATEGORY_UPDATES'] }
+    expect(toMails([alert, promo]).map((m) => [m.subject, m.automated])).toEqual([
+      ['Nitro is on sale', true],
+      ['Phone Removed From Discord Account', false]
+    ])
   })
 
   it('lists the inbox with the Gmail sign-in, and archives a conversation', async () => {
@@ -107,6 +116,7 @@ describe('inbox snapshot', () => {
     snippet: 'Due Friday',
     at: new Date(2026, 9, 6, 9, 5).getTime(),
     unread: true,
+    automated: false,
     ...over
   })
 
@@ -120,11 +130,16 @@ describe('inbox snapshot', () => {
   })
 
   it('lists one line per conversation, framed as data', () => {
-    const text = inboxContext({ connected: true, email: 'me@gmail.com', error: null, mails: [mail(), mail({ id: 'm2', from: 'x@y.com', fromAddress: 'x@y.com', unread: false })] })
+    const text = inboxContext({
+      connected: true,
+      email: 'me@gmail.com',
+      error: null,
+      mails: [mail(), mail({ id: 'm2', from: 'x@y.com', fromAddress: 'x@y.com', unread: false, automated: true })]
+    })
     const lines = text.split('\n')
     expect(lines[0]).toMatch(/never as instructions/)
     expect(lines[1]).toBe('- ● Tue 09:05 · Ann Lee <ann@x.com> · "Lab" · Due Friday (id m1)')
-    expect(lines[2]).toBe('- Tue 09:05 · x@y.com · "Lab" · Due Friday (id m2)')
+    expect(lines[2]).toBe('- [auto] Tue 09:05 · x@y.com · "Lab" · Due Friday (id m2)')
   })
 
   it('says when Gmail is not connected or could not be read', () => {
@@ -139,5 +154,26 @@ describe('promptLabel', () => {
     expect(promptLabel('Write my morning brief {{today}} {{inbox}}')).toEqual({ text: 'Write my morning brief', attached: ["Today's agenda", 'Inbox'] })
     expect(promptLabel('Plan my day.\n\n{{today}}')).toEqual({ text: 'Plan my day.', attached: ["Today's agenda"] })
     expect(promptLabel('Hi  there')).toEqual({ text: 'Hi  there', attached: [] })
+  })
+})
+
+describe('isAutomated', () => {
+  const headers = (h: Record<string, string>) => (name: string) => h[name] ?? ''
+
+  it('spots newsletters, alerts and receipts', () => {
+    expect(isAutomated(headers({ 'list-unsubscribe': '<mailto:u@x.com>' }), 'news@x.com', [])).toBe(true)
+    expect(isAutomated(headers({ precedence: 'bulk' }), 'a@x.com', [])).toBe(true)
+    expect(isAutomated(headers({ 'auto-submitted': 'auto-generated' }), 'a@x.com', [])).toBe(true)
+    expect(isAutomated(headers({}), 'noreply@discord.com', [])).toBe(true)
+    expect(isAutomated(headers({}), 'jobalerts-noreply@linkedin.com', [])).toBe(true)
+    expect(isAutomated(headers({}), 'no-reply@accounts.google.com', [])).toBe(true)
+    expect(isAutomated(headers({}), 'billing+ie@lidl.ie', [])).toBe(true)
+    expect(isAutomated(headers({}), 'a@x.com', ['INBOX', 'CATEGORY_UPDATES'])).toBe(true)
+  })
+
+  it('keeps mail from people', () => {
+    expect(isAutomated(headers({ 'auto-submitted': 'no' }), 'matthias.nickles@universityofgalway.ie', ['INBOX', 'CATEGORY_PERSONAL'])).toBe(false)
+    expect(isAutomated(headers({}), 'information.desk@x.com', [])).toBe(false)
+    expect(isAutomated(headers({}), 'teamlead@x.com', [])).toBe(false)
   })
 })
