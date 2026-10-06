@@ -139,6 +139,15 @@ export class Rooms {
     this.deps.emitRooms()
   }
 
+  /** Deletes the conversation (pinned messages stay); every member starts a fresh room session. */
+  clear(id: string): void {
+    const room = this.require(id)
+    if (this.live.has(room.id)) throw new Error('The group is still talking. Stop it first, then clear the chat.')
+    this.deps.db.clearMessages(room.id)
+    for (const m of Object.keys(this.deps.db.seats(room.id))) this.deps.db.setSeat(room.id, m, null)
+    this.deps.emitRooms()
+  }
+
   /** An agent was deleted: take it out of every room (rooms left with one member are kept but can't run). */
   removeMember(agentId: string): void {
     for (const room of this.rooms.values()) {

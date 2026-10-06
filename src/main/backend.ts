@@ -950,6 +950,29 @@ export class Backend implements NateBotApi {
     this.emitAgents()
   }
 
+  async clearMessages(chatId: string): Promise<void> {
+    if (isRoomId(String(chatId))) {
+      this.rooms.clear(this.rooms.require(chatId).id)
+    } else {
+      const agent = this.requireAgent(chatId)
+      // A run or action still finishing would write its message back into the cleared chat.
+      const { running, queued } = this.engine.status(agent.id)
+      if (running || queued) throw new Error(`${agent.name} is still working. Stop it first, then clear the chat.`)
+      if (this.db.hasExecutingAction(agent.id)) throw new Error('An approved action is still running. Clear the chat once it finishes.')
+      this.db.clearMessages(agent.id)
+      // Start over so the agent doesn't bring up what's no longer on screen (lasting notes are kept).
+      this.store.setSession(agent.id, null)
+      this.db.takeNotes(agent.id)
+      this.emitAgents()
+    }
+    // Approval notifications for actions that were just cleared away.
+    for (const [messageId, n] of this.approvalNotices) {
+      if (this.db.getMessage(messageId)) continue
+      n.close()
+      this.approvalNotices.delete(messageId)
+    }
+  }
+
   async getMemory(agentId: string): Promise<string> {
     this.requireAgent(agentId)
     return readMemory(agentId)
