@@ -26,12 +26,13 @@ import type {
   RoomConfig,
   RoomDraft,
   RoutineInfo,
+  ReplyRef,
   RoutineRun,
   UsageBreakdown,
   UsageInfo,
   UsageWindow
 } from '@shared/types'
-import { isRoomId, OLDER_PAGE } from '@shared/types'
+import { isRoomId, OLDER_PAGE, replyExcerpt, replyNote } from '@shared/types'
 import { describeCron } from '@shared/schedule'
 import { toolLabel } from '@shared/tools'
 import { AgentStore, slugify } from './agents'
@@ -847,13 +848,22 @@ export class Backend implements NateBotApi {
     return saved
   }
 
-  async sendMessage(agentId: string, text: string, attachments?: string[]): Promise<void> {
+  /** The message a reply answers, if it's in this chat. */
+  private replyRef(chatId: string, id: unknown): ReplyRef | undefined {
+    const target = typeof id === 'string' ? this.db.getMessage(id) : null
+    if (!target || target.agentId !== chatId || !target.text || (target.role !== 'user' && target.role !== 'agent')) return undefined
+    const who = target.role === 'user' ? 'You' : (this.store.get(target.speakerId ?? chatId)?.name ?? 'An agent')
+    return { id: target.id, who, excerpt: replyExcerpt(target.text) }
+  }
+
+  async sendMessage(agentId: string, text: string, attachments?: string[], replyTo?: string): Promise<void> {
     const body = typeof text === 'string' ? text.trim() : ''
+    const reply = this.replyRef(String(agentId), replyTo)
     if (isRoomId(String(agentId))) {
       const room = this.rooms.require(agentId)
       // Every member gets its own copy, since agents can only read their own workspace.
       const files = this.saveAttachments(attachments, room.memberIds.filter((m) => this.store.get(m)))
-      if (body || files.length) this.rooms.post(room.id, body, files)
+      if (body || files.length) this.rooms.post(room.id, body, files, reply)
       return
     }
     const agent = this.requireAgent(agentId)
@@ -865,11 +875,13 @@ export class Backend implements NateBotApi {
       role: 'user',
       text: body,
       createdAt: Date.now(),
-      attachments: saved.length ? saved.map((p) => p.replace(/^attachments\/\d+-/, '')) : undefined
+      attachments: saved.length ? saved.map((p) => p.replace(/^attachments\/\d+-/, '')) : undefined,
+      ...(reply ? { replyTo: reply } : {})
     }
     this.db.saveMessage(msg)
     emit('message', msg)
-    this.engine.enqueue(agentId, { source: 'chat', prompt: body, attachments: saved })
+    const quoted = reply ? `${replyNote(reply)}\n\n${body}` : body
+    this.engine.enqueue(agentId, { source: 'chat', prompt: quoted, attachments: saved })
   }
 
   async stop(agentId: string): Promise<void> {

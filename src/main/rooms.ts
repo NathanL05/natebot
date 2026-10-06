@@ -11,7 +11,7 @@
 // many replies are left so they converge, and the last one wraps up (a
 // summary, or a question for the user) instead of the group being cut off.
 import { randomUUID } from 'node:crypto'
-import type { AgentConfig, ChatMessage, RoomConfig, RoomDraft, RoomSummary } from '@shared/types'
+import type { AgentConfig, ChatMessage, ReplyRef, RoomConfig, RoomDraft, RoomSummary } from '@shared/types'
 import { ROOM_PREFIX } from '@shared/types'
 import type { AgentStore } from './agents'
 import type { Db, Seat } from './db'
@@ -165,9 +165,9 @@ export class Rooms {
   // ---- conversation ----
 
   /** files: workspace-relative paths, already copied into every member's workspace. */
-  post(roomId: string, text: string, files: string[] = []): void {
+  post(roomId: string, text: string, files: string[] = [], replyTo?: ReplyRef): void {
     const room = this.require(roomId)
-    const msg: ChatMessage = { id: randomUUID(), agentId: roomId, role: 'user', text, createdAt: Date.now() }
+    const msg: ChatMessage = { id: randomUUID(), agentId: roomId, role: 'user', text, createdAt: Date.now(), ...(replyTo ? { replyTo } : {}) }
     if (files.length) {
       msg.files = files
       msg.attachments = files.map((f) => f.replace(/^attachments\/\d+-/, ''))
@@ -312,7 +312,8 @@ export class Rooms {
     const lines = shown.map((m) => {
       const who = m.role === 'user' ? `${user} (user)` : (this.deps.store.get(m.speakerId ?? '')?.name ?? 'A former member')
       const files = m.files?.length ? `\n[Attached files, saved in your working folder: ${m.files.join(', ')}]` : ''
-      return `${who}: ${m.text}${files}`
+      const reply = m.replyTo ? ` (replying to ${m.replyTo.who === 'You' ? `${user}'s` : `${m.replyTo.who}'s`} message "${m.replyTo.excerpt}")` : ''
+      return `${who}${reply}: ${m.text}${files}`
     })
     const budget = `${repliesLeft} repl${repliesLeft === 1 ? 'y' : 'ies'} left before the group hands back to ${user}, including yours${
       repliesLeft <= 3 ? '. Start converging: no new threads' : ''

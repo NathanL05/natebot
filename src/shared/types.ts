@@ -122,6 +122,13 @@ export interface ToolUse {
 
 export type ActionStatus = 'pending' | 'executing' | 'done' | 'failed' | 'rejected'
 
+export interface ReplyRef {
+  id: string
+  /** Who wrote it: an agent's name, or "You". */
+  who: string
+  excerpt: string
+}
+
 export interface ProposedAction {
   id: string
   type: string
@@ -209,6 +216,8 @@ export interface ChatMessage {
   /** Reminders this message set (a copy kept in step with the reminders table, for display). */
   reminders?: Reminder[]
   attachments?: string[]
+  /** Your message answers this earlier one (a short excerpt is kept for display and for the agent). */
+  replyTo?: ReplyRef
   /** Group chats only: the agent who wrote this agent message. */
   speakerId?: string
   /** Group chats only: attached files, relative to each member's workspace. */
@@ -445,4 +454,16 @@ export interface MarketplaceData {
   skills: MarketplaceSkill[]
   sources: MarketplaceSource[]
   installedCount: number
+}
+
+/** A short, plain-text excerpt of a message to quote in a reply. */
+export function replyExcerpt(text: string): string {
+  const flat = text.replace(/[*_`#>|]/g, '').replace(/\s+/g, ' ').trim()
+  return flat.length > 280 ? `${flat.slice(0, 279)}…` : flat
+}
+
+/** Tells the agent which earlier message the user is answering, quoted in case it's no longer in its context. */
+export function replyNote(reply: ReplyRef): string {
+  const whose = reply.who === 'You' ? 'their own earlier message' : 'this earlier message of yours'
+  return `[NateBot note: the user is replying to ${whose}, quoted because it may no longer be in your context: "${reply.excerpt}"]`
 }

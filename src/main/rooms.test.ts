@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentConfig, ChatMessage, RoomConfig } from '@shared/types'
+import type { AgentConfig, ChatMessage, ReplyRef, RoomConfig } from '@shared/types'
 import type { AgentStore } from './agents'
 import type { Db, Seat } from './db'
 import type { Engine, RoomTurn, RoomTurnResult } from './engine'
@@ -116,10 +116,10 @@ function setup(opts: { members?: AgentConfig[]; waitMs?: number } = {}) {
   })
 
   /** Posts a user message and waits for the group to go quiet. Returns how many replies were added. */
-  const say = (roomId: string, text: string): Promise<number> =>
+  const say = (roomId: string, text: string, replyTo?: ReplyRef): Promise<number> =>
     new Promise((resolve) => {
       idle = resolve
-      rooms.post(roomId, text)
+      rooms.post(roomId, text, [], replyTo)
     })
 
   const speakers = (): string[] => turns.map((t) => t.agent.id)
@@ -179,6 +179,25 @@ describe('creating and editing group chats', () => {
     const room = rooms.create({ name: 'Team', memberIds: ['a', 'b', 'c'], maxTurns: 8 })
     rooms.removeMember('b')
     expect(rooms.get(room.id)?.memberIds).toEqual(['a', 'c'])
+  })
+})
+
+describe('replies', () => {
+  it("shows the group which message you're replying to", async () => {
+    const { rooms, turns, say } = setup()
+    const room = rooms.create({ name: 'Team', memberIds: ['a', 'b'], maxTurns: 8 })
+    await say(room.id, 'Do that one first', { id: 'm1', who: 'Ann', excerpt: 'We could start with the budget' })
+    expect(turns[0]?.input).toContain(`Nathan (user) (replying to Ann's message "We could start with the budget"): Do that one first`)
+  })
+})
+
+describe('reply notes', () => {
+  it('quotes a plain excerpt for the agent', async () => {
+    const { replyExcerpt, replyNote } = await import('@shared/types')
+    expect(replyExcerpt('**Gym**: go at *6am*\n\nbefore work')).toBe('Gym: go at 6am before work')
+    expect(replyExcerpt('x'.repeat(400))).toHaveLength(280)
+    expect(replyNote({ id: 'm', who: 'Planner', excerpt: 'Gym at 6' })).toContain('this earlier message of yours')
+    expect(replyNote({ id: 'm', who: 'You', excerpt: 'Gym at 6' })).toContain('their own earlier message')
   })
 })
 

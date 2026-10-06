@@ -58,6 +58,9 @@ interface State {
   clearChat(chatId: string): Promise<void>
   /** Chat whose "Clear chat?" confirmation is open. */
   clearingId: string | null
+  /** The message the composer is replying to, per chat. */
+  replying: Record<string, ChatMessage | undefined>
+  setReplying(chatId: string, msg: ChatMessage | null): void
   setView(view: View): void
   setSearch(search: string): void
   setDrawerOpen(open: boolean): void
@@ -134,6 +137,8 @@ export const useStore = create<State>((set, get) => {
     roomEditor: null,
     renamingFolderId: null,
     clearingId: null,
+    replying: {},
+    setReplying: (chatId, msg) => set({ replying: { ...get().replying, [chatId]: msg ?? undefined } }),
 
     async init() {
       api.on('agents', (agents) => {

@@ -33,7 +33,8 @@ export interface NateBotApi {
   listMessages(chatId: string): Promise<ChatMessage[]>
   /** Up to OLDER_PAGE messages from before `beforeId`, oldest first; `more` if there are older ones still. */
   olderMessages(chatId: string, beforeId: string): Promise<{ messages: ChatMessage[]; more: boolean }>
-  sendMessage(chatId: string, text: string, attachments?: string[]): Promise<void>
+  /** replyTo: the id of an earlier message in this chat that this one answers. */
+  sendMessage(chatId: string, text: string, attachments?: string[], replyTo?: string): Promise<void>
   stop(chatId: string): Promise<void>
   markRead(chatId: string): Promise<void>
   /** Deletes a chat's messages (pinned ones stay) and starts a fresh conversation. Refused while it's working. */

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type { AgentSummary } from '@shared/types'
-import { api } from '../lib/store'
+import { api, useStore } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
 import { basename } from '../lib/format'
 import { Avatar } from './Avatar'
-import { ArrowUpIcon, PlusIcon, StopIcon, XIcon } from './icons'
+import { ArrowUpIcon, PlusIcon, ReplyIcon, StopIcon, XIcon } from './icons'
 
 // Unsent text survives switching between chats.
 const drafts = new Map<string, string>()
@@ -32,6 +32,15 @@ export function Composer({
   /** The "@query" being typed before the caret, if any. */
   const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(null)
   const box = useRef<HTMLTextAreaElement>(null)
+  const replying = useStore((s) => s.replying[chatId])
+  const replyWho = useStore((s) =>
+    !replying ? '' : replying.role === 'user' ? 'yourself' : (s.agents.find((a) => a.id === (replying.speakerId ?? replying.agentId))?.name ?? name)
+  )
+
+  // Clicking Reply puts the caret here.
+  useEffect(() => {
+    if (replying) box.current?.focus()
+  }, [replying])
 
   const q = mention?.query.toLowerCase() ?? ''
   const matches = mention
@@ -81,9 +90,10 @@ export function Composer({
   const send = (): void => {
     const body = text.trim()
     if (!body && attachments.length === 0) return
-    void api.sendMessage(chatId, body, attachments.length ? attachments : undefined)
+    void api.sendMessage(chatId, body, attachments.length ? attachments : undefined, replying?.id)
     update('')
     setAttachments([])
+    if (replying) useStore.getState().setReplying(chatId, null)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -108,6 +118,9 @@ export function Composer({
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       send()
+    } else if (e.key === 'Escape' && replying) {
+      e.preventDefault()
+      useStore.getState().setReplying(chatId, null)
     }
   }
 
@@ -127,6 +140,23 @@ export function Composer({
             {queued} message{queued > 1 ? 's' : ''} queued · will send when {name} is free
           </div>
         )}
+        {replying && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl border-l-2 border-accent/60 bg-elev px-3 py-1.5 text-[12px]">
+            <ReplyIcon size={12} className="shrink-0 text-muted" />
+            <span className="min-w-0 flex-1 truncate text-muted">
+              Replying to <span className="font-medium text-fg">{replyWho}</span>: {replying.text.replace(/[*_`#>|]/g, '').replace(/\s+/g, ' ').slice(0, 160)}
+            </span>
+            <button
+              type="button"
+              aria-label="Cancel reply"
+              title="Cancel reply (Esc)"
+              className="rounded p-0.5 text-muted hover:bg-hover hover:text-fg"
+              onClick={() => useStore.getState().setReplying(chatId, null)}
+            >
+              <XIcon size={12} />
+            </button>
+          </div>
+        )}
         {attachments.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1.5">
             {attachments.map((p) => (
@@ -144,7 +174,7 @@ export function Composer({
             ))}
           </div>
         )}
-        {quickPrompts.length > 0 && !text && attachments.length === 0 && (
+        {quickPrompts.length > 0 && !text && attachments.length === 0 && !replying && (
           <div className="mb-2 flex flex-wrap gap-1.5" aria-label="Quick prompts">
             {quickPrompts.map((p) => (
               <button
