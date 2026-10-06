@@ -300,7 +300,9 @@ listing each one), reminders and routines due in the next day, and what routines
 once those are connected. NateBot reads them directly, so this uses no Claude usage.
 
 Below it, **Inbox** lists your Gmail conversations from the last three days (promotions and social left out), unread
-ones marked with a dot. Click one to open it in Gmail, or hover for **Mark read**, **Archive** and **Ask** (opens your
+ones marked with a dot. Mail from people comes first. Newsletters, job alerts, receipts and notifications (spotted from
+mailing-list headers, no-reply style senders and Gmail's Updates tab) fold into one row you can open, with
+**Mark all read**. Security alerts (sign-ins, password or phone changes) are never folded away. Click one to open it in Gmail, or hover for **Mark read**, **Archive** and **Ask** (opens your
 email agent's chat with a message about that email started for you). NateBot reads Gmail with the Connect Gmail
 sign-in, so the Inbox uses no Claude usage; Mark read and Archive are changes you click yourself. A badge
 shows how many approvals are waiting. It's built from what NateBot already stores, so opening it uses no tokens.

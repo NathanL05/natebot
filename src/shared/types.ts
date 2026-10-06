@@ -305,6 +305,8 @@ export interface InboxMail {
   snippet: string
   at: number
   unread: boolean
+  /** Sent by a machine (newsletter, alert, receipt, notification), not a person. Security alerts never count. */
+  automated: boolean
 }
 
 export interface Inbox {
