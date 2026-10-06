@@ -54,7 +54,7 @@ import { backupIfDue } from './backup'
 import { cleanTmp } from './tmp'
 import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
-import { parsePhoneMessage, PhoneInbox } from './phone'
+import { approvalButtons, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
 import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
 import { dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
@@ -78,6 +78,9 @@ function previewOf(msg: ChatMessage | null): string {
   return line.replace(/[*_`#>]/g, '').trim().slice(0, 140)
 }
 
+/** How long the Approve / Reject buttons on a phone notification keep working. */
+const PHONE_CODE_TTL = 24 * 3_600_000
+
 export class Backend implements NateBotApi {
   readonly settings = new SettingsStore()
   readonly usage = new UsageTracker(() => (this.env.claudeFound && this.env.loggedIn ? this.env.claudePath : null))
@@ -88,6 +91,8 @@ export class Backend implements NateBotApi {
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected, markSignInExpired)
+  /** One-time codes behind the Approve / Reject buttons on phone notifications. */
+  private phoneCodes = new Map<string, { messageId: string; actionId: string; at: number }>()
   private phone = new PhoneInbox((text) => this.fromPhone(text), log)
   /** Agents answering messages from your phone (how many): those replies always go to the phone. */
   private phoneWaiting = new Map<string, number>()
@@ -321,7 +326,9 @@ export class Backend implements NateBotApi {
     title: string,
     body: string,
     buttons?: { labels: string[]; onAction: (index: number) => void },
-    urgent = false
+    urgent = false,
+    /** ntfy action buttons for the phone copy. */
+    phoneButtons?: string
   ): Notification | null {
     if (!Notification.isSupported()) return null
     const quiet = this.settings.get().quietHours
@@ -339,7 +346,7 @@ export class Backend implements NateBotApi {
     n.on('click', () => this.onOpenAgent(chatId))
     if (buttons) n.on('action', (e) => buttons.onAction(e.actionIndex))
     n.show()
-    this.push(name ? `${name} · ${title}` : title, body)
+    void this.push(name ? `${name} · ${title}` : title, body, phoneButtons)
     return n
   }
 
@@ -350,6 +357,8 @@ export class Backend implements NateBotApi {
 
   /** A message from your phone: to the @named agent, or the one you used last. */
   private fromPhone(raw: string): void {
+    const tapped = parsePhoneDecision(raw)
+    if (tapped) return void this.phoneDecision(tapped.decision, tapped.code)
     const { agent, text } = parsePhoneMessage(raw)
     if (!text) return
     const agents = this.summaries()
@@ -391,14 +400,14 @@ export class Backend implements NateBotApi {
   }
 
   /** Copies a notification to your phone through ntfy (Settings → General), if set up. Text only when you allow it. */
-  private push(title: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  private push(title: string, body: string, actions?: string): Promise<{ ok: boolean; error?: string }> {
     const { pushTopic, pushDetails } = this.settings.get()
     if (!pushTopic) return Promise.resolve({ ok: false, error: 'No topic set.' })
     // Header values must be plain ASCII; ntfy shows a fallback title otherwise.
     const ascii = title.replace(/[^\x20-\x7E]/g, '').trim() || 'NateBot'
     return fetch(`https://ntfy.sh/${encodeURIComponent(pushTopic)}`, {
       method: 'POST',
-      headers: { Title: ascii, Tags: 'robot' },
+      headers: { Title: ascii, Tags: 'robot', ...(actions && pushDetails ? { Actions: actions } : {}) },
       signal: AbortSignal.timeout(15_000),
       body: pushDetails ? body.slice(0, 1000) : 'Open NateBot to see it.'
     })
@@ -438,13 +447,54 @@ export class Backend implements NateBotApi {
           }
         }
       : undefined
-    const n = this.notify(r.agentId, 'Needs your approval', notice.body, buttons)
+    const n = this.notify(r.agentId, 'Needs your approval', notice.body, buttons, false, action ? this.phoneButtons(r.messageId, action.id) : undefined)
     if (!n) return
     this.approvalNotices.get(r.messageId)?.close()
     this.approvalNotices.set(r.messageId, n)
     n.on('close', () => {
       if (this.approvalNotices.get(r.messageId) === n) this.approvalNotices.delete(r.messageId)
     })
+  }
+
+  /**
+   * Approve / Reject buttons for the phone copy of an approval notification, when you can message
+   * NateBot from your phone and its notifications show what you'd be approving. Each code works once.
+   */
+  private phoneButtons(messageId: string, actionId: string): string | undefined {
+    const { pushTopic, pushDetails, phoneInbox } = this.settings.get()
+    if (!pushTopic || !pushDetails || !phoneInbox) return undefined
+    const now = Date.now()
+    for (const [c, e] of this.phoneCodes) if (now - e.at > PHONE_CODE_TTL) this.phoneCodes.delete(c)
+    const code = randomUUID().replace(/-/g, '').slice(0, 16)
+    this.phoneCodes.set(code, { messageId, actionId, at: now })
+    return approvalButtons(`${pushTopic}-in`, code)
+  }
+
+  /** Approve or Reject tapped on your phone. */
+  private async phoneDecision(decision: 'approve' | 'reject', code: string): Promise<void> {
+    const entry = this.phoneCodes.get(code)
+    this.phoneCodes.delete(code)
+    if (!entry || Date.now() - entry.at > PHONE_CODE_TTL) {
+      void this.push('NateBot', 'That button was already used or has expired. Open NateBot to decide.')
+      return
+    }
+    const msg = this.db.getMessage(entry.messageId)
+    const action = msg?.actions?.find((a) => a.id === entry.actionId)
+    if (!msg || action?.status !== 'pending') {
+      void this.push('NateBot', 'That was already decided in NateBot.')
+      return
+    }
+    log(`phone: ${decision} ${action.tool ?? action.type}`)
+    if (decision === 'reject') {
+      await this.resolveAction(msg.id, action.id, 'reject')
+      void this.push('NateBot', `Rejected: ${action.summary}`)
+      return
+    }
+    await this.approveFromNotification(msg.agentId, msg.id, action.id)
+    // Failures always notify (and reach the phone); success only does when the Mac isn't in use.
+    if (this.db.getMessage(msg.id)?.actions?.find((a) => a.id === action.id)?.status === 'done' && this.focused()) {
+      void this.push('NateBot', `Done: ${action.summary}`)
+    }
   }
 
   private async approveFromNotification(agentId: string, messageId: string, actionId: string): Promise<void> {
