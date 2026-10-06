@@ -192,3 +192,26 @@ describe('clearMessages', () => {
     expect(db.hasExecutingAction('planner')).toBe(false)
   })
 })
+
+describe('routineRuns', () => {
+  it("lists one routine's finished runs, newest first, with the reply and tokens", () => {
+    const db = new Db(':memory:')
+    db.startRun('old', 'brief', 'routine') // from before routine ids were recorded: the "main" routine
+    db.finishRun('old', true, 'Old brief')
+    db.startRun('r1', 'brief', 'routine', 'main')
+    db.finishRun('r1', false, 'Timed out', null, 'msg-1')
+    db.startRun('r2', 'brief', 'routine', 'evening')
+    db.finishRun('r2', true, 'Evening', tokens(100, 20, 0), 'msg-2')
+    db.startRun('r3', 'brief', 'routine', 'main') // still running: not listed
+    db.startRun('c1', 'brief', 'chat')
+    db.finishRun('c1', true, 'Chat', null, 'msg-3')
+
+    const main = db.routineRuns('brief', 'main')
+    expect(main.map((r) => [r.summary, r.ok, r.messageId])).toEqual([
+      ['Timed out', false, 'msg-1'],
+      ['Old brief', true, null]
+    ])
+    expect(db.routineRuns('brief', 'evening')).toEqual([expect.objectContaining({ summary: 'Evening', messageId: 'msg-2', tokens: 120 })])
+    expect(db.routineRuns('brief', 'main', 1)).toHaveLength(1)
+  })
+})

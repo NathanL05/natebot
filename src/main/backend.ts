@@ -26,6 +26,7 @@ import type {
   RoomConfig,
   RoomDraft,
   RoutineInfo,
+  RoutineRun,
   UsageBreakdown,
   UsageInfo,
   UsageWindow
@@ -1185,6 +1186,11 @@ export class Backend implements NateBotApi {
       this.engine.enqueue(target.id, { source: 'chat', prompt: handoffPrompt(from.name, handoff.task), attachments: [] })
     }
     this.emitAgents()
+  }
+
+  async routineHistory(agentId: string, routineId: string): Promise<RoutineRun[]> {
+    const agent = this.requireAgent(agentId)
+    return this.db.routineRuns(agent.id, String(routineId))
   }
 
   async listRoutines(): Promise<RoutineInfo[]> {

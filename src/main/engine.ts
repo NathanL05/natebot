@@ -483,7 +483,7 @@ export class Engine extends EventEmitter {
     // A long chat session starts over, carrying the latest messages across as a note.
     if (ok && !fresh && state.contextTokens > ROTATE_AT_TOKENS) this.rotate(agentId)
 
-    this.deps.db.finishRun(runId, ok, summary, tokens)
+    this.deps.db.finishRun(runId, ok, summary, tokens, msg.id)
     if (remindersSet) this.emit('remindersChanged')
     this.running.delete(agentId)
     if (requeue) {

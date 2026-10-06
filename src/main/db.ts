@@ -2,7 +2,7 @@
 // Uses Node's built-in node:sqlite, so there is no native module to rebuild.
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
-import type { AgentUsage, ChatMessage, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig } from '@shared/types'
+import type { AgentUsage, ChatMessage, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -208,6 +208,8 @@ export class Db {
     if (!runCols.some((c) => c.name === 'cost_usd')) this.db.exec('ALTER TABLE runs ADD COLUMN cost_usd REAL')
     // Added later: which of the agent's routines a routine run was (null before: the "main" one).
     if (!runCols.some((c) => c.name === 'routine_id')) this.db.exec('ALTER TABLE runs ADD COLUMN routine_id TEXT')
+    // Added later: the message a run produced (routine history links to it).
+    if (!runCols.some((c) => c.name === 'message_id')) this.db.exec('ALTER TABLE runs ADD COLUMN message_id TEXT')
     // Added later: repeating reminders.
     const remCols = this.db.prepare('PRAGMA table_info(reminders)').all() as { name: string }[]
     if (!remCols.some((c) => c.name === 'repeat')) this.db.exec('ALTER TABLE reminders ADD COLUMN repeat TEXT')
@@ -425,11 +427,11 @@ export class Db {
       .run(id, agentId, source, Date.now(), routineId)
   }
 
-  finishRun(id: string, ok: boolean, summary: string, tokens: RunTokens | null = null): void {
+  finishRun(id: string, ok: boolean, summary: string, tokens: RunTokens | null = null, messageId: string | null = null): void {
     this.db
       .prepare(
         `UPDATE runs SET ended_at = ?, ok = ?, summary = ?, input_tokens = ?, cache_write_tokens = ?,
-         cache_read_tokens = ?, output_tokens = ?, cost_usd = ? WHERE id = ?`
+         cache_read_tokens = ?, output_tokens = ?, cost_usd = ?, message_id = ? WHERE id = ?`
       )
       .run(
         Date.now(),
@@ -440,8 +442,21 @@ export class Db {
         tokens?.cacheRead ?? null,
         tokens?.output ?? null,
         tokens?.costUsd ?? null,
+        messageId,
         id
       )
+  }
+
+  /** A routine's latest finished runs, newest first. Runs from before routine ids were recorded belong to "main". */
+  routineRuns(agentId: string, routineId: string, limit = 20): RoutineRun[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ended_at, ok, summary, message_id, input_tokens + cache_write_tokens + cache_read_tokens + output_tokens AS tokens
+         FROM runs WHERE agent_id = ? AND source = 'routine' AND ended_at IS NOT NULL
+         AND (routine_id = ? OR (routine_id IS NULL AND ? = 'main')) ORDER BY started_at DESC, rowid DESC LIMIT ?`
+      )
+      .all(agentId, routineId, routineId, limit) as { ended_at: number; ok: number | null; summary: string | null; message_id: string | null; tokens: number | null }[]
+    return rows.map((r) => ({ at: r.ended_at, ok: r.ok === 1, summary: r.summary ?? '', messageId: r.message_id, tokens: r.tokens }))
   }
 
   /** Per-agent totals for runs started since `since` (every kind: chat, routine, action, group chat). */
