@@ -66,7 +66,7 @@ Deleting an agent moves its workspace to the Trash.
 ## Known limitations
 
 - **Routines only run while NateBot is running** (window open or in the menu bar) **and the Mac is awake.**
-  A run missed in the last 12 hours is caught up once on launch or wake; older ones are skipped. Turn on
+  A run missed in the last 12 hours is caught up once on launch or wake; older ones are skipped, with a line in the chat saying so. Turn on
   Launch at login. To run at exact times with the lid closed, schedule a wake: `sudo pmset repeat wakeorpoweron MTWRF 07:55:00`.
 - **Shared usage limit.** Agents use the same 5-hour and weekly limits as your own Claude Code use. Haiku uses
   the least. Several agents can run at once (up to 3), which uses the limit faster.
