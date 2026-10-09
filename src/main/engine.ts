@@ -320,6 +320,15 @@ export class Engine extends EventEmitter {
     return [...args, ...sessionArgs]
   }
 
+  /**
+   * A failed run hit the subscription's usage limit: claude said so, or the error reads like it
+   * and `/usage` agrees. Waiting for a reset that isn't coming would retry a broken run forever.
+   */
+  private async isUsageLimit(detail: string, state: StreamState): Promise<boolean> {
+    if (state.rateLimit?.status === 'rejected') return true
+    return looksLikeUsageLimit(detail) && (await this.deps.usage.confirmLimit())
+  }
+
   // ---- a normal run ----
 
   private async run(agentId: string, job: Job): Promise<void> {
@@ -443,7 +452,7 @@ export class Engine extends EventEmitter {
                 : 'Done')
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
-        if (looksLikeUsageLimit(detail) || state.rateLimit?.status === 'rejected') {
+        if (await this.isUsageLimit(detail, state)) {
           this.deps.usage.markLimited(detail)
           requeue = true
           summary = 'Usage limit reached'
@@ -593,7 +602,7 @@ export class Engine extends EventEmitter {
         result = { status: 'ok', text: PASS_RE.test(text) ? '' : text, detail: '' }
       } else {
         const detail = (state.result?.text || tail(exit.stderr) || `Claude Code exited with code ${exit.code ?? '?'}`).trim()
-        if (looksLikeUsageLimit(detail) || state.rateLimit?.status === 'rejected') {
+        if (await this.isUsageLimit(detail, state)) {
           this.deps.usage.markLimited(detail)
           result = { status: 'limited', text: '', detail }
         } else if (t.sessionId && /no conversation found|session.*not found|invalid session/i.test(detail)) {

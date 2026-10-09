@@ -82,6 +82,12 @@ function toWindow(raw: { utilization?: number; resetsAt?: number } | undefined, 
   }
 }
 
+/** Whether a usage window is (about) full; true when neither has numbers yet. */
+export function windowsFull(fiveHour: UsageWindow | undefined, sevenDay: UsageWindow | undefined): boolean {
+  const used = [fiveHour?.utilization, sevenDay?.utilization].filter((u): u is number => typeof u === 'number')
+  return used.length === 0 || used.some((u) => u >= 0.98)
+}
+
 /** A window whose reset time has passed starts again from zero. */
 function rollOver(w: UsageWindow): UsageWindow {
   return w.resetsAt && w.resetsAt <= Date.now() ? { utilization: 0, resetsAt: null } : w
@@ -220,6 +226,20 @@ export class UsageTracker extends EventEmitter {
     }
     this.blockedUntil = r.status === 'rejected' ? (resetsAt ?? Date.now() + FALLBACK_WAIT) : 0
     this.changed()
+  }
+
+  /**
+   * A run failed with text that reads like a usage limit, but claude didn't report one. Asks
+   * `/usage` (no tokens) whether a window is really full: other errors can mention "rate limit"
+   * (an MCP server's API quota), and treating them as the limit would retry the run forever.
+   * Without fresh numbers to go on, it trusts the text.
+   */
+  async confirmLimit(): Promise<boolean> {
+    const before = this.info?.updatedAt
+    await this.refresh(true)
+    // `/usage` gave no fresh numbers: the stale ones can't overrule the error.
+    if (!this.info || this.info.updatedAt === before) return true
+    return windowsFull(this.info.fiveHour, this.info.sevenDay)
   }
 
   /** Called when a run fails with a usage-limit error. */

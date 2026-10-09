@@ -84,7 +84,7 @@ const reply = (text: string, tools: { id: string; name: string; ok: boolean }[] 
   { type: 'result', subtype: 'success', result: text, session_id: 'sess-1' }
 ]
 
-function setup(agent: AgentConfig = emailAgent) {
+function setup(agent: AgentConfig = emailAgent, opts: { limitConfirmed?: boolean } = {}) {
   const saved: ChatMessage[] = []
   const notes: string[] = []
   const reminders: unknown[] = []
@@ -104,7 +104,7 @@ function setup(agent: AgentConfig = emailAgent) {
       scheduledCount: () => 0,
       saveReminder: (r: unknown) => reminders.push(r)
     } as unknown as Db,
-    usage: { waitMs: () => 0, update: vi.fn(), markLimited: vi.fn() } as unknown as UsageTracker,
+    usage: { waitMs: () => 0, update: vi.fn(), markLimited: vi.fn(), confirmLimit: async () => opts.limitConfirmed ?? true } as unknown as UsageTracker,
     claudePath: () => '/usr/local/bin/claude',
     emitMessage: vi.fn(),
     emitAgents: vi.fn(),
@@ -116,7 +116,7 @@ function setup(agent: AgentConfig = emailAgent) {
       engine.once('runFinished', resolve)
       engine.enqueue(agent.id, { source: 'chat', prompt, attachments: [] })
     })
-  return { engine, saved, notes, reminders, run }
+  return { engine, saved, notes, reminders, run, usage: engine['deps'].usage }
 }
 
 const action = (over: Partial<ProposedAction> = {}): ProposedAction => ({
@@ -429,3 +429,28 @@ describe('read-only folders', () => {
     expect(prompt).not.toContain('/does/not/exist')
   })
 })
+
+describe('usage limit', () => {
+  const failing = (text: string): Record<string, unknown>[] => [
+    { type: 'system', subtype: 'init', session_id: 'sess-1' },
+    { type: 'result', subtype: 'error_during_execution', is_error: true, result: text, session_id: 'sess-1' }
+  ]
+
+  it('waits for the reset when /usage agrees the limit is reached', async () => {
+    const { run, usage } = setup(emailAgent, { limitConfirmed: true })
+    h.events.push(...failing('Claude AI usage limit reached|1791373740'))
+    const done = await run('Summarise my inbox')
+    expect(done.summary).toBe('Usage limit reached')
+    expect(usage.markLimited).toHaveBeenCalled()
+  })
+
+  it("fails normally when an error only mentions a rate limit and /usage shows room", async () => {
+    const { run, usage, saved } = setup(emailAgent, { limitConfirmed: false })
+    h.events.push(...failing('Gmail API error: rate limit exceeded for user'))
+    const done = await run('Summarise my inbox')
+    expect(done.ok).toBe(false)
+    expect(usage.markLimited).not.toHaveBeenCalled()
+    expect(saved.some((m) => m.role === 'error' && m.text.includes('rate limit exceeded'))).toBe(true)
+  })
+})
+

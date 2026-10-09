@@ -43,7 +43,8 @@ How NateBot uses your Claude Code subscription, keeps agents isolated, keeps usa
 
 ## Where your data lives
 
-Everything stays on this Mac:
+Everything stays on this Mac. `~/NateBot` itself is readable by your account only (NateBot sets this at launch), so other
+users on the Mac can't open your chats or notes:
 
 | Path | What |
 |---|---|

@@ -57,6 +57,7 @@ import { APPROVAL_BUTTONS, APPROVE, approvalNotice, autoApprovable, REJECT } fro
 import { readMemory, writeMemory } from './memory'
 import { backupIfDue } from './backup'
 import { cleanTmp } from './tmp'
+import { makePrivate } from './private-dir'
 import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
 import { approvalButtons, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
@@ -143,7 +144,7 @@ export class Backend implements NateBotApi {
   private captureOk = true
 
   constructor() {
-    mkdirSync(ROOT, { recursive: true })
+    if (makePrivate(ROOT)) log(`startup: made ${ROOT} readable by you only`)
     mkdirSync(WORKSPACES_DIR, { recursive: true })
     ensureMcpFile()
     refreshAppleEntry()
