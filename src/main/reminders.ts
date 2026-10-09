@@ -76,6 +76,11 @@ export function dueAction(r: Reminder, now: number): 'run' | 'miss' | null {
   return r.kind === 'task' && now - r.at > TASK_CATCH_UP ? 'miss' : 'run'
 }
 
+/** Where a missed reminder goes: a repeating one skips to its next time, a one-off is done (null). */
+export function afterMiss(r: Reminder, now: number): number | null {
+  return r.repeat ? nextRepeat(r.at, r.repeat, now) : null
+}
+
 /** One timer for the next reminder due. */
 export class ReminderClock {
   private timer: NodeJS.Timeout | undefined
