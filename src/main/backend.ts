@@ -244,6 +244,7 @@ export class Backend implements NateBotApi {
     const path = await resolveShellPath()
     log(`startup: version=${app.getVersion()} packaged=${app.isPackaged} pathDirs=${path.split(':').length}`)
     await this.recheckEnv()
+    this.syncLoginItem()
     this.usage.startPolling()
     // Routines only fire while the Mac is awake and NateBot is open: run what was missed.
     this.catchUpRoutines()
@@ -255,6 +256,17 @@ export class Backend implements NateBotApi {
     this.quietTimer = setInterval(() => this.endQuiet(), 60_000)
     this.syncPhone()
     powerMonitor.on('resume', this.onResume)
+  }
+
+  /**
+   * Launch at login is only written when the setting changes, so an install that replaced the
+   * app (the old copy moved to the Trash) can leave macOS with no login item for this copy.
+   */
+  private syncLoginItem(): void {
+    if (!app.isPackaged || !this.settings.get().launchAtLogin) return
+    if (app.getLoginItemSettings().openAtLogin) return
+    app.setLoginItemSettings({ openAtLogin: true })
+    log(`login item: re-registered (now ${app.getLoginItemSettings().openAtLogin ? 'on' : 'still off'})`)
   }
 
   shutdown(): void {

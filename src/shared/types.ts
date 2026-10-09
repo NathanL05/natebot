@@ -377,6 +377,8 @@ export interface AppSettings {
   voice: string | null
   /** Speaking speed for Listen (1 = normal). */
   voiceRate: number
+  /** ⌘Q asks first (routines and reminders stop while NateBot is closed). */
+  confirmQuit: boolean
 }
 
 export const VOICE_RATES = [0.9, 1, 1.15, 1.3]

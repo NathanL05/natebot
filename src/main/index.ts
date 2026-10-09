@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, nativeImage, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, powerMonitor, shell, type MenuItemConstructorOptions } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { handleAvatarProtocol, registerAvatarScheme } from './avatars'
@@ -9,6 +9,7 @@ import { createCapture } from './capture'
 import { parseShareLink } from './share'
 import { createTray } from './tray'
 import { loadBounds, trackBounds } from './window-state'
+import { log } from './log'
 import { CUSTOM_HOME, ROOT } from './paths'
 
 app.setName('NateBot')
@@ -52,6 +53,8 @@ if (app.isPackaged) app.setAsDefaultProtocolClient('natebot')
 
 let mainWindow: BrowserWindow | null = null
 let quitting = false
+/** What asked NateBot to quit, for the log (Dock, logout and `quit app` scripts are "other"). */
+let quitReason = 'other'
 let backend: Backend
 
 const BACKGROUNDS = { dark: '#0E0E13', light: '#FFFFFF' } as const
@@ -113,6 +116,45 @@ function showWindow(): void {
   mainWindow.focus()
 }
 
+/**
+ * ⌘Q from the app menu. Closing NateBot stops routines, reminders and watches, which is
+ * rarely what ⌘Q is reaching for, so it asks first and offers to close the window instead.
+ * Quitting from the menu-bar menu, the Dock or at logout never asks.
+ */
+let askingToQuit = false
+async function confirmQuit(): Promise<void> {
+  if (!backend.settings.get().confirmQuit) return quit('menu')
+  // ⌘Q pressed again while the question is up: one dialog is enough.
+  if (askingToQuit) return
+  askingToQuit = true
+  const win = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() ? mainWindow : null
+  const opts = {
+    type: 'question' as const,
+    message: 'Quit NateBot?',
+    detail:
+      "While NateBot is closed, routines, reminders, email triggers and page watches don't run. " +
+      'To get it out of the way, close the window instead: NateBot keeps working in the menu bar.',
+    buttons: ['Close Window', 'Quit', 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    checkboxLabel: "Don't ask again"
+  }
+  const res = await (win ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts)).finally(() => {
+    askingToQuit = false
+  })
+  if (res.response === 0) {
+    for (const w of BrowserWindow.getAllWindows()) w.hide()
+  } else if (res.response === 1) {
+    if (res.checkboxChecked) backend.settings.update({ confirmQuit: false })
+    quit('menu')
+  }
+}
+
+function quit(reason: string): void {
+  quitReason = reason
+  app.quit()
+}
+
 function openAgent(agentId: string): void {
   showWindow()
   emit('focusAgent', agentId)
@@ -137,7 +179,7 @@ function buildMenu(): void {
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
-        { role: 'quit', label: 'Quit NateBot' }
+        { label: 'Quit NateBot', accelerator: 'Cmd+Q', click: () => void confirmQuit() }
       ]
     },
     {
@@ -231,7 +273,8 @@ app.whenReady().then(async () => {
       emit('navigate', 'today')
     },
     onQuickPrompt: (agentId, prompt) => void backend.sendMessage(agentId, prompt),
-    onCapture: () => capture.show()
+    onCapture: () => capture.show(),
+    onQuit: () => quit('menu bar')
   })
   backend.onAgentsChanged = tray.update
   backend.onOpenAgent = openAgent
@@ -245,12 +288,21 @@ app.whenReady().then(async () => {
   tray.update((await backend.bootstrap()).agents)
 
   app.on('activate', showWindow)
+  powerMonitor.on('shutdown', () => {
+    quitReason = 'shutdown'
+  })
 })
 
 app.on('before-quit', () => {
+  if (!quitting) log(`quit: ${quitReason}`)
   quitting = true
   backend?.shutdown()
 })
+
+// So a quiet exit can be told apart from a crash in the log.
+app.on('render-process-gone', (_e, _wc, d) => log(`renderer gone: ${d.reason} (exit ${d.exitCode})`))
+app.on('child-process-gone', (_e, d) => log(`${d.type} process gone: ${d.reason} (exit ${d.exitCode})`))
+process.on('unhandledRejection', (e) => log(`unhandled rejection: ${e instanceof Error ? e.message : String(e)}`))
 
 // NateBot stays alive with no windows so routines keep running.
 app.on('window-all-closed', () => {

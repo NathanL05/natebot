@@ -73,7 +73,7 @@ You need a Mac with Apple Silicon and [Claude Code](https://code.claude.com) ins
 2. Open `dist/NateBot-<version>-arm64.dmg` and drag **NateBot** onto **Applications**.
 3. Launch it. If macOS blocks a downloaded copy, right-click it in Applications → **Open** → **Open**.
 
-Closing the window keeps NateBot in the menu bar so routines keep running. Turn on **Settings → Launch at login**,
+Closing the window keeps NateBot in the menu bar so routines keep running (⌘Q asks first). Turn on **Settings → Launch at login**,
 and open the **Guide** to get going. Gmail and the other Google connectors need a free Google Cloud OAuth client,
 which takes about 5 minutes to set up: see [Connections](docs/connections.md).
 

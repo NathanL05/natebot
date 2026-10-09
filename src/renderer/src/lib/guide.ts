@@ -771,6 +771,18 @@ export const GUIDE: GuideCategory[] = [
         steps: ['Open **Settings → General**.', 'Turn on **Launch at login**.'],
         go: 'settings',
         keywords: 'startup boot autostart'
+      },
+      {
+        id: 'confirm-quit',
+        title: 'Quit or close the window',
+        summary: '⌘Q asks before quitting, because routines, reminders and watches stop while NateBot is closed.',
+        steps: [
+          'Press **⌘Q** and choose **Close Window** to keep NateBot working in the menu bar, or **Quit** to stop it.',
+          'To quit without the question, use **Quit NateBot** in the menu-bar menu, or turn off **Settings → General → Ask before quitting**.'
+        ],
+        tip: 'Closing the window (⌘W or the red button) never stops anything.',
+        go: 'settings',
+        keywords: 'quit close exit cmd q stop running'
       }
     ]
   },
