@@ -6,7 +6,12 @@ import { chmodSync, mkdirSync, statSync } from 'node:fs'
 /** Creates `dir` if needed and makes it readable by its owner only. Returns whether it had to be tightened. */
 export function makePrivate(dir: string): boolean {
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  if ((statSync(dir).mode & 0o077) === 0) return false
-  chmodSync(dir, 0o700)
-  return true
+  try {
+    if ((statSync(dir).mode & 0o077) === 0) return false
+    chmodSync(dir, 0o700)
+    return true
+  } catch {
+    // Not ours to change (e.g. owned by another account): never stop NateBot starting over it.
+    return false
+  }
 }
