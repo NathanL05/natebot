@@ -192,6 +192,9 @@ NateBot shows the proposal as a card with **Approve / Edit / Reject**:
 
 - **Approve** starts a separate one-off `claude -p` run that allows **only that one tool**, from one of the
   agent's own MCP servers. It carries out exactly the approved details and then reports "✓ Sent reply to Sarah".
+  A check runs just before the tool call: if anything differs from what you approved (another recipient, a reworded
+  body) or the tool is called a second time, NateBot blocks the call and the card says why
+  (`resources/approval-guard.cjs`).
 - **Edit** lets you change the details before you approve.
 - **Reject** tells the agent not to do it.
 

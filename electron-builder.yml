@@ -10,8 +10,10 @@ files:
   - resources/**/*
   - package.json
 # The Apple connector runs as a plain script (outside the archive) under ELECTRON_RUN_AS_NODE.
+# So does the hook that checks an approved action's tool call (approval-guard.cjs).
 asarUnpack:
   - resources/apple-mcp.cjs
+  - resources/approval-guard.cjs
 protocols:
   - name: NateBot
     schemes: [natebot]
