@@ -121,8 +121,12 @@ function showWindow(): void {
  * rarely what ⌘Q is reaching for, so it asks first and offers to close the window instead.
  * Quitting from the menu-bar menu, the Dock or at logout never asks.
  */
+let askingToQuit = false
 async function confirmQuit(): Promise<void> {
   if (!backend.settings.get().confirmQuit) return quit('menu')
+  // ⌘Q pressed again while the question is up: one dialog is enough.
+  if (askingToQuit) return
+  askingToQuit = true
   const win = mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible() ? mainWindow : null
   const opts = {
     type: 'question' as const,
@@ -135,7 +139,9 @@ async function confirmQuit(): Promise<void> {
     cancelId: 2,
     checkboxLabel: "Don't ask again"
   }
-  const res = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts)
+  const res = await (win ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts)).finally(() => {
+    askingToQuit = false
+  })
   if (res.response === 0) {
     for (const w of BrowserWindow.getAllWindows()) w.hide()
   } else if (res.response === 1) {
