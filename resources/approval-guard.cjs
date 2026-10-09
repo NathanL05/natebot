@@ -15,6 +15,15 @@ function norm(v) {
 
 const isObject = (x) => x !== null && typeof x === 'object' && !Array.isArray(x)
 
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
+
+/** "2026-10-09T10:00" and "2026-10-09T10:00:00+01:00" are the same moment (no offset = local time). */
+function sameTime(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || !DATE_TIME.test(a.trim()) || !DATE_TIME.test(b.trim())) return false
+  const t = (s) => new Date(s.trim().replace(' ', 'T')).getTime()
+  return Number.isFinite(t(a)) && t(a) === t(b)
+}
+
 /**
  * The first approved detail the tool's input contradicts ("to", "event.start"), or null.
  * Details the tool doesn't take under that name (descriptions, notes) can't be compared and are skipped.
@@ -30,7 +39,7 @@ function mismatch(approved, input, path = '') {
     if (isObject(v) && isObject(got)) {
       const inner = mismatch(v, got, `${path}${k}.`)
       if (inner) return inner
-    } else if (norm(v) !== norm(got)) {
+    } else if (norm(v) !== norm(got) && !sameTime(v, got)) {
       return `${path}${k}`
     }
   }
@@ -76,4 +85,4 @@ if (require.main === module) {
   process.exit(main(process.argv[2], stdin))
 }
 
-module.exports = { norm, mismatch, main }
+module.exports = { norm, sameTime, mismatch, main }

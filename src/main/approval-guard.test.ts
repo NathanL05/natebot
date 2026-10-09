@@ -21,6 +21,12 @@ describe('mismatch', () => {
     expect(guard.mismatch(approved, input)).toBeNull()
     expect(guard.mismatch({ to: 'a@x.com, b@x.com' }, { to: ['a@x.com', 'b@x.com'] })).toBeNull()
     expect(guard.mismatch({ count: 3 }, { count: '3' })).toBeNull()
+    // The same moment written two ways (an approved calendar event, then the tool's format).
+    const local = new Date(2026, 9, 9, 10, 0)
+    const offset = -local.getTimezoneOffset()
+    const zone = `${offset >= 0 ? '+' : '-'}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0')}:${String(Math.abs(offset) % 60).padStart(2, '0')}`
+    expect(guard.mismatch({ start: '2026-10-09T10:00' }, { start: `2026-10-09T10:00:00${zone}` })).toBeNull()
+    expect(guard.mismatch({ start: '2026-10-09T10:00' }, { start: '2026-10-09T11:00' })).toBe('start')
   })
 
   it('names the first detail that differs, nested ones too', () => {
