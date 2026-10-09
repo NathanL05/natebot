@@ -1,5 +1,5 @@
 // Menu-bar icon so NateBot (and its routines) keep running with the window closed.
-import { app, Menu, nativeImage, Tray } from 'electron'
+import { Menu, nativeImage, Tray } from 'electron'
 import { join } from 'node:path'
 import { promptLabel, type AgentSummary } from '@shared/types'
 
@@ -15,6 +15,7 @@ export function createTray(opts: {
   onQuickPrompt: (agentId: string, prompt: string) => void
   /** Opens the quick-capture box. */
   onCapture: () => void
+  onQuit: () => void
 }): { update: (agents: AgentSummary[]) => void } {
   const icon = nativeImage.createFromPath(join(opts.resourcesDir, 'trayTemplate.png'))
   icon.setTemplateImage(true)
@@ -49,7 +50,7 @@ export function createTray(opts: {
         { label: 'Today', click: opts.onToday },
         { label: 'Routines & reminders', click: opts.onRoutines },
         { type: 'separator' },
-        { label: 'Quit NateBot', accelerator: 'Cmd+Q', click: () => app.quit() }
+        { label: 'Quit NateBot', accelerator: 'Cmd+Q', click: opts.onQuit }
       ])
     )
   }

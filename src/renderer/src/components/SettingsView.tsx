@@ -412,6 +412,9 @@ export function SettingsView() {
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />
             </Row>
+            <Row label="Ask before quitting" hint="⌘Q offers to close the window instead, since routines and reminders stop while NateBot is closed.">
+              <Toggle label="Ask before quitting" checked={settings.confirmQuit} onChange={(v) => void patch({ confirmQuit: v })} />
+            </Row>
           </Section>
 
           <p className="pb-6 text-center text-[12px] text-muted">

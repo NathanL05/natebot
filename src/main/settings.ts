@@ -50,7 +50,8 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
           ? { start: String(raw.quietHours.start), end: String(raw.quietHours.end) }
           : fallback.quietHours,
     voice: raw.voice === null ? null : typeof raw.voice === 'string' && raw.voice.trim() ? raw.voice.trim().slice(0, 120) : fallback.voice,
-    voiceRate: VOICE_RATES.includes(raw.voiceRate as number) ? (raw.voiceRate as number) : fallback.voiceRate
+    voiceRate: VOICE_RATES.includes(raw.voiceRate as number) ? (raw.voiceRate as number) : fallback.voiceRate,
+    confirmQuit: typeof raw.confirmQuit === 'boolean' ? raw.confirmQuit : fallback.confirmQuit
   }
 }
 
@@ -75,7 +76,8 @@ export class SettingsStore {
       phoneInbox: false,
       quietHours: null,
       voice: null,
-      voiceRate: 1
+      voiceRate: 1,
+      confirmQuit: true
     }
     let raw: Partial<AppSettings> = {}
     try {

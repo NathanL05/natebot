@@ -20,7 +20,8 @@ const defaults: AppSettings = {
   phoneInbox: false,
   quietHours: null,
   voice: null,
-  voiceRate: 1
+  voiceRate: 1,
+  confirmQuit: true
 }
 
 describe('settings sanitising', () => {
