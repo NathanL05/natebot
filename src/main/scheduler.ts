@@ -40,6 +40,19 @@ export function dueRun(cronExpr: string, checkpoint: Checkpoint | null, now: num
   return due
 }
 
+/** How far back a catch-up looks for a run that was missed for good. */
+const MISSED_LOOKBACK = 8 * 24 * 60 * 60_000
+
+/**
+ * The latest scheduled time that was missed for good: after the checkpoint, but too long ago
+ * to catch up on. Null when nothing was missed, or when dueRun can still run it.
+ */
+export function missedRun(cronExpr: string, checkpoint: Checkpoint | null, now: number): number | null {
+  if (checkpoint?.cron !== cronExpr || now - checkpoint.at <= CATCH_UP_WINDOW) return null
+  const last = lastOccurrence(cronExpr, now, Math.min(now - checkpoint.at, MISSED_LOOKBACK))
+  return last !== null && last > checkpoint.at && now - last > CATCH_UP_WINDOW ? last : null
+}
+
 /** Chat lines for what changed in an agent's routines when its settings are saved. */
 export function routineChanges(before: Routine[], after: Routine[]): string[] {
   const lines: string[] = []

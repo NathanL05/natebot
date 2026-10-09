@@ -453,6 +453,7 @@ export const GUIDE: GuideCategory[] = [
         summary: 'If your Mac was asleep or NateBot was closed, the latest missed run happens when it’s back.',
         steps: [
           'Nothing to do: it happens by itself within 12 hours of the missed time.',
+          'Missed by longer? The chat says it didn’t run. Open **Routines** (⇧⌘R) and click **Run now** if you still need it.',
           'Turn on **Settings → General → Launch at login** so NateBot is always running.'
         ],
         tip: 'Only the latest missed time runs, never a backlog.',

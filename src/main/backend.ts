@@ -67,7 +67,7 @@ import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
 import { watchPrompt, WebWatcher } from './webwatch'
 import { draftFromShare, shareFile } from './agent-share'
-import { dueRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
+import { dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
 
@@ -628,7 +628,18 @@ export class Backend implements NateBotApi {
     const now = Date.now()
     const cps = this.db.routineCheckpoints(agentId)
     const due = dueRun(routine.cron, cps[routineId] ?? null, now, trigger)
-    if (due === null) return
+    if (due === null) {
+      // Too late to run: say so once, rather than leaving no trace that it didn't happen.
+      const missed = trigger === 'catch-up' ? missedRun(routine.cron, cps[routineId] ?? null, now) : null
+      if (missed === null) return
+      this.db.setRoutineCheckpoints(agentId, { ...cps, [routineId]: { cron: routine.cron, at: now } })
+      const which = agent.routines.length > 1 ? ` (${describeCron(routine.cron)})` : ''
+      const when = new Date(missed).toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit' })
+      log(`routine: agent=${agentId} routine=${routineId} missed ${new Date(missed).toISOString()}`)
+      this.engine.system(agentId, `Routine${which} didn't run on ${when}: the Mac was asleep or NateBot was closed for more than 12 hours. Run it now from Routines (⇧⌘R) if you still need it.`)
+      this.emitAgents()
+      return
+    }
     // From here this scheduled time counts as dealt with, whether it runs or is skipped.
     this.db.setRoutineCheckpoints(agentId, { ...cps, [routineId]: { cron: routine.cron, at: now } })
     const late = now - due > LATE_AFTER_MS

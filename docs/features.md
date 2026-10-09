@@ -235,7 +235,8 @@ still appears in the chat, but there's no notification and no unread badge.
 
 Routines fire while NateBot is running and the Mac is awake. If one was missed in the last 12 hours (the Mac was
 asleep or NateBot was quit), it runs once when NateBot starts or the Mac wakes, and the chat says so: *Routine ran
-at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A new or changed schedule
+at 9:14 AM (it was due at 8:00 AM)*. Only the latest missed time runs, never a backlog. A time missed by more than 12 hours
+is skipped, and the chat says so (*Routine didn't run on Friday 7:00 PM…*), so you can run it from Routines. A new or changed schedule
 starts counting from when you save it.
 
 ## Reminders
