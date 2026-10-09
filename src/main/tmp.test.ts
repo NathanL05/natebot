@@ -7,10 +7,10 @@ import { cleanTmp } from './tmp'
 describe('cleanTmp', () => {
   it('removes leftover MCP configs and day-old clipboard images, and nothing else', () => {
     const dir = mkdtempSync(join(tmpdir(), 'natebot-tmp-'))
-    for (const name of ['mcp-email-1234.json', 'clipboard-1.png', 'clipboard-2.png', 'notes.txt']) writeFileSync(join(dir, name), 'x')
+    for (const name of ['mcp-email-1234.json', 'approved-ab12.json', 'approved-ab12.json.used', 'clipboard-1.png', 'clipboard-2.png', 'notes.txt']) writeFileSync(join(dir, name), 'x')
     const twoDaysAgo = (Date.now() - 2 * 86_400_000) / 1000
     utimesSync(join(dir, 'clipboard-1.png'), twoDaysAgo, twoDaysAgo)
-    expect(cleanTmp(dir)).toBe(2)
+    expect(cleanTmp(dir)).toBe(4)
     expect(readdirSync(dir).sort()).toEqual(['clipboard-2.png', 'notes.txt'])
   })
 

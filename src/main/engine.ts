@@ -8,6 +8,7 @@ import { MODEL_IDS, type AgentConfig, type ChatMessage, type ProposedAction } fr
 import type { AgentStore } from './agents'
 import type { Db } from './db'
 import { childEnv } from './env'
+import { approvalGuard, type ApprovalGuard } from './approval-guard'
 import { agentNotes, approvalOnlyTools, configuredServersFor, writeRunConfig } from './mcp'
 import { googleLabel, googleReady } from './gmail'
 import { workspaceOf } from './paths'
@@ -663,9 +664,11 @@ export class Engine extends EventEmitter {
     const runId = randomUUID()
     this.deps.db.startRun(runId, agentId, 'action')
     let mcp: ReturnType<typeof writeRunConfig> | null = null
+    let guard: ApprovalGuard | null = null
     const state = new StreamState()
     try {
       mcp = writeRunConfig(agent)
+      guard = approvalGuard(tool, action.details)
       const disallowed = agent.disallowed_tools.filter((t) => t !== tool)
       const args = [
         '-p',
@@ -681,7 +684,9 @@ export class Engine extends EventEmitter {
         '--permission-prompts', 'none',
         '--tools', '',
         '--allowedTools', tool,
-        ...(disallowed.length ? ['--disallowedTools', disallowed.join(',')] : [])
+        ...(disallowed.length ? ['--disallowedTools', disallowed.join(',')] : []),
+        // The call must match what was approved, and happen once (see approval-guard.ts).
+        '--settings', guard.settings
       ]
       const proc = spawnClaude({
         bin,
@@ -710,9 +715,12 @@ export class Engine extends EventEmitter {
         this.deps.db.finishRun(runId, true, action.summary, state.result?.tokens ?? null)
         this.emit('actionFinished', { agentId, ok: true, summary: action.summary })
       } else {
+        const blocked = guard.denied()
         const reason =
           exit.reason === 'timeout'
             ? 'Timed out.'
+            : blocked
+              ? `NateBot stopped the call: ${blocked}`
             : // A "✓" here is a claim the checks above disproved, never a reason.
               (reply.startsWith('✓') ? '' : reply.replace(/^✗\s*/, '')) ||
               (state.result?.permissionDenials ? `Permission for ${tool} was refused.` : '') ||
@@ -728,6 +736,7 @@ export class Engine extends EventEmitter {
       fail(`Something went wrong: ${(e as Error).message}`)
     } finally {
       mcp?.cleanup()
+      guard?.cleanup()
       this.deps.emitAgents()
     }
   }

@@ -1,6 +1,7 @@
 // The safety promises: tools marked require_approval are never available in a
 // normal run, and an approved action can only run its one tool, from one of
 // the agent's own MCP servers. claude itself is never started here.
+import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +18,9 @@ const h = vi.hoisted(() => ({
   /** stream-json events the fake claude emits on its next run. */
   events: [] as Record<string, unknown>[],
   /** Makes the next spawn throw instead of starting. */
-  spawnError: null as string | null
+  spawnError: null as string | null,
+  /** Runs inside the fake claude, while its files still exist. */
+  during: null as ((args: string[]) => void) | null
 }))
 
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp' }, shell: {} }))
@@ -38,6 +41,7 @@ vi.mock('./claude/process', () => ({
   spawnClaude: (opts: { args: string[]; env: NodeJS.ProcessEnv; input: string; onEvent: (e: Record<string, unknown>) => void }) => {
     if (h.spawnError) throw new Error(h.spawnError)
     h.spawns.push({ args: opts.args, env: opts.env, input: opts.input })
+    h.during?.(opts.args)
     for (const e of h.events.splice(0)) opts.onEvent(e)
     return { kill: () => undefined, done: Promise.resolve({ code: 0, reason: 'exit', stderr: '' }) }
   }
@@ -129,6 +133,7 @@ beforeEach(() => {
   h.spawns.length = 0
   h.events.length = 0
   h.spawnError = null
+  h.during = null
   vi.stubEnv('ANTHROPIC_API_KEY', 'sk-should-never-be-passed')
 })
 afterEach(() => {
@@ -185,6 +190,8 @@ describe('approved actions', () => {
     expect(flag(s, '--tools')).toBe('')
     expect(flag(s, '--disallowedTools')).toBe('mcp__gmail__manage_gmail_filter')
     expect(s?.args).toContain('--no-session-persistence')
+    // The call is checked against the approved details before it runs.
+    expect(JSON.parse(flag(s, '--settings') ?? '{}').hooks.PreToolUse[0].matcher).toBe(SEND)
     expect(s?.input).toContain('"to": "sarah@example.com"')
     expect(a.status).toBe('done')
     expect(a.result).toBe('✓ Sent reply to Sarah')
@@ -216,6 +223,19 @@ describe('approved actions', () => {
     await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
     expect(a.status).toBe('failed')
     expect(a.result).toMatch(/never called/)
+  })
+
+  it('fails with the reason when the approval check blocked the call', async () => {
+    const { engine } = setup()
+    const a = action()
+    h.during = (args) => {
+      const hook = JSON.parse(args[args.indexOf('--settings') + 1] as string).hooks.PreToolUse[0].hooks[0].command as string
+      writeFileSync(`${/'([^']*approved-[^']*\.json)'$/.exec(hook)?.[1]}.denied`, `"to" isn't what you approved.`)
+    }
+    h.events.push(...reply('✗ Blocked', [{ id: 't1', name: SEND, ok: false }]))
+    await engine.executeAction('email-agent', { id: 'm1', agentId: 'email-agent', role: 'agent', text: '', createdAt: 0 }, a)
+    expect(a.status).toBe('failed')
+    expect(a.result).toBe(`NateBot stopped the call: "to" isn't what you approved.`)
   })
 
   it('keeps both results when two actions on one message run at once', async () => {
