@@ -253,7 +253,7 @@ Reminders are set straight away. Click **Cancel** on the card (or in **Routines 
   weekdays or weekly. After going off it moves to its next time, and Cancel ends the series. For repeating work that
   needs more than a nudge, use a routine.
 - Like routines, they go off while NateBot is running and the Mac is awake. A message reminder that was missed
-  shows up as soon as NateBot starts or the Mac wakes. A task more than 12 hours late is skipped and the chat says so.
+  shows up as soon as NateBot starts or the Mac wakes. A task more than 12 hours late is skipped and the chat says so; a repeating one carries on from its next time.
 - Limits: 5 per reply, 20 waiting per agent, up to a year ahead. Group chats can't set reminders.
 
 Reminders are stored in `~/NateBot/data.db` (table `reminders`). The logic is in `src/main/reminders.ts`.

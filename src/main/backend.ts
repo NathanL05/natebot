@@ -61,7 +61,7 @@ import { BRIEF_ID, briefDraft, TODAY_TOKEN, todayContext } from './brief'
 import { digest, inQuietHours } from './quiet'
 import { approvalButtons, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
 import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
-import { dueAction, nextRepeat, ReminderClock } from './reminders'
+import { afterMiss, dueAction, nextRepeat, ReminderClock } from './reminders'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
@@ -702,8 +702,12 @@ export class Backend implements NateBotApi {
       if (what === 'run' && r.kind === 'task' && (!env.claudeFound || !env.loggedIn)) continue
       const due = new Date(r.at).toDateString() === new Date(now).toDateString() ? clock(r.at) : new Date(r.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })
       if (what === 'miss') {
-        this.setReminderStatus(r, 'missed')
-        this.engine.system(r.agentId, `Missed reminder (due ${due}, while the Mac was asleep or NateBot was closed): ${r.text}`)
+        // A repeating one skips the stale time and keeps going; a one-off is done.
+        const next = afterMiss(r, now)
+        if (next) this.moveReminder(r, next)
+        else this.setReminderStatus(r, 'missed')
+        const then = next ? ` It repeats, so the next one is ${new Date(next).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}.` : ''
+        this.engine.system(r.agentId, `Missed reminder (due ${due}, while the Mac was asleep or NateBot was closed): ${r.text}${then}`)
         continue
       }
       // A repeating reminder moves on to its next time instead of finishing.

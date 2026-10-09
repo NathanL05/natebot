@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Reminder } from '@shared/types'
-import { dueAction, MAX_PER_REPLY, MAX_SCHEDULED, nextRepeat, parseTime, resolveReminders, TASK_CATCH_UP } from './reminders'
+import { afterMiss, dueAction, MAX_PER_REPLY, MAX_SCHEDULED, nextRepeat, parseTime, resolveReminders, TASK_CATCH_UP } from './reminders'
 
 const now = new Date(2026, 9, 3, 13, 0).getTime() // Sat 3 Oct 2026, 1pm local
 
@@ -73,5 +73,19 @@ describe('repeating reminders', () => {
     const later = new Date(2026, 9, 6, 23, 0).getTime()
     const next = new Date(nextRepeat(fri, 'daily', later))
     expect([next.getDate(), next.getHours()]).toEqual([7, 22])
+  })
+})
+
+describe('afterMiss', () => {
+  const task = (over: Partial<Reminder>): Reminder => ({ id: 'r', agentId: 'a', messageId: 'm', at: 0, kind: 'task', text: 'x', status: 'scheduled', ...over })
+
+  it('keeps a repeating task going after a long miss, and ends a one-off', () => {
+    const mon = new Date(2026, 9, 5, 8, 30).getTime()
+    // The Mac was shut from Monday morning until Wednesday evening.
+    const wed = new Date(2026, 9, 7, 20, 0).getTime()
+    expect(dueAction(task({ at: mon, repeat: 'daily' }), wed)).toBe('miss')
+    const next = new Date(afterMiss(task({ at: mon, repeat: 'daily' }), wed) as number)
+    expect([next.getDate(), next.getHours(), next.getMinutes()]).toEqual([8, 8, 30])
+    expect(afterMiss(task({ at: mon }), wed)).toBeNull()
   })
 })
