@@ -232,6 +232,16 @@ function signInExpired(server: GoogleServer): boolean {
   return !!email && !googleReady(server) && existsSync(`${tokenFile(email, SERVICES[server].credentialsDir)}.expired`)
 }
 
+/** Why routines can't use these servers yet: an expired sign-in says so, rather than "not set up". */
+export function setupProblem(servers: string[]): string {
+  const expired = servers.filter((s) => isGoogle(s) && signInExpired(s))
+  const unset = servers.filter((s) => !expired.includes(s))
+  const parts: string[] = []
+  if (expired.length) parts.push(`${expired.map(googleLabel).join(' and ')}'s sign-in expired (reconnect in Settings → Connected tools)`)
+  if (unset.length) parts.push(`${unset.map(googleLabel).join(', ')} ${unset.length > 1 ? "aren't" : "isn't"} set up yet`)
+  return parts.join('; ')
+}
+
 /** A Google service's sign-in token file once it's connected (for NateBot's own API calls). */
 export function googleTokenPath(server: string): string | null {
   if (!isGoogle(server)) return null

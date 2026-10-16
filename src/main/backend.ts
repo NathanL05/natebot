@@ -47,7 +47,7 @@ import { checkEnv, resolveShellPath } from './env'
 import { emit } from './ipc'
 import { log } from './log'
 import * as skills from './skills'
-import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailAddress, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
+import { calendarStatus, connectCalendar, connectGmail, connectGoogle, gmailAddress, gmailStatus, gmailTokenPath, googleReady, markSignInExpired, googleStatus, setupProblem, googleTokenPath, isGoogle, stopGmailConnect } from './gmail'
 import { AgendaReader } from './agenda'
 import { INBOX_TOKEN, inboxContext, InboxReader, wantsInbox } from './inbox'
 import { approvalOnlyTools, configuredServersFor, ensureMcpFile, listServers } from './mcp'
@@ -665,7 +665,7 @@ export class Backend implements NateBotApi {
     const ready = configuredServersFor(agent).filter((n) => googleReady(n))
     const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
     if (missing.length) {
-      this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: ${missing.join(', ')} isn't set up yet`)
+      this.engine.system(agentId, `Routine${which} skipped at ${time}${dueText}: ${setupProblem(missing)}`)
       this.emitAgents()
       return
     }
