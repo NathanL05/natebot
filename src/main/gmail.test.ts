@@ -15,7 +15,7 @@ vi.mock('./env', () => ({ childEnv: () => ({}), findOnPath: () => '/usr/local/bi
 vi.mock('./log', () => ({ log: () => undefined }))
 
 h.root = mkdtempSync(join(tmpdir(), 'natebot-google-'))
-const { calendarEntry, connectCalendar, gmailEntry, googleReady, CALENDAR_APPROVAL_TOOLS } = await import('./gmail')
+const { calendarEntry, connectCalendar, gmailEntry, googleReady, setupProblem, CALENDAR_APPROVAL_TOOLS } = await import('./gmail')
 
 const EMAIL = 'me@example.com'
 const token = (dir: string, body: Record<string, unknown> = {}): void => {
@@ -51,6 +51,17 @@ describe('googleReady', () => {
     expect(googleReady('gcal')).toBe(false)
     token('google-calendar', { client_id: 'new.apps.googleusercontent.com' })
     expect(googleReady('gcal')).toBe(true)
+  })
+})
+
+describe('setupProblem', () => {
+  it('says a sign-in expired rather than "not set up" once its token was set aside', () => {
+    h.servers = { gmail: { env: { USER_GOOGLE_EMAIL: EMAIL } } }
+    mkdirSync(join(h.root, 'credentials', 'google'), { recursive: true })
+    writeFileSync(join(h.root, 'credentials', 'google', `${EMAIL}.json.expired`), '{}')
+    expect(setupProblem(['gmail'])).toMatch(/^Gmail's sign-in expired/)
+    expect(setupProblem(['gcal', 'gtasks'])).toMatch(/aren't set up yet$/)
+    expect(setupProblem(['gmail', 'gcal'])).toMatch(/sign-in expired .*; .* isn't set up yet$/)
   })
 })
 
