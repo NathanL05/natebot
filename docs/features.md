@@ -6,8 +6,10 @@ The full reference. For short click-by-click steps, open **Guide** in the app (s
 
 Add agents with **+** in the sidebar. You can start from a template (Straight Talk, Study Buddy, Weekly Review, Budget
 Buddy, Fitness Coach, Travel Planner), each set up to be light on your limit (Haiku or low effort, only the tools it
-needs), or from blank. Straight Talk is a brutally honest mentor, manager and sounding board: verdict first, reasoning
-you can check, one next step, and a log of your commitments in its memory.md. It starts with the folders your other
+needs), or from blank. Straight Talk is an honest mentor, manager and sounding board. It reads what you need from each
+message: a verdict for decisions, a real answer for worries and big questions (AI, what to learn, where to go next), a
+thinking partner when you just want to talk, and 1:1 feedback when you ask. Replies are about 150 words, and it raises a
+slipped commitment at most once per conversation, from a log in its memory.md. It starts with the folders your other
 agents read, and drops the bluntness and points you to Samaritans (116 123) if you mention a crisis. Edit one with the sliders button in the chat header. Each agent is a YAML
 file:
 
@@ -168,6 +170,9 @@ agents and a group that holds them:
 | **Recruiter** | Reads you as a future CV for the plan's target companies and city: would they interview and sponsor you? |
 | **Staff Engineer** | Technical substance: real depth or a tool tour, and skills AI can't already replicate |
 | **Auditor** | What your logs show against what you say: hours, gaps that haven't moved, deadlines at risk |
+
+Each member stays in its own lens, keeps to about 80 words, and doesn't repeat a point another member made. Only the
+Auditor brings up your logs and slipped commitments.
 
 They read (never change) the folders your other agents already read, or the board asks you to pick your plan folder.
 They're told to be brutally honest: verdict first, weakest point first, no praise, and not to agree with each

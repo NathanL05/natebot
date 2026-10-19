@@ -16,4 +16,11 @@ describe('agent templates', () => {
     expect(mentor.draft.instructions).toContain('never about my worth')
     expect(mentor.draft.instructions).toContain('116 123')
   })
+
+  it('lets the mentor talk, not just audit', () => {
+    const { instructions } = AGENT_TEMPLATES.find((t) => t.id === 'mentor')!.draft
+    expect(instructions).toContain('I want to talk')
+    expect(instructions).toContain('A worry is a fair question')
+    expect(instructions).toContain('at most once per conversation')
+  })
 })

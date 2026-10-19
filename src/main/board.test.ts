@@ -18,6 +18,8 @@ describe('career board', () => {
       const a = normalize({ ...m, read_folders: ['/Users/x/Atlas'] }, slugify(m.name))
       expect(a.instructions).toContain('Brutal honesty')
       expect(a.instructions).toContain('Agreement is earned')
+      expect(a.instructions).toContain('Stay in your lane')
+      expect(a.instructions).toContain('A worry is a fair question')
       expect(a.mcp_servers).toEqual([])
       expect(a.routines).toEqual([])
       expect(a.read_folders).toEqual(['/Users/x/Atlas'])

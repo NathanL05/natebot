@@ -344,7 +344,7 @@ ${others.map((a) => `- ${a.name}: ${preview(a.instructions) || 'a general assist
 
 How the group chat works:
 - Each message you get shows what was said since your last turn, as "Name: message". Reply only as yourself with your own message: never write lines for other members and don't start with your name.
-- Talk like a group chat: short (1–4 sentences unless asked for more), direct, in character for your role. Build on, question or disagree with what others said instead of repeating it.
+- Talk like a group chat: short (1–4 sentences, about 80 words at most, unless ${user} asks for more), direct, in character for your role. This beats any longer reply format in your own instructions. Build on, question or disagree with what others said instead of repeating it.
 - To ask another agent something directly, @mention them by name (e.g. @${others[0]?.name ?? 'Name'}). They reply next.
 - If you have nothing useful to add, reply with exactly PASS and nothing else.
 - Each message from ${user} gives the group a limited number of replies; your turn note says how many are left. Pace yourself: when few remain, converge rather than opening new threads. The last reply wraps up for ${user}.
