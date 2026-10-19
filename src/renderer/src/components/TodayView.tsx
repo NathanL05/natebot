@@ -1,7 +1,7 @@
 // Today: everything waiting for you across all agents, what's coming up, and what the
 // routines found. Built from data NateBot already has, so it never runs Claude.
 import { useCallback, useEffect, useState } from 'react'
-import type { Agenda, ChatMessage, Reminder, RoutineInfo } from '@shared/types'
+import type { Agenda, ChatMessage, Commitment, CommitmentStatus, Reminder, RoutineInfo } from '@shared/types'
 import { api, useStore } from '../lib/store'
 import { agentPicture } from '../lib/avatars'
 import { clockTime, dueTime, listTime } from '../lib/format'
@@ -10,8 +10,8 @@ import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { InboxCard } from './InboxCard'
 import { Markdown } from './Markdown'
-import { CheckIcon } from './icons'
-import { Button, ConfirmDialog } from './ui'
+import { CheckIcon, XIcon } from './icons'
+import { Button, ConfirmDialog, IconButton } from './ui'
 
 const DAY = 86_400_000
 
@@ -111,6 +111,8 @@ export function TodayView() {
               </div>
             )}
           </section>
+
+          <Commitments />
 
           <section className="mb-8">
             <h2 className="mb-2 text-[14px] font-semibold">Coming up</h2>
@@ -292,6 +294,88 @@ function BriefCard() {
           </div>
         )}
       </div>
+    </section>
+  )
+}
+
+/** Midnight at the start of a YYYY-MM-DD day, local time. */
+const dayStart = (due: string): number => {
+  const [y, m, d] = due.split('-').map(Number)
+  return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1).getTime()
+}
+
+function dueLabel(due: string): { text: string; late: boolean } {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days = Math.round((dayStart(due) - today.getTime()) / DAY)
+  if (days < 0) return { text: `Overdue ${-days} day${days < -1 ? 's' : ''}`, late: true }
+  if (days === 0) return { text: 'Due today', late: false }
+  if (days === 1) return { text: 'Due tomorrow', late: false }
+  return { text: `Due ${new Date(dayStart(due)).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}`, late: false }
+}
+
+/**
+ * What you said you'd do and by when, as recorded by your agents. Marking one here costs
+ * nothing: the agent that recorded it sees the result next time you talk to it.
+ */
+function Commitments() {
+  const agents = useStore((s) => s.agents)
+  const [list, setList] = useState<Commitment[]>([])
+  useEffect(() => void api.listCommitments().then(setList), [agents])
+
+  const set = (id: string, status: CommitmentStatus): void => void api.setCommitmentStatus(id, status).then(() => api.listCommitments().then(setList))
+  const remove = (id: string): void => void api.deleteCommitment(id).then(() => api.listCommitments().then(setList))
+  const name = (agentId: string): string => agents.find((a) => a.id === agentId)?.name ?? 'Agent'
+  const open = list.filter((c) => c.status === 'open')
+  const closed = list.filter((c) => c.status !== 'open' && c.updatedAt > Date.now() - 7 * DAY)
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-2 text-[14px] font-semibold">Commitments</h2>
+      {open.length === 0 && closed.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-line p-6 text-center text-[13px] text-muted">
+          Nothing you've committed to. Tell an agent like Straight Talk what you'll do and by when, and it lands here.
+        </div>
+      ) : (
+        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-elev/60">
+          {open.map((c) => {
+            const due = dueLabel(c.due)
+            return (
+              <div key={c.id} className="group flex items-center gap-3 px-4 py-2.5">
+                <div className={`w-[130px] shrink-0 text-[12px] font-medium ${due.late ? 'text-warn' : ''}`}>{due.text}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px]" title={c.text}>
+                    {c.text}
+                  </div>
+                  <button type="button" onClick={() => useStore.getState().select(c.agentId)} className="text-[11px] text-muted hover:underline">
+                    {name(c.agentId)}
+                  </button>
+                </div>
+                <Button onClick={() => set(c.id, 'done')}>
+                  <CheckIcon size={13} /> Done
+                </Button>
+                <Button variant="ghost" onClick={() => set(c.id, 'missed')}>
+                  Missed
+                </Button>
+                <IconButton label="Remove" className="opacity-0 group-hover:opacity-100" onClick={() => remove(c.id)}>
+                  <XIcon size={13} />
+                </IconButton>
+              </div>
+            )
+          })}
+          {closed.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 opacity-60">
+              <div className={`w-[130px] shrink-0 text-[12px] font-medium ${c.status === 'missed' ? 'text-danger' : ''}`}>
+                {c.status === 'done' ? '✓ Done' : '✗ Missed'}
+              </div>
+              <div className="min-w-0 flex-1 truncate text-[13px]">{c.text}</div>
+              <button type="button" onClick={() => set(c.id, 'open')} className="text-[12px] text-muted hover:text-fg">
+                Undo
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

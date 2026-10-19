@@ -9,7 +9,8 @@ Buddy, Fitness Coach, Travel Planner), each set up to be light on your limit (Ha
 needs), or from blank. Straight Talk is an honest mentor, manager and sounding board. It reads what you need from each
 message: a verdict for decisions, a real answer for worries and big questions (AI, what to learn, where to go next), a
 thinking partner when you just want to talk, and 1:1 feedback when you ask. Replies are about 150 words, and it raises a
-slipped commitment at most once per conversation, from a log in its memory.md. It starts with the folders your other
+slipped commitment at most once per conversation. It records what you commit to on Today's **Commitments** list, and
+runs a weekly 1:1 every Sunday at 19:00. It starts with the folders your other
 agents read, and drops the bluntness and points you to Samaritans (116 123) if you mention a crisis. Edit one with the sliders button in the chat header. Each agent is a YAML
 file:
 
@@ -104,7 +105,8 @@ and you're back in the app you were using. The reply arrives as a
 **Today** (in the sidebar menu, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
 proposed actions and handoffs waiting for your OK (with **Approve all** when there are several, after a confirmation
 listing each one), reminders and routines due in the next day, and what routines found in the last day. At the top, **Your day** lists today's Google Calendar events and the tasks due from Google Tasks and Apple Reminders,
-once those are connected. NateBot reads them directly, so this uses no Claude usage.
+once those are connected. NateBot reads them directly, so this uses no Claude usage. **Commitments** lists what you told
+your agents you'd do and by when, with **Done** and **Missed** buttons (see [Commitments](#commitments)).
 
 Below it, **Inbox** lists your Gmail conversations from the last three days (promotions and social left out), unread
 ones marked with a dot. Mail from people comes first. Newsletters, job alerts, receipts and notifications (spotted from
@@ -266,6 +268,23 @@ Reminders are set straight away. Click **Cancel** on the card (or in **Routines 
 - Limits: 5 per reply, 20 waiting per agent, up to a year ahead. Group chats can't set reminders.
 
 Reminders are stored in `~/NateBot/data.db` (table `reminders`). The logic is in `src/main/reminders.ts`.
+
+## Commitments
+
+When you tell an agent you'll do something by a date (*"I'll email my supervisor by Friday"*), it records it with a
+`commitments` block, and the chat shows a line like `Commitments: + Email supervisor (due 2026-10-24)`. Today lists
+open commitments under **Commitments**, soonest first, with overdue ones marked. Click **Done** or **Missed**, or just
+tell the agent how it went. Closed ones stay on Today for a week with **Undo**.
+
+- The agent that recorded a commitment sees where each one stands at the top of every message, so it can follow up
+  without re-reading your notes. Agents with no commitments see nothing and pay nothing.
+- On the due day, a free message reminder at 9:00 in that agent's chat says what's due. It's cancelled if you close
+  the commitment first.
+- Straight Talk is told to raise a slipped commitment at most once per conversation. Its **weekly 1:1** routine
+  (Sundays at 19:00) goes through them, gives manager-style feedback, and asks you to commit to next week's priorities.
+- Limits: 30 open per agent. Group chats can't record commitments.
+
+Stored in `~/NateBot/data.db` (table `commitments`). The logic is in `src/main/commitments.ts`.
 
 ## Email triggers
 

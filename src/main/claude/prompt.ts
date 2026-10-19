@@ -44,7 +44,7 @@ ${FENCE}proposed_actions
 [{"type": "send_email", "summary": "Reply to Sarah re: deadline", "tool": "mcp__gmail__send_message", "details": {"to": "sarah@example.com", "subject": "Re: Deadline", "body": "Hi Sarah, ..."}}]
 ${FENCE}
   "type" is a short snake_case verb. "summary" is one line the user sees. "tool" is the exact name of the tool that would carry it out. "details" must contain everything needed to do it exactly as approved. The user gets Approve / Edit / Reject buttons, and approved actions are carried out separately. Only include the block when something needs approval, and don't describe the block in your text.
-${roster.length ? handoffRules(roster) : ''}${chat ? REMINDER_RULES : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
+${roster.length ? handoffRules(roster) : ''}${chat ? REMINDER_RULES + COMMITMENT_RULES : ''}- Your working folder is private scratch space for notes and files. Files the user attaches are saved in attachments/ inside it.
 - memory.md in your working folder holds your lasting notes about the user, and survives memory resets. When you learn something worth remembering for later (names, people, preferences, recurring commitments, how they like things done), add or update a short line there with Edit or Write, without mentioning it unless asked. Keep it under about 60 lines, remove what's no longer true, and never store passwords, card numbers or other secrets. At the start of a fresh conversation NateBot shows you its contents.
 - Each message starts with a [Current time: …] line; use it for dates and scheduling.
 ${toolNotes.length ? `\nNotes about your connected tools:\n${toolNotes.map((n) => `- ${n}`).join('\n')}\n` : ''}
@@ -69,6 +69,14 @@ ${FENCE}reminders
 [{"at": "2026-10-03T19:00", "message": "Time to leave for the gym"}, {"at": "2026-10-04T08:30", "task": "Check whether Sarah replied about the deadline and tell me"}]
 ${FENCE}
   "at" is the local time (work it out from the [Current time] line). A "message" is shown to the user as written at that time, with a notification, and costs nothing. A "task" instead runs you at that time with its text as your prompt: use it only when the moment needs fresh work, like checking email or the web or writing something new. Add "repeat": "daily", "weekdays" or "weekly" for a simple repeating nudge. Reminders are set as soon as you reply, so just confirm them in a few words and don't describe the block. You can't change or cancel one; the user cancels them in NateBot. For repeating work that needs more than a nudge, suggest a routine.
+`
+
+/** Recording what the user commits to. Only in one-on-one chats. */
+const COMMITMENT_RULES = `- When the user commits to doing something themselves by a date ("I'll email Ramlan by Friday"), record it so NateBot tracks it on its Today screen. End your reply with a fenced block (after any other block):
+${FENCE}commitments
+[{"text": "Email Ramlan about supervising the FYP", "due": "2026-10-24"}]
+${FENCE}
+  "due" is YYYY-MM-DD. Only record what the user agreed to do, not your own suggestions, and confirm it in a few words without describing the block. When they tell you how one went, update it by its id from the list NateBot shows you: {"id": "c1a2b3c4d", "status": "done"} (or "missed", "open", or a new "due"). The user can also mark them on Today.
 `
 
 /** One-off prompt used after the user approves a proposed action. */

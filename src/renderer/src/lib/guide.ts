@@ -473,6 +473,33 @@ export const GUIDE: GuideCategory[] = [
         keywords: 'remind alarm later task'
       },
       {
+        id: 'commitments',
+        title: 'Track your commitments',
+        summary: 'What you told an agent you’d do, and by when, listed on Today so nothing slips quietly.',
+        steps: [
+          'Tell an agent what you’ll do, e.g. “I’ll email my supervisor by Friday”.',
+          'It records it, and it shows under **Commitments** on **Today**.',
+          'Click **Done** or **Missed** when it’s over, or tell the agent.',
+          'On the due day you get a free nudge at 9:00 in that agent’s chat.'
+        ],
+        tip: 'The agent sees where each one stands, so it can follow up without re-reading your notes. Marking them costs nothing.',
+        go: 'today',
+        keywords: 'accountability promise goal deadline commit'
+      },
+      {
+        id: 'weekly-1-1',
+        title: 'Weekly 1:1 with Straight Talk',
+        summary: 'A Sunday-evening check-in: what you committed to, what happened, and what matters next week.',
+        steps: [
+          'Create **Straight Talk** from the templates in **New agent**.',
+          'It runs every Sunday at 19:00. Change or turn it off in **Routines**.',
+          'Reply to it to commit to next week’s priorities with dates.'
+        ],
+        tip: 'One run a week. With light routines on (Settings → Usage), it runs on Haiku.',
+        go: 'routines',
+        keywords: 'mentor manager review feedback weekly'
+      },
+      {
         id: 'repeating',
         title: 'Repeating reminders',
         summary: 'Reminders that repeat daily, on weekdays or weekly.',

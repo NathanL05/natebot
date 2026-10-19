@@ -13,6 +13,8 @@ import type {
   GmailProgress,
   GmailStatus,
   Inbox,
+  Commitment,
+  CommitmentStatus,
   Job,
   MarketplaceData,
   McpServerInfo,
@@ -61,6 +63,11 @@ export interface NateBotApi {
   /** Edits a job from the tracker screen (status, deadline, notes…). */
   updateJob(job: Job): Promise<void>
   deleteJob(jobId: string): Promise<void>
+  /** What agents recorded the user committing to: open ones first, soonest due first. */
+  listCommitments(): Promise<Commitment[]>
+  /** Marks a commitment done or missed from Today (or reopens it). */
+  setCommitmentStatus(commitmentId: string, status: CommitmentStatus): Promise<void>
+  deleteCommitment(commitmentId: string): Promise<void>
   /** Creates the Job Hunter agent (Haiku, Gmail, daily routine and an interview trigger). Returns its id. */
   createJobHunter(): Promise<string>
   /** Creates the Morning Brief agent (Haiku, daily 7:30, fed today's agenda). Returns its id. */
@@ -174,6 +181,9 @@ export const API_METHODS = [
   'listJobs',
   'updateJob',
   'deleteJob',
+  'listCommitments',
+  'setCommitmentStatus',
+  'deleteCommitment',
   'createJobHunter',
   'createMorningBrief',
   'createCareerBoard',

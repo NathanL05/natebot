@@ -23,4 +23,12 @@ describe('agent templates', () => {
     expect(instructions).toContain('A worry is a fair question')
     expect(instructions).toContain('at most once per conversation')
   })
+
+  it('gives the mentor a weekly 1:1 that tracks commitments', () => {
+    const { draft } = AGENT_TEMPLATES.find((t) => t.id === 'mentor')!
+    expect(draft.instructions).toContain('record it as a commitment')
+    expect(draft.routines).toHaveLength(1)
+    expect(draft.routines[0]?.cron).toBe('0 19 * * 0')
+    expect(draft.routines[0]?.prompt).toContain('weekly 1:1')
+  })
 })

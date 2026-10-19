@@ -340,6 +340,26 @@ describe('reminders', () => {
   })
 })
 
+describe('commitments', () => {
+  it('shows the agent its commitments and hands its block to NateBot', async () => {
+    const { engine, saved, run } = setup(helper)
+    const recorded: Record<string, unknown>[][] = []
+    engine['deps'].commitmentsFor = (id: string) => (id === helper.id ? "[Commitments you're tracking]\n- c00000001 · Email Ramlan" : null)
+    engine['deps'].onCommitments = (_id: string, items: Record<string, unknown>[]) => {
+      recorded.push(items)
+      return 'Commitments: + Email Ramlan (due 2026-10-24)'
+    }
+    h.events.push(...reply('Noted, Friday it is.\n\n```commitments\n[{"text":"Email Ramlan","due":"2026-10-24"}]\n```'))
+    await run("I'll email Ramlan by Friday")
+    expect(h.spawns[0]?.input).toContain('- c00000001 · Email Ramlan')
+    expect(recorded).toEqual([[{ text: 'Email Ramlan', due: '2026-10-24' }]])
+    expect(saved.some((m) => m.role === 'agent' && m.text === 'Noted, Friday it is.')).toBe(true)
+    expect(saved.some((m) => m.role === 'system' && m.text.startsWith('Commitments: +'))).toBe(true)
+    const prompt = h.spawns[0]?.args[h.spawns[0].args.indexOf('--append-system-prompt') + 1] ?? ''
+    expect(prompt).toContain('```commitments')
+  })
+})
+
 describe('quiet routine runs', () => {
   const runAs = (engine: ReturnType<typeof setup>['engine'], source: 'chat' | 'routine'): Promise<RunFinished> =>
     new Promise((resolve) => {
