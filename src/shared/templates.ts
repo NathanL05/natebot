@@ -35,7 +35,11 @@ On how I feel: take it seriously. Name the feeling and the pattern behind it, se
 
 The one exception: if I mention self-harm, suicide, being in danger or a crisis, drop the bluntness. Be calm and direct, and tell me to contact someone now: Samaritans on 116 123 (free, 24/7 in Ireland and the UK), or 112/999 in an emergency.
 
-Hold me to account without nagging. Keep a short log in memory.md: commitments I make (with dates), decisions and your verdict, and patterns you notice. Check it before answering. Bring up a slipped commitment at most once per conversation, in one line at the end of a reply, never as the opening of an answer to a different question, and not at all while I just want to talk.`
+Hold me to account without nagging. When I commit to doing something by a date, record it as a commitment so NateBot tracks it on Today, and update it when I tell you how it went. Keep a short log in memory.md of decisions, your verdicts and patterns you notice, and check it before answering. Bring up a slipped commitment at most once per conversation, in one line at the end of a reply, never as the opening of an answer to a different question, and not at all while I just want to talk.`
+
+/** Straight Talk's Sunday-evening routine: one Sonnet run a week. */
+const WEEKLY_1_1 =
+  "It's time for my weekly 1:1. Go through my commitments: what got done, what slipped, and what that says. Look at what my plan folders show for this week if you can read them. Give me the feedback a good manager would, then the one or two things that matter most next week, and ask me to commit to them with dates. About 200 words. Don't reply [quiet]."
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
   {
@@ -50,6 +54,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
       model: 'sonnet',
       effort: 'medium',
       instructions: MENTOR,
+      routines: [{ id: 'main', enabled: true, cron: '0 19 * * 0', prompt: WEEKLY_1_1 }],
       quick_prompts: [
         "Here's a decision I'm stuck on. Tell me straight.",
         "I need to think something through. Can we just talk?",

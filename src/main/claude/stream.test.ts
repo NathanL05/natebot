@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractActions, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState } from './stream'
+import { extractActions, extractCommitments, extractHandoffs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState } from './stream'
 
 const block = (json: string): string => `Here's a draft.\n\n\`\`\`proposed_actions\n${json}\n\`\`\``
 
@@ -210,6 +210,22 @@ describe('reminders blocks', () => {
     expect(hideActionsBlock('Sure.\n\n```reminders\n[{"at":"20')).toBe('Sure.')
     const handoff = '```handoff\n[{"to":"Planner","task":"Plan Friday"}]\n```'
     expect(stripBlocks(`Sure.\n\n${block}\n\n${handoff}`)).toBe('Sure.')
+  })
+})
+
+describe('commitments blocks', () => {
+  const block = '```commitments\n[{"text":"Email Ramlan","due":"2026-10-24"},{"id":"c1a2b3c4d","status":"done"}]\n```'
+
+  it('returns the entries and removes the block', () => {
+    const r = extractCommitments(`Noted.\n\n${block}`)
+    expect(r.text).toBe('Noted.')
+    expect(r.items).toEqual([{ text: 'Email Ramlan', due: '2026-10-24' }, { id: 'c1a2b3c4d', status: 'done' }])
+    expect(extractCommitments('Ok\n\n```commitments\nnope\n```').error).toContain('invalid')
+  })
+
+  it('is hidden while streaming and stripped in group chats', () => {
+    expect(hideActionsBlock('Noted.\n\n```commitments\n[{"te')).toBe('Noted.')
+    expect(stripBlocks(`Noted.\n\n${block}`)).toBe('Noted.')
   })
 })
 

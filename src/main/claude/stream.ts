@@ -183,6 +183,8 @@ const REMINDER_BLOCKS = [/```reminders\s*([\s\S]*?)\n[ \t]*```/, /```reminders\s
 const REMINDER_START = '```reminders'
 const JOBS_BLOCKS = [/```jobs\s*([\s\S]*?)\n[ \t]*```/, /```jobs\s*([\s\S]*?)```/]
 const JOBS_START = '```jobs'
+const COMMIT_BLOCKS = [/```commitments\s*([\s\S]*?)\n[ \t]*```/, /```commitments\s*([\s\S]*?)```/]
+const COMMIT_START = '```commitments'
 
 /** Cuts the text at a block's opening fence, even a half-written one. */
 function cutAt(text: string, ...starts: string[]): string {
@@ -190,9 +192,9 @@ function cutAt(text: string, ...starts: string[]): string {
   return found.length ? text.slice(0, Math.min(...found)).trimEnd() : text
 }
 
-/** While streaming, hide proposed_actions, handoff and reminders blocks (even half-written ones). */
+/** While streaming, hide NateBot's blocks (proposed_actions, handoff, reminders…), even half-written ones. */
 export function hideActionsBlock(text: string): string {
-  return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START, JOBS_START)
+  return cutAt(text, ACTIONS_START, HANDOFF_START, REMINDER_START, JOBS_START, COMMIT_START)
 }
 
 const QUIET = '[quiet]'
@@ -210,7 +212,7 @@ export function quietMarker(text: string): { quiet: boolean; text: string } {
 
 /** Removes every NateBot block from a finished reply (group chats, which use none of them). */
 export function stripBlocks(text: string): string {
-  return extractJobs(extractReminders(extractHandoffs(extractActions(text).text).text).text).text
+  return extractCommitments(extractJobs(extractReminders(extractHandoffs(extractActions(text).text).text).text).text).text
 }
 
 /** A handoff block as written by the agent. Targets are looked up by the caller. */
@@ -277,6 +279,20 @@ export function extractJobs(text: string): { text: string; jobs: Json[]; error: 
     return { text: clean, jobs: list.filter((j): j is Json => !!j && typeof j === 'object'), error: null }
   } catch {
     return { text: clean, jobs: [], error: 'The agent tried to update the job tracker but its format was invalid, so it was ignored.' }
+  }
+}
+
+/** A ```commitments block: commitments to record or update, as the agent wrote them (checked by the caller). */
+export function extractCommitments(text: string): { text: string; items: Json[]; error: string | null } {
+  const match = COMMIT_BLOCKS.map((re) => re.exec(text)).find((m) => m !== null)
+  if (!match) return { text: cutAt(text, COMMIT_START), items: [], error: null }
+  const clean = (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim()
+  try {
+    const parsed = JSON.parse(match[1] ?? '[]') as unknown
+    const list = Array.isArray(parsed) ? parsed : [parsed]
+    return { text: clean, items: list.filter((j): j is Json => !!j && typeof j === 'object'), error: null }
+  } catch {
+    return { text: clean, items: [], error: 'The agent tried to record a commitment but its format was invalid, so it was ignored.' }
   }
 }
 

@@ -205,6 +205,25 @@ export const JOB_STATUSES: { id: JobStatus; label: string }[] = [
   { id: 'rejected', label: 'Closed' }
 ]
 
+export type CommitmentStatus = 'open' | 'done' | 'missed'
+
+/**
+ * Something the user said they'd do by a date. An agent records it with a ```commitments
+ * block, Today lists it, and the user (or the agent, when told) marks it done or missed.
+ */
+export interface Commitment {
+  /** Short, so agents can refer to it ("c1a2b3c4"). */
+  id: string
+  /** The agent that recorded it: its chat gets the due-day nudge and sees it each turn. */
+  agentId: string
+  text: string
+  /** YYYY-MM-DD. */
+  due: string
+  status: CommitmentStatus
+  createdAt: number
+  updatedAt: number
+}
+
 /** A job or internship in the tracker, filled in by agents (```jobs blocks) or by hand. */
 export interface Job {
   id: string

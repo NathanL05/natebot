@@ -15,7 +15,7 @@ import { workspaceOf } from './paths'
 import { hasInstalledSkills, SKILLS_PLUGIN } from './skills'
 import { currentTimeLine, executePrompt, systemPrompt } from './claude/prompt'
 import { spawnClaude, type ClaudeProcess } from './claude/process'
-import { extractActions, extractHandoffs, extractJobs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
+import { extractActions, extractCommitments, extractHandoffs, extractJobs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
 import { memoryBlock } from './memory'
 import { resolveReminders } from './reminders'
@@ -108,6 +108,10 @@ export interface EngineDeps {
   user?: () => { name: string; about: string }
   /** Job-tracker entries from a reply's ```jobs block. Returns a chat line describing what changed. */
   onJobs?: (agentId: string, jobs: Record<string, unknown>[]) => string | null
+  /** Commitments from a reply's ```commitments block. Returns a chat line describing what changed. */
+  onCommitments?: (agentId: string, items: Record<string, unknown>[]) => string | null
+  /** Where the agent's recorded commitments stand, shown at the top of each message (null when it has none). */
+  commitmentsFor?: (agentId: string) => string | null
 }
 
 class UserFacingError extends Error {}
@@ -241,9 +245,11 @@ export class Engine extends EventEmitter {
     this.deps.db.bumpUnread(agentId)
   }
 
-  private buildInput(job: Job, notes: string[], memory: string | null = null, lastReport: string | null = null): string {
+  private buildInput(agentId: string, job: Job, notes: string[], memory: string | null = null, lastReport: string | null = null): string {
     const parts: string[] = [currentTimeLine()]
     if (memory) parts.push(memory)
+    const commitments = this.deps.commitmentsFor?.(agentId) ?? null
+    if (commitments) parts.push(commitments)
     if (lastReport) parts.push(`[Your latest reply in this chat, for reference]\n${short(lastReport, 1500)}`)
     if (notes.length) parts.push(`[NateBot notes since your last reply]\n${notes.map((n) => `- ${n}`).join('\n')}`)
     if (job.source === 'routine') {
@@ -388,8 +394,8 @@ export class Engine extends EventEmitter {
         env: childEnv(),
         // A fresh session starts from the agent's lasting notes; a resumed one already has them.
         input: fresh
-          ? this.buildInput(job, notes, memoryBlock(agent.id), this.deps.db.lastAgentText(agentId))
-          : this.buildInput(job, notes, agent.session_id ? null : memoryBlock(agent.id)),
+          ? this.buildInput(agentId, job, notes, memoryBlock(agent.id), this.deps.db.lastAgentText(agentId))
+          : this.buildInput(agentId, job, notes, agent.session_id ? null : memoryBlock(agent.id)),
         timeoutMs: RUN_TIMEOUT,
         onEvent: (ev) => {
           const changed = state.handle(ev)
@@ -429,7 +435,11 @@ export class Engine extends EventEmitter {
         const jobsLine = jobBlock.jobs.length ? (this.deps.onJobs?.(agentId, jobBlock.jobs) ?? null) : null
         if (jobsLine) extraLines.push({ role: 'system', text: jobsLine })
         if (jobBlock.error) extraLines.push({ role: 'error', text: jobBlock.error })
-        const timed = extractReminders(jobBlock.text)
+        const committed = extractCommitments(jobBlock.text)
+        const commitLine = committed.items.length ? (this.deps.onCommitments?.(agentId, committed.items) ?? null) : null
+        if (commitLine) extraLines.push({ role: 'system', text: commitLine })
+        if (committed.error) extraLines.push({ role: 'error', text: committed.error })
+        const timed = extractReminders(committed.text)
         const set = resolveReminders(timed.reminders, agentId, msg.id, Date.now(), this.deps.db.scheduledCount(agentId))
         msg.text = timed.text
         if (parsed.actions.length) msg.actions = parsed.actions

@@ -72,6 +72,29 @@ describe('reminders', () => {
   })
 })
 
+describe('commitments', () => {
+  const c = (id: string, due: string, status: 'open' | 'done' | 'missed' = 'open', agentId = 'straight-talk', updatedAt = 1) =>
+    ({ id, agentId, text: id, due, status, createdAt: 1, updatedAt })
+
+  it('lists open ones soonest first, then closed ones, and forgets them with their agent', () => {
+    const db = new Db(':memory:')
+    db.saveCommitment(c('later', '2026-10-30'))
+    db.saveCommitment(c('soon', '2026-10-20'))
+    db.saveCommitment(c('closed', '2026-10-01', 'done', 'straight-talk', 5))
+    db.saveCommitment(c('other', '2026-10-25', 'open', 'planner'))
+    expect(db.listCommitments().map((x) => x.id)).toEqual(['soon', 'other', 'later', 'closed'])
+    expect(db.listCommitments('straight-talk').map((x) => x.id)).toEqual(['soon', 'later', 'closed'])
+
+    db.saveCommitment({ ...c('soon', '2026-10-21', 'missed'), updatedAt: 9 })
+    expect(db.commitment('soon')).toMatchObject({ due: '2026-10-21', status: 'missed', updatedAt: 9 })
+    db.setCommitmentReminder('later', 'r1')
+    expect(db.commitmentReminder('later')).toBe('r1')
+
+    db.deleteAgent('straight-talk')
+    expect(db.listCommitments().map((x) => x.id)).toEqual(['other'])
+  })
+})
+
 describe('routine checkpoints and runs', () => {
   it('reads an older single checkpoint as the main routine', () => {
     const db = new Db(':memory:')

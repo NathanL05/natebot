@@ -17,6 +17,8 @@ import type {
   EnvStatus,
   Folder,
   GmailStatus,
+  Commitment,
+  CommitmentStatus,
   EmailTrigger,
   Inbox,
   Job,
@@ -63,6 +65,7 @@ import { digest, inQuietHours } from './quiet'
 import { approvalButtons, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
 import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
 import { afterMiss, dueAction, nextRepeat, ReminderClock } from './reminders'
+import { commitmentsBlock, mergeCommitments, nudgeAt } from './commitments'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
@@ -163,7 +166,9 @@ export class Backend implements NateBotApi {
       emitAgents: () => this.emitAgents(),
       lightRuns: () => this.settings.get().lightRuns,
       user: () => ({ name: this.settings.get().userName, about: this.settings.get().aboutMe }),
-      onJobs: (agentId, items) => this.applyJobs(agentId, items)
+      onJobs: (agentId, items) => this.applyJobs(agentId, items),
+      onCommitments: (agentId, items) => this.applyCommitments(agentId, items),
+      commitmentsFor: (agentId) => commitmentsBlock(this.db.listCommitments(agentId), Date.now())
     })
     this.engine.on('runFinished', (r: RunFinished) => this.onRunFinished(r))
     this.engine.on('actionFinished', (r: { agentId: string; ok: boolean; summary: string }) => {
@@ -782,6 +787,31 @@ export class Backend implements NateBotApi {
     return `Job tracker: ${[added && `${added} added`, updated && `${updated} updated`].filter(Boolean).join(', ')}`
   }
 
+  /** Records or updates commitments from an agent's ```commitments block. Returns the chat line. */
+  private applyCommitments(agentId: string, items: Record<string, unknown>[]): string | null {
+    const { save, changes } = mergeCommitments(this.db.listCommitments(agentId), items, agentId, Date.now())
+    for (const c of save) this.saveCommitment(c)
+    if (!changes.length) return null
+    this.emitAgents()
+    return `Commitments: ${changes.join(' · ')}`
+  }
+
+  /** Saves a commitment and keeps its due-day nudge (a free message reminder at 9:00) in step. */
+  private saveCommitment(c: Commitment): void {
+    this.db.saveCommitment(c)
+    this.cancelNudge(c.id)
+    const at = c.status === 'open' && this.store.get(c.agentId) ? nudgeAt(c.due, Date.now()) : null
+    const id = at ? randomUUID() : null
+    if (id && at) this.db.saveReminder({ id, agentId: c.agentId, messageId: '', at, kind: 'message', text: `Due today: ${c.text}`, status: 'scheduled' })
+    this.db.setCommitmentReminder(c.id, id)
+    this.reminderClock.arm()
+  }
+
+  private cancelNudge(commitmentId: string): void {
+    const id = this.db.commitmentReminder(commitmentId)
+    if (id && this.db.reminder(id)?.status === 'scheduled') this.db.setReminderStatus(id, 'cancelled')
+  }
+
   /** Replaces a job's deadline reminders (free message reminders in the agent's chat). */
   private syncJobReminders(job: Job): void {
     for (const id of this.db.jobReminders(job.id)) if (this.db.reminder(id)?.status === 'scheduled') this.db.setReminderStatus(id, 'cancelled')
@@ -1060,6 +1090,25 @@ export class Backend implements NateBotApi {
     const job: Job = { ...old, ...p, status: p.status ?? old.status, deadline: typeof next.deadline === 'string' ? (p.deadline ?? null) : null, link: p.link ?? null, notes: p.notes ?? '', updatedAt: Date.now() }
     this.db.saveJob(job, jobKey(job.company, job.role))
     this.syncJobReminders(job)
+    this.emitAgents()
+  }
+
+  async listCommitments(): Promise<Commitment[]> {
+    return this.db.listCommitments()
+  }
+
+  async setCommitmentStatus(id: string, status: CommitmentStatus): Promise<void> {
+    const old = this.db.commitment(String(id))
+    if (!old || !['open', 'done', 'missed'].includes(status) || old.status === status) return
+    this.saveCommitment({ ...old, status, updatedAt: Date.now() })
+    this.emitAgents()
+  }
+
+  async deleteCommitment(id: string): Promise<void> {
+    const old = this.db.commitment(String(id))
+    if (!old) return
+    this.cancelNudge(old.id)
+    this.db.deleteCommitment(old.id)
     this.emitAgents()
   }
 

@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
 import { HISTORY_PAGE } from '@shared/types'
-import type { AgentUsage, ChatMessage, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
+import type { AgentUsage, ChatMessage, Commitment, CommitmentStatus, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -67,6 +67,28 @@ function toJob(r: JobRow): Job {
     link: r.link,
     notes: r.notes,
     agentId: r.agent_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  }
+}
+
+interface CommitmentRow {
+  id: string
+  agent_id: string
+  text: string
+  due: string
+  status: string
+  created_at: number
+  updated_at: number
+}
+
+function toCommitment(r: CommitmentRow): Commitment {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    text: r.text,
+    due: r.due,
+    status: r.status as CommitmentStatus,
     createdAt: r.created_at,
     updatedAt: r.updated_at
   }
@@ -180,6 +202,16 @@ export class Db {
         notes TEXT NOT NULL DEFAULT '',
         agent_id TEXT NOT NULL,
         reminder_ids TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS commitments (
+        id TEXT PRIMARY KEY,
+        agent_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        due TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reminder_id TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -575,6 +607,44 @@ export class Db {
     this.db.prepare('DELETE FROM jobs WHERE id = ?').run(id)
   }
 
+  // ---- commitments ----
+
+  /** Open ones first (soonest due first), then the rest, most recently closed first. */
+  listCommitments(agentId?: string): Commitment[] {
+    const sql = `SELECT * FROM commitments ${agentId ? 'WHERE agent_id = ?' : ''}
+      ORDER BY status = 'open' DESC, CASE WHEN status = 'open' THEN due END ASC, updated_at DESC`
+    const rows = (agentId ? this.db.prepare(sql).all(agentId) : this.db.prepare(sql).all()) as unknown as CommitmentRow[]
+    return rows.map(toCommitment)
+  }
+
+  commitment(id: string): Commitment | null {
+    const row = this.db.prepare('SELECT * FROM commitments WHERE id = ?').get(id) as CommitmentRow | undefined
+    return row ? toCommitment(row) : null
+  }
+
+  saveCommitment(c: Commitment): void {
+    this.db
+      .prepare(
+        `INSERT INTO commitments (id, agent_id, text, due, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET text = excluded.text, due = excluded.due, status = excluded.status, updated_at = excluded.updated_at`
+      )
+      .run(c.id, c.agentId, c.text, c.due, c.status, c.createdAt, c.updatedAt)
+  }
+
+  /** The due-day nudge (a free message reminder) for a commitment, if one is set. */
+  commitmentReminder(id: string): string | null {
+    const row = this.db.prepare('SELECT reminder_id FROM commitments WHERE id = ?').get(id) as { reminder_id: string | null } | undefined
+    return row?.reminder_id ?? null
+  }
+
+  setCommitmentReminder(id: string, reminderId: string | null): void {
+    this.db.prepare('UPDATE commitments SET reminder_id = ? WHERE id = ?').run(reminderId, id)
+  }
+
+  deleteCommitment(id: string): void {
+    this.db.prepare('DELETE FROM commitments WHERE id = ?').run(id)
+  }
+
   // ---- email triggers ----
 
   /** Of these Gmail message ids, the ones this trigger hasn't seen; all of them are marked seen. */
@@ -647,6 +717,7 @@ export class Db {
   deleteAgent(agentId: string): void {
     this.db.prepare('DELETE FROM messages WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM reminders WHERE agent_id = ?').run(agentId)
+    this.db.prepare('DELETE FROM commitments WHERE agent_id = ?').run(agentId)
     this.db.prepare('DELETE FROM agent_state WHERE agent_id = ?').run(agentId)
     // Agent ids can't contain LIKE wildcards (a-z, 0-9 and -), so this only matches its own watches.
     this.db.prepare('DELETE FROM web_watch WHERE watch_key LIKE ?').run(`${agentId}#%`)
