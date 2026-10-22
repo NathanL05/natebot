@@ -74,7 +74,7 @@ import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
 import { RadarWatcher, skipRoles } from './radar'
 import { watchPrompt, WebWatcher } from './webwatch'
 import { draftFromShare, shareFile } from './agent-share'
-import { dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
+import { dueDay, dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
 
@@ -676,7 +676,7 @@ export class Backend implements NateBotApi {
       const which = agent.routines.length > 1 ? ` (${describeCron(routine.cron)})` : ''
       const when = new Date(missed).toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit' })
       log(`routine: agent=${agentId} routine=${routineId} missed ${new Date(missed).toISOString()}`)
-      this.engine.system(agentId, `Routine${which} didn't run on ${when}: the Mac was asleep or NateBot was closed for more than 12 hours. Run it now from Routines (⇧⌘R) if you still need it.`)
+      this.engine.system(agentId, `Routine${which} didn't run on ${when}: the Mac was asleep or NateBot was closed for more than a week. Run it now from Routines (⇧⌘R) if you still need it.`)
       this.emitAgents()
       return
     }
@@ -687,7 +687,7 @@ export class Backend implements NateBotApi {
     const time = clock(now)
     // With several routines, say which one.
     const which = agent.routines.length > 1 ? ` (${describeCron(routine.cron)})` : ''
-    const dueText = late ? ` (it was due at ${new Date(due).toDateString() === new Date(now).toDateString() ? '' : 'yesterday at '}${clock(due)})` : ''
+    const dueText = late ? ` (it was due ${dueDay(due, now)}${clock(due)})` : ''
     // Don't spend usage on a routine whose tools aren't set up (e.g. Gmail not connected).
     const ready = configuredServersFor(agent).filter((n) => googleReady(n))
     const missing = agent.mcp_servers.filter((n) => !ready.includes(n))
