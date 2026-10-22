@@ -89,8 +89,8 @@ which takes about 5 minutes to set up: see [Connections](docs/connections.md).
 
 ## Good to know
 
-- Routines run only while NateBot is running and the Mac is awake. A run missed in the last 12 hours catches up once
-  on launch or wake.
+- Routines run only while NateBot is running and the Mac is awake. The latest run missed in the last week catches up
+  once on launch or wake.
 - Agents share your normal Claude usage limits. Haiku agents use the least.
 - NateBot is for personal use on your own Mac with your own subscription. Don't run it as a service for other people.
 - The app is signed ad hoc, not notarised, so it can't auto-update.

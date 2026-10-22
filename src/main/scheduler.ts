@@ -1,12 +1,15 @@
 // Routines: one node-cron task per enabled routine (an agent can have several). Runs only
 // while NateBot is running (window or menu bar) and the Mac is awake, so on
-// launch and on wake the backend catches up on a recently missed run.
+// launch and on wake the backend catches up on the latest missed run.
 import cron, { type ScheduledTask } from 'node-cron'
 import type { AgentConfig, Routine } from '@shared/types'
 import { describeCron, lastOccurrence } from '@shared/schedule'
 
-/** How long a missed routine is still worth running late. */
-export const CATCH_UP_WINDOW = 12 * 60 * 60_000
+/**
+ * How long a missed routine is still worth running late. A week, so the latest time of a daily
+ * or weekly routine always runs when NateBot is next opened, even after a day or more closed.
+ */
+export const CATCH_UP_WINDOW = 7 * 24 * 60 * 60_000
 
 /** A routine's scheduled times up to `at` have been dealt with (run or skipped), for this cron. */
 export interface Checkpoint {
@@ -40,8 +43,17 @@ export function dueRun(cronExpr: string, checkpoint: Checkpoint | null, now: num
   return due
 }
 
-/** How far back a catch-up looks for a run that was missed for good. */
-const MISSED_LOOKBACK = 8 * 24 * 60 * 60_000
+/** "at ", "yesterday at " or "Sunday at ", before a time that was due up to a week ago. */
+export function dueDay(due: number, now: number): string {
+  const day = (ts: number): number => new Date(new Date(ts).toDateString()).getTime()
+  const days = Math.round((day(now) - day(due)) / 86_400_000)
+  if (days <= 0) return 'at '
+  if (days === 1) return 'yesterday at '
+  return `${new Date(due).toLocaleDateString([], { weekday: 'long' })} at `
+}
+
+/** How far back a catch-up looks for a run that was missed for good (monthly routines). */
+const MISSED_LOOKBACK = 35 * 24 * 60 * 60_000
 
 /**
  * The latest scheduled time that was missed for good: after the checkpoint, but too long ago
