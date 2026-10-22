@@ -71,7 +71,7 @@ import { commitmentsBlock, mergeCommitments, nudgeAt } from './commitments'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
-import { RadarWatcher } from './radar'
+import { RadarWatcher, skipRoles } from './radar'
 import { watchPrompt, WebWatcher } from './webwatch'
 import { draftFromShare, shareFile } from './agent-share'
 import { dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
@@ -1056,7 +1056,8 @@ export class Backend implements NateBotApi {
     return {
       active: this.radar.active(),
       email: gmailAddress(),
-      hits: this.db.listRadarHits(Date.now() - RADAR_DAYS * 86_400_000),
+      // Skip words added later hide what was already found.
+      hits: skipRoles(this.db.listRadarHits(Date.now() - RADAR_DAYS * 86_400_000), this.settings.get().radarSkip),
       checkedAt: this.radar.checkedAt,
       error: this.radar.error
     }

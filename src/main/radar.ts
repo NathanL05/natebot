@@ -60,10 +60,10 @@ export function radarQuery(companies: RadarCompany[]): string {
   return `newer_than:3d -from:me (from:(${ALERT_SENDERS.join(' OR ')}) OR subject:(${ALERT_SUBJECTS.join(' OR ')})) (${names.join(' OR ')})`
 }
 
-/** Changes with the company list, so editing it starts from a fresh baseline. */
-export function radarKey(companies: RadarCompany[]): string {
+/** Changes with the company list and skip words, so editing either rereads recent alerts (quietly). */
+export function radarKey(companies: RadarCompany[], skip: string[] = []): string {
   let h = 0
-  for (const ch of JSON.stringify(companies)) h = (h * 31 + ch.charCodeAt(0)) | 0
+  for (const ch of JSON.stringify([companies, skip])) h = (h * 31 + ch.charCodeAt(0)) | 0
   return `radar#${(h >>> 0).toString(36)}`
 }
 
@@ -179,7 +179,7 @@ function hash(s: string): string {
 }
 
 /** Roles whose title has one of these words ("Senior", "VP"), as whole words. */
-export function skipRoles(roles: FoundRole[], words: string[]): FoundRole[] {
+export function skipRoles<T extends { title: string }>(roles: T[], words: string[]): T[] {
   const list = words.map((w) => w.trim()).filter(Boolean)
   if (!list.length) return roles
   const re = wordsRe(list)
@@ -257,7 +257,8 @@ export class RadarWatcher {
     const companies = parseCompanies(this.deps.companies())
     if (companies.length === 0 || !this.google.available()) return
     try {
-      const key = radarKey(companies)
+      const skip = this.deps.skip()
+      const key = radarKey(companies, skip)
       const started = this.deps.db.triggerStarted(key)
       const q = encodeURIComponent(radarQuery(companies))
       const list = await this.google.fetchJson<{ messages?: { id: string }[] }>(`${API}/messages?q=${q}&maxResults=${MAX_MAILS}`)
@@ -273,7 +274,7 @@ export class RadarWatcher {
           })
           const header = (name: string): string => m.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value ?? ''
           const from = header('from').replace(/<[^>]*>/g, '').replace(/"/g, '').trim()
-          const roles = skipRoles(findRoles(bodyText(m.payload), header('subject'), from, companies), this.deps.skip())
+          const roles = skipRoles(findRoles(bodyText(m.payload), header('subject'), from, companies), skip)
           found.push(...this.deps.db.addRadarHits(toHits(m.threadId, clip(from, 80), Number(m.internalDate) || Date.now(), roles)))
         }
       } finally {

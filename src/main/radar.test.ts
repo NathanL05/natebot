@@ -44,6 +44,7 @@ describe('job radar', () => {
     expect(q).toContain('from:(linkedin.com OR')
     expect(q).toContain('"J.P. Morgan"')
     expect(radarKey(companies)).not.toBe(radarKey(parseCompanies(['HSBC'])))
+    expect(radarKey(companies, ['Senior'])).not.toBe(radarKey(companies))
   })
 
   it('takes each role from a LinkedIn alert, with its place and link', () => {
