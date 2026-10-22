@@ -9,6 +9,7 @@ import { ActionCard } from './ActionCard'
 import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { InboxCard } from './InboxCard'
+import { RadarCard } from './RadarCard'
 import { Markdown } from './Markdown'
 import { CheckIcon, XIcon } from './icons'
 import { Button, ConfirmDialog, IconButton } from './ui'
@@ -84,6 +85,7 @@ export function TodayView() {
           <BriefCard />
           {agenda && <YourDay agenda={agenda} onRefresh={() => void api.todayAgenda(true).then(setAgenda)} />}
           <InboxCard />
+          <RadarCard />
 
           <section className="mb-8">
             <div className="mb-2 flex items-center gap-3">

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { EFFORTS, MAX_ABOUT_ME, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, SPOKEN_CONTENT_SETTINGS, VOICE_RATES, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
+import { EFFORTS, MAX_ABOUT_ME, MAX_RADAR_COMPANIES, MODELS, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, SPOKEN_CONTENT_SETTINGS, VOICE_RATES, type EffortLevel, type ModelId, type Theme, type UsageBreakdown, type UsageWindow } from '@shared/types'
 import { DELETED_AGENT_ID, formatTokens, rankUsage } from '@shared/usage'
 import { ACCENTS, accentById, onFill } from '@shared/accents'
 import { api, useStore } from '../lib/store'
@@ -262,6 +262,48 @@ export function SettingsView() {
             <Row label="Other MCP servers" hint="Add them to ~/NateBot/mcp.json (see docs/connections.md). They appear in each agent's settings.">
               <Button onClick={() => void api.openExternal('https://github.com/NathanL05/natebot#adding-mcp-servers')}>How-to</Button>
             </Row>
+          </Section>
+
+          <Section title="Job radar">
+            <Row
+              label="Watch job alerts for your companies"
+              hint={
+                gmail?.configured
+                  ? 'Every 15 minutes NateBot reads your job-alert email (LinkedIn, company careers sites) and shows roles at these companies on Today. It reads the email itself, so it uses no Claude usage.'
+                  : 'Needs Gmail: connect it under Connected tools.'
+              }
+            >
+              <Toggle label="Job radar" checked={settings.jobRadar} onChange={(v) => void patch({ jobRadar: v })} />
+            </Row>
+            {settings.jobRadar && (
+              <div className="px-4 py-3">
+                <div className="text-[13px] font-medium">Companies</div>
+                <div className="mt-0.5 mb-2 text-[12px] text-muted">
+                  One per line, up to {MAX_RADAR_COMPANIES}. Add other names it goes by after a slash. The radar only sees alerts that reach Gmail, so
+                  turn on job alerts on each company's careers site and on LinkedIn.
+                </div>
+                <textarea
+                  className={`${inputClass} min-h-[110px] resize-y font-mono text-[12px]`}
+                  defaultValue={settings.radarCompanies.join('\n')}
+                  onBlur={(e) => {
+                    const next = e.target.value.split('\n').map((l) => l.trim()).filter(Boolean)
+                    if (next.join('\n') !== settings.radarCompanies.join('\n')) void patch({ radarCompanies: next })
+                  }}
+                  placeholder={'HSBC\nCiti\nJPMorgan / J.P. Morgan'}
+                />
+                <div className="mt-3 text-[13px] font-medium">Skip titles with</div>
+                <div className="mt-0.5 mb-2 text-[12px] text-muted">Words, separated by commas, that rule a role out, such as roles above your level.</div>
+                <input
+                  className={inputClass}
+                  defaultValue={settings.radarSkip.join(', ')}
+                  onBlur={(e) => {
+                    const next = e.target.value.split(',').map((w) => w.trim()).filter(Boolean)
+                    if (next.join() !== settings.radarSkip.join()) void patch({ radarSkip: next })
+                  }}
+                  placeholder="Senior, Lead, Principal, VP, Director"
+                />
+              </div>
+            )}
           </Section>
 
           <Section title="Usage">

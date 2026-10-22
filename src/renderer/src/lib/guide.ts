@@ -585,6 +585,20 @@ export const GUIDE: GuideCategory[] = [
         keywords: 'brief summary daily morning'
       },
       {
+        id: 'job-radar',
+        title: 'Spot roles at your companies',
+        summary: 'The job radar reads your job-alert email and shows roles at the companies you list on Today, with no Claude usage.',
+        steps: [
+          'Connect Gmail.',
+          'Turn on job alerts on each company’s careers site and on LinkedIn, so they reach Gmail.',
+          'Open **Settings → Job radar**, turn it on and list your companies, one per line (other names after a slash).',
+          'Open **Today**: hover a role under **Job radar** to open it, add it to the job tracker or hide it.'
+        ],
+        tip: 'It checks every 15 minutes and notifies you when a new role turns up. The first check fills Today quietly.',
+        go: 'settings',
+        keywords: 'jobs linkedin careers alerts target companies hiring radar'
+      },
+      {
         id: 'jobs',
         title: 'Track job applications',
         summary: 'Roles and applications by stage: to apply, applied, interviewing, offer, closed.',

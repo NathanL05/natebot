@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { userInfo } from 'node:os'
-import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, MAX_ABOUT_ME, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, VOICE_RATES, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
+import { DEFAULT_EFFORT, DEFAULT_QUICK_CAPTURE, EFFORTS, MAX_ABOUT_ME, MAX_RADAR_COMPANIES, PAUSE_LEVELS, QUICK_CAPTURE_SHORTCUTS, VOICE_RATES, type AppSettings, type EffortLevel, type ModelId, type Theme } from '@shared/types'
 import { DEFAULT_ACCENT, isAccentId } from '@shared/accents'
 import { SETTINGS_FILE } from './paths'
 
@@ -51,7 +51,14 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
           : fallback.quietHours,
     voice: raw.voice === null ? null : typeof raw.voice === 'string' && raw.voice.trim() ? raw.voice.trim().slice(0, 120) : fallback.voice,
     voiceRate: VOICE_RATES.includes(raw.voiceRate as number) ? (raw.voiceRate as number) : fallback.voiceRate,
-    confirmQuit: typeof raw.confirmQuit === 'boolean' ? raw.confirmQuit : fallback.confirmQuit
+    confirmQuit: typeof raw.confirmQuit === 'boolean' ? raw.confirmQuit : fallback.confirmQuit,
+    jobRadar: typeof raw.jobRadar === 'boolean' ? raw.jobRadar : fallback.jobRadar,
+    radarCompanies: Array.isArray(raw.radarCompanies)
+      ? [...new Set(raw.radarCompanies.filter((c): c is string => typeof c === 'string').map((c) => c.replace(/\s+/g, ' ').trim().slice(0, 120)).filter(Boolean))].slice(0, MAX_RADAR_COMPANIES)
+      : fallback.radarCompanies,
+    radarSkip: Array.isArray(raw.radarSkip)
+      ? [...new Set(raw.radarSkip.filter((w): w is string => typeof w === 'string').map((w) => w.replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 30)
+      : fallback.radarSkip
   }
 }
 
@@ -77,7 +84,10 @@ export class SettingsStore {
       quietHours: null,
       voice: null,
       voiceRate: 1,
-      confirmQuit: true
+      confirmQuit: true,
+      jobRadar: false,
+      radarCompanies: [],
+      radarSkip: []
     }
     let raw: Partial<AppSettings> = {}
     try {

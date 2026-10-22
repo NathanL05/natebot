@@ -224,6 +224,43 @@ export interface Commitment {
   updatedAt: number
 }
 
+export type RadarStatus = 'new' | 'tracked' | 'dismissed'
+
+/**
+ * A role at one of the job radar's companies, found in a job-alert email (LinkedIn,
+ * a company careers site) by NateBot itself: no Claude run.
+ */
+export interface RadarHit {
+  /** A hash of company and title, so the same role in later alerts is the same find. */
+  id: string
+  /** The company as written in Settings (its first name, not the alias that matched). */
+  company: string
+  /** Best guess at the role's title from the email, or the email's subject. */
+  title: string
+  location: string | null
+  /** The job's link from the email, or null (open the email instead). */
+  link: string | null
+  threadId: string
+  /** Who sent the alert, e.g. "LinkedIn Job Alerts". */
+  from: string
+  receivedAt: number
+  status: RadarStatus
+}
+
+export interface JobRadar {
+  /** Radar is on, has companies, and Gmail is connected. */
+  active: boolean
+  /** Gmail address (for "Open in Gmail" links). */
+  email: string | null
+  /** New finds first, then the rest from the last two weeks. */
+  hits: RadarHit[]
+  checkedAt: number | null
+  error: string | null
+}
+
+/** Most companies the radar watches (each line may list other names after " / "). */
+export const MAX_RADAR_COMPANIES = 30
+
 /** A job or internship in the tracker, filled in by agents (```jobs blocks) or by hand. */
 export interface Job {
   id: string
@@ -398,6 +435,12 @@ export interface AppSettings {
   voiceRate: number
   /** ⌘Q asks first (routines and reminders stop while NateBot is closed). */
   confirmQuit: boolean
+  /** Job radar: look through job-alert email for roles at radarCompanies (no Claude run). */
+  jobRadar: boolean
+  /** One company per line; other names it goes by follow " / " ("JPMorgan / J.P. Morgan"). */
+  radarCompanies: string[]
+  /** Roles whose title has one of these words are left out ("Senior", "VP"). */
+  radarSkip: string[]
 }
 
 export const VOICE_RATES = [0.9, 1, 1.15, 1.3]
