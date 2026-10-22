@@ -23,8 +23,8 @@ signed in to, so there's **no API key and no extra bill**.
   triggers** that fire when matching mail arrives, **page watches** for websites that change, and **handoffs**
   between agents. Waiting for email and page changes costs no usage.
 - **Your day on one screen.** **Today** gathers waiting approvals, your calendar and tasks, a people-first Gmail
-  inbox, an optional morning brief, and a job-application tracker. Reading Gmail, calendar and tasks there uses no
-  Claude usage.
+  inbox, an optional morning brief, a job-application tracker, and a **job radar** that spots roles at the companies
+  you list in your job-alert email. Reading Gmail, calendar and tasks there uses no Claude usage.
 - **Connects to your stuff.** Gmail, Google Calendar, Tasks and Drive, Apple Reminders and Notes, any MCP server,
   and Agent Skills from a built-in marketplace.
 - **Reachable from anywhere.** **⌥Space** quick capture over any app, the menu bar, the macOS Share menu, ⌘K, and

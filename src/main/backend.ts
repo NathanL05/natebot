@@ -22,8 +22,10 @@ import type {
   EmailTrigger,
   Inbox,
   Job,
+  JobRadar,
   MarketplaceData,
   MessageHit,
+  RadarHit,
   Reminder,
   ReminderStatus,
   RoomConfig,
@@ -69,6 +71,7 @@ import { commitmentsBlock, mergeCommitments, nudgeAt } from './commitments'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
+import { RadarWatcher, skipRoles } from './radar'
 import { watchPrompt, WebWatcher } from './webwatch'
 import { draftFromShare, shareFile } from './agent-share'
 import { dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
@@ -78,6 +81,8 @@ import { UsageTracker } from './usage'
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
 /** After a wake, give the network a moment before catching up on routines. */
 const WAKE_DELAY_MS = 15_000
+/** How far back Today's job radar shows finds. */
+const RADAR_DAYS = 14
 /** A routine that starts this much after its scheduled time is reported as running late. */
 const LATE_AFTER_MS = 2 * 60_000
 
@@ -102,6 +107,7 @@ export class Backend implements NateBotApi {
   private reminderClock: ReminderClock
   private emailWatcher: EmailWatcher
   private webWatcher: WebWatcher
+  private radar: RadarWatcher
   private agenda = new AgendaReader(googleTokenPath, appleConnected, markSignInExpired)
   private inboxReader = new InboxReader(gmailTokenPath, gmailAddress, (path) => {
     markSignInExpired(path)
@@ -208,6 +214,19 @@ export class Backend implements NateBotApi {
       log
     })
 
+    this.radar = new RadarWatcher({
+      db: this.db,
+      companies: () => (this.settings.get().jobRadar ? this.settings.get().radarCompanies : []),
+      skip: () => this.settings.get().radarSkip,
+      tokenPath: gmailTokenPath,
+      onFound: (hits) => this.radarFound(hits),
+      onSignInExpired: (path) => {
+        markSignInExpired(path)
+        this.signInExpired()
+      },
+      log
+    })
+
     this.webWatcher = new WebWatcher({
       db: this.db,
       agents: () => this.store.list(),
@@ -257,6 +276,7 @@ export class Backend implements NateBotApi {
     this.fireReminders()
     this.emailWatcher.start()
     this.webWatcher.start()
+    this.radar.start()
     this.backup()
     this.backupTimer = setInterval(() => this.backup(), 60 * 60_000)
     this.quietTimer = setInterval(() => this.endQuiet(), 60_000)
@@ -288,6 +308,7 @@ export class Backend implements NateBotApi {
     this.reminderClock.stop()
     this.emailWatcher.stop()
     this.webWatcher.stop()
+    this.radar.stop()
     clearInterval(this.backupTimer)
     clearInterval(this.quietTimer)
     this.phone.stop()
@@ -384,7 +405,8 @@ export class Backend implements NateBotApi {
       silent: false,
       ...(buttons ? { actions: buttons.labels.map((text) => ({ type: 'button' as const, text })), closeButtonText: 'Later' } : {})
     })
-    n.on('click', () => this.onOpenAgent(chatId))
+    // Not from a chat (the job radar): open Today.
+    n.on('click', () => (chatId ? this.onOpenAgent(chatId) : this.onShowView('today')))
     if (buttons) n.on('action', (e) => buttons.onAction(e.actionIndex))
     n.show()
     void this.push(name ? `${name} · ${title}` : title, body, phoneButtons)
@@ -1027,11 +1049,49 @@ export class Backend implements NateBotApi {
     return this.demoToday()?.inbox ?? this.inboxReader.list(refresh === true)
   }
 
+  async jobRadar(refresh?: boolean): Promise<JobRadar> {
+    const demo = this.demoToday()?.radar
+    if (demo) return demo
+    if (refresh === true) await this.radar.check()
+    return {
+      active: this.radar.active(),
+      email: gmailAddress(),
+      // Skip words added later hide what was already found.
+      hits: skipRoles(this.db.listRadarHits(Date.now() - RADAR_DAYS * 86_400_000), this.settings.get().radarSkip),
+      checkedAt: this.radar.checkedAt,
+      error: this.radar.error
+    }
+  }
+
+  async radarAction(hitId: string, action: 'track' | 'dismiss' | 'restore'): Promise<void> {
+    const hit = this.db.radarHit(String(hitId))
+    if (!hit || !['track', 'dismiss', 'restore'].includes(action)) return
+    if (action === 'track') {
+      const key = jobKey(hit.company, hit.title)
+      if (!this.db.jobByKey(key)) {
+        const now = Date.now()
+        const notes = ['Job radar', hit.location, hit.from].filter(Boolean).join(' · ')
+        this.db.saveJob({ id: randomUUID(), company: hit.company, role: hit.title, status: 'saved', deadline: null, link: hit.link, notes, agentId: '', createdAt: now, updatedAt: now }, key)
+      }
+    }
+    this.db.setRadarStatus(hit.id, action === 'track' ? 'tracked' : action === 'dismiss' ? 'dismissed' : 'new')
+    this.emitAgents()
+  }
+
+  /** The radar found roles at your companies in new job alerts. */
+  private radarFound(hits: RadarHit[]): void {
+    const first = hits[0]
+    if (!first) return
+    const more = hits.length > 1 ? ` (+${hits.length - 1} more)` : ''
+    this.notify('', 'Job radar', `${first.company}: ${first.title}${first.location ? ` · ${first.location}` : ''}${more}`)
+    this.emitAgents()
+  }
+
   /** Made-up calendar and inbox items for a demo folder (NATEBOT_HOME, see scripts/demo-data.ts), for screenshots. */
-  private demoToday(): { agenda?: Agenda; inbox?: Inbox } | null {
+  private demoToday(): { agenda?: Agenda; inbox?: Inbox; radar?: JobRadar } | null {
     if (!CUSTOM_HOME) return null
     try {
-      return JSON.parse(readFileSync(join(ROOT, 'demo-today.json'), 'utf8')) as { agenda?: Agenda; inbox?: Inbox }
+      return JSON.parse(readFileSync(join(ROOT, 'demo-today.json'), 'utf8')) as { agenda?: Agenda; inbox?: Inbox; radar?: JobRadar }
     } catch {
       return null
     }
@@ -1455,6 +1515,9 @@ export class Backend implements NateBotApi {
     if (next.claudePath !== before.claudePath) void this.recheckEnv()
     if (next.quickCapture !== before.quickCapture) this.applyCaptureShortcut()
     if (next.phoneInbox !== before.phoneInbox || next.pushTopic !== before.pushTopic) this.syncPhone()
+    if (next.jobRadar !== before.jobRadar || next.radarCompanies.join('\n') !== before.radarCompanies.join('\n') || next.radarSkip.join() !== before.radarSkip.join()) {
+      void this.radar.check().then(() => this.emitAgents())
+    }
     if (next.theme !== before.theme) {
       for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(next.theme === 'dark' ? '#0E0E13' : '#FFFFFF')
     }

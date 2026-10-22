@@ -5,7 +5,7 @@
 //   NATEBOT_HOME=/tmp/natebot-demo npm run dev    (runs NateBot on it, next to the installed app)
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import type { Agenda, AgentConfig, ChatMessage, Inbox, Reminder } from '@shared/types'
+import type { Agenda, AgentConfig, ChatMessage, Inbox, JobRadar, Reminder } from '@shared/types'
 import { serialize } from '../src/main/agents'
 import { Db } from '../src/main/db'
 
@@ -297,7 +297,25 @@ const inbox: Inbox = {
     mail('Zalando', 'Your refund is on its way', "We've refunded €34.99 to your card.", 34, false, true)
   ]
 }
-writeFileSync(join(home, 'demo-today.json'), JSON.stringify({ agenda, inbox }, null, 2))
+const role = (company: string, title: string, location: string, hoursAgo: number) => ({
+  id: id(),
+  company,
+  title,
+  location,
+  link: 'https://example.com/jobs/1',
+  threadId: id(),
+  from: 'LinkedIn Job Alerts',
+  receivedAt: now - hoursAgo * HOUR,
+  status: 'new' as const
+})
+const radar: JobRadar = {
+  active: true,
+  email: 'alex@example.com',
+  checkedAt: now,
+  error: null,
+  hits: [role('Northwind Bank', 'Graduate Cloud Engineer', 'Dublin, Ireland', 5), role('Contoso', 'Platform Engineer I', 'Hong Kong', 28)]
+}
+writeFileSync(join(home, 'demo-today.json'), JSON.stringify({ agenda, inbox, radar }, null, 2))
 
 db.close()
 console.log(`Demo data written to ${home}`)

@@ -16,6 +16,7 @@ import type {
   Commitment,
   CommitmentStatus,
   Job,
+  JobRadar,
   MarketplaceData,
   McpServerInfo,
   MessageHit,
@@ -50,6 +51,10 @@ export interface NateBotApi {
   inbox(refresh?: boolean): Promise<Inbox>
   /** Archives or marks read a Gmail conversation the user clicked. */
   inboxAction(threadId: string, change: 'archive' | 'read'): Promise<{ ok: boolean; error?: string }>
+  /** Roles at your radar companies found in job-alert email (no Claude run); refresh checks Gmail now. */
+  jobRadar(refresh?: boolean): Promise<JobRadar>
+  /** Adds a radar find to the job tracker, hides it, or brings it back. */
+  radarAction(hitId: string, action: 'track' | 'dismiss' | 'restore'): Promise<void>
   /** Saves text to a file the user picks (Markdown by default). */
   saveText(suggestedName: string, text: string): Promise<{ ok: boolean; path?: string }>
   /** Saves text as a new Apple note. */
@@ -174,6 +179,8 @@ export const API_METHODS = [
   'todayAgenda',
   'inbox',
   'inboxAction',
+  'jobRadar',
+  'radarAction',
   'saveText',
   'saveToNotes',
   'setPinned',
