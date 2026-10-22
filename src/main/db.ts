@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { DELETED_AGENT_ID } from '@shared/usage'
 import { HISTORY_PAGE } from '@shared/types'
-import type { AgentUsage, ChatMessage, Commitment, CommitmentStatus, Folder, Job, JobStatus, MessageHit, MessageRole, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
+import type { AgentUsage, ChatMessage, Commitment, CommitmentStatus, Folder, Job, JobStatus, MessageHit, MessageRole, RadarHit, RadarStatus, Reminder, ReminderStatus, RoomConfig, RoutineRun } from '@shared/types'
 import type { RunTokens } from './claude/stream'
 import type { Checkpoint } from './scheduler'
 
@@ -43,6 +43,32 @@ export interface RunRecord {
 
 /** Marks a trigger as started (kept forever, unlike the per-message rows). */
 export const TRIGGER_START = '__start__'
+
+interface RadarRow {
+  id: string
+  company: string
+  title: string
+  location: string | null
+  link: string | null
+  thread_id: string
+  from_name: string
+  received_at: number
+  status: string
+}
+
+function toRadarHit(r: RadarRow): RadarHit {
+  return {
+    id: r.id,
+    company: r.company,
+    title: r.title,
+    location: r.location,
+    link: r.link,
+    threadId: r.thread_id,
+    from: r.from_name,
+    receivedAt: r.received_at,
+    status: r.status as RadarStatus
+  }
+}
 
 interface JobRow {
   id: string
@@ -226,6 +252,18 @@ export class Db {
         text TEXT NOT NULL,
         checked_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS radar_hits (
+        id TEXT PRIMARY KEY,
+        company TEXT NOT NULL,
+        title TEXT NOT NULL,
+        location TEXT,
+        link TEXT,
+        thread_id TEXT NOT NULL,
+        from_name TEXT NOT NULL,
+        received_at INTEGER NOT NULL,
+        status TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_radar_received ON radar_hits(received_at);
       CREATE TABLE IF NOT EXISTS folders (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -657,9 +695,43 @@ export class Db {
     return fresh
   }
 
+  /** Lets a trigger see this message again (reading it failed, so try next time). */
+  forgetEmail(triggerKey: string, id: string): void {
+    this.db.prepare('DELETE FROM trigger_seen WHERE trigger_key = ? AND message_id = ?').run(triggerKey, id)
+  }
+
   /** Whether a trigger has ever checked Gmail (its first check only records what's already there). */
   triggerStarted(triggerKey: string): boolean {
     return !!this.db.prepare('SELECT 1 FROM trigger_seen WHERE trigger_key = ? AND message_id = ?').get(triggerKey, TRIGGER_START)
+  }
+
+  // ---- job radar ----
+
+  /** Stores roles the radar found; returns the ones it hadn't stored before. */
+  addRadarHits(hits: RadarHit[]): RadarHit[] {
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO radar_hits (id, company, title, location, link, thread_id, from_name, received_at, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    return hits.filter((h) => insert.run(h.id, h.company, h.title, h.location, h.link, h.threadId, h.from, h.receivedAt, h.status).changes > 0)
+  }
+
+  /** Finds received since `since`: new ones first, newest first. Older ones are dropped. */
+  listRadarHits(since: number): RadarHit[] {
+    this.db.prepare('DELETE FROM radar_hits WHERE received_at < ?').run(since - 60 * 86_400_000)
+    const rows = this.db
+      .prepare(`SELECT * FROM radar_hits WHERE received_at >= ? ORDER BY status = 'new' DESC, received_at DESC LIMIT 100`)
+      .all(since) as unknown as RadarRow[]
+    return rows.map(toRadarHit)
+  }
+
+  radarHit(id: string): RadarHit | null {
+    const row = this.db.prepare('SELECT * FROM radar_hits WHERE id = ?').get(id) as RadarRow | undefined
+    return row ? toRadarHit(row) : null
+  }
+
+  setRadarStatus(id: string, status: RadarStatus): void {
+    this.db.prepare('UPDATE radar_hits SET status = ? WHERE id = ?').run(status, id)
   }
 
   // ---- web page watches ----

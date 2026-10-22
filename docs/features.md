@@ -318,6 +318,20 @@ interview or assessment email arrives (an email trigger). It adds or updates ent
 any agent can use. You can change a status or deadline, or remove an entry, on the Jobs screen. Roles still "to apply"
 with a deadline get message reminders 2 days before and on the day at 9:00, which cost nothing.
 
+## Job radar
+
+**Settings → Job radar** watches your job-alert email for roles at the companies you list (one per line, with other
+names after a slash, e.g. `JPMorgan / J.P. Morgan`). Every 15 minutes NateBot searches Gmail for recent alerts from
+LinkedIn and the usual careers-site systems (Workday, Oracle, SuccessFactors, Greenhouse, Lever and others) that name
+one of them, reads each alert itself and picks out the roles: title, place and link. Names match as whole words, so
+`Citi` doesn't match `Citizens`. **Skip titles with** leaves out roles whose title has one of your words (say
+`Senior, Lead, VP`), and a role repeated in later alerts shows once. It never runs Claude, so it uses no usage.
+
+New roles appear under **Job radar** on Today and you get a notification (click it to open Today). Hover a role to open
+the job (or the email when there's no link), **add it to the job tracker** as "to apply", or hide it. The first check
+after you turn the radar on or change the list fills Today from the last three days without notifying you. The radar
+only sees what reaches Gmail, so turn on job alerts on each company's careers site and on LinkedIn.
+
 ## Avatars
 
 Each agent gets a mascot (a coloured shape with a small face) generated from its name, so it always looks

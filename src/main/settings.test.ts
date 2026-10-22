@@ -21,7 +21,10 @@ const defaults: AppSettings = {
   quietHours: null,
   voice: null,
   voiceRate: 1,
-  confirmQuit: true
+  confirmQuit: true,
+  jobRadar: false,
+  radarCompanies: [],
+  radarSkip: []
 }
 
 describe('settings sanitising', () => {
@@ -71,5 +74,13 @@ describe('settings sanitising', () => {
   it('keeps a known quick-capture shortcut, or off', () => {
     expect(sanitize({ quickCapture: 'Control+Alt+Space' }, defaults).quickCapture).toBe('Control+Alt+Space')
     expect(sanitize({ quickCapture: null }, defaults).quickCapture).toBeNull()
+  })
+
+  it('cleans the job radar companies', () => {
+    const next = sanitize({ jobRadar: true, radarCompanies: ['  HSBC ', 'Citi', 'HSBC', '', 42 as unknown as string, 'JPMorgan  /  J.P. Morgan'] }, defaults)
+    expect(next.jobRadar).toBe(true)
+    expect(next.radarCompanies).toEqual(['HSBC', 'Citi', 'JPMorgan / J.P. Morgan'])
+    expect(sanitize({ radarCompanies: 'HSBC' as unknown as string[] }, defaults).radarCompanies).toEqual([])
+    expect(sanitize({ radarSkip: [' Senior ', 'VP', 'VP', ''] }, defaults).radarSkip).toEqual(['Senior', 'VP'])
   })
 })
