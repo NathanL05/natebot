@@ -203,7 +203,7 @@ export function Composer({
                   onMouseEnter={() => setMention({ ...mention, index: i })}
                   className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] ${i === mention.index ? 'bg-selected' : ''}`}
                 >
-                  <Avatar seed={a.name} shape={a.shape} color={a.color} picture={agentPicture(a.id, a.avatarVersion)} size={22} />
+                  <Avatar seed={a.name} shape={a.shape} color={a.color} emoji={a.emoji} picture={agentPicture(a.id, a.avatarVersion)} size={22} />
                   <span className="truncate font-medium">{a.name}</span>
                 </button>
               ))}

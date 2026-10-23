@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { DEFAULT_EFFORT, EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MAX_WEB_WATCHES, WATCH_INTERVALS } from '@shared/types'
 import type { AgentConfig, AgentDraft, EffortLevel, EmailTrigger, MascotShape, ModelId, Routine, WebWatch } from '@shared/types'
-import { MASCOT_SHAPES } from '@shared/mascot'
+import { cleanEmoji, MASCOT_SHAPES } from '@shared/mascot'
 import { STARTER_AGENTS } from './starters'
 
 const MODELS: ModelId[] = ['sonnet', 'haiku', 'opus']
@@ -18,7 +18,8 @@ const HEADER =
   '# routines: id, enabled, cron (minute hour day month weekday), prompt; up to 20\n' +
   '# web_watches: id, enabled, url, every (hours: 1 | 3 | 6 | 24), match (words, optional), prompt; up to 3\n' +
   '# auto_approve: approval-only tools (mcp__server__tool) approved without asking\n' +
-  '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n'
+  '# shape: blob | circle | square | hexagon | triangle | pill | cloud  (null = picked from the name)\n' +
+  '# emoji: the avatar\'s emoji, e.g. "📬"  (null = picked from the name)\n'
 
 export function slugify(name: string): string {
   return (
@@ -117,6 +118,7 @@ export function normalize(raw: unknown, id: string): AgentConfig {
     name: str(r['name']).trim() || id,
     shape: normalizeShape(r['shape'], id),
     color: /^#[0-9a-f]{6}$/i.test(str(r['color'])) ? str(r['color']) : '#5E8BFF',
+    emoji: cleanEmoji(r['emoji']),
     model: MODELS.includes(model) ? model : 'sonnet',
     effort: EFFORTS.some((e) => e.id === r['effort']) ? (r['effort'] as EffortLevel) : DEFAULT_EFFORT,
     instructions: str(r['instructions']).trim(),
@@ -140,6 +142,7 @@ export function serialize(a: AgentConfig): string {
     name: a.name,
     shape: a.shape,
     color: a.color,
+    emoji: a.emoji ?? null,
     model: a.model,
     effort: a.effort,
     instructions: a.instructions.endsWith('\n') ? a.instructions : `${a.instructions}\n`,

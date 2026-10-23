@@ -23,7 +23,7 @@ export function GroupAvatar({
     <div className={`relative shrink-0 rounded-full ${running ? 'pulse' : ''}`} style={style}>
       {a && (
         <div className="absolute top-0 left-0">
-          <Avatar seed={a.name} shape={a.shape} color={a.color} picture={agentPicture(a.id, a.avatarVersion)} size={inner} />
+          <Avatar seed={a.name} shape={a.shape} color={a.color} emoji={a.emoji} picture={agentPicture(a.id, a.avatarVersion)} size={inner} />
         </div>
       )}
       {b && (
@@ -33,7 +33,7 @@ export function GroupAvatar({
             filter: [[2, 0], [-2, 0], [0, 2], [0, -2]].map(([x, y]) => `drop-shadow(${x}px ${y}px 0 ${backdrop})`).join(' ')
           }}
         >
-          <Avatar seed={b.name} shape={b.shape} color={b.color} picture={agentPicture(b.id, b.avatarVersion)} size={inner} />
+          <Avatar seed={b.name} shape={b.shape} color={b.color} emoji={b.emoji} picture={agentPicture(b.id, b.avatarVersion)} size={inner} />
         </div>
       )}
       {members.length > 2 && (

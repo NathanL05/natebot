@@ -39,7 +39,7 @@ function Speaker({ agent, showName, children }: { agent: AgentSummary | undefine
     <div className={`flex items-start gap-2.5 ${showName ? 'mt-2' : ''}`}>
       <div className="w-8 shrink-0">
         {showName && (
-          <Avatar seed={name} shape={agent?.shape} color={agent?.color} picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null} size={32} />
+          <Avatar seed={name} shape={agent?.shape} color={agent?.color} emoji={agent?.emoji} picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null} size={32} />
         )}
       </div>
       <div className="flex max-w-[75%] min-w-0 flex-col items-start">

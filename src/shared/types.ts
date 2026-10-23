@@ -74,9 +74,11 @@ export const MAX_READ_FOLDERS = 5
 export interface AgentConfig {
   id: string
   name: string
-  /** Mascot shape; null = derived from the name. */
+  /** Avatar shape; null = derived from the name. */
   shape: MascotShape | null
   color: string
+  /** Avatar emoji; null or missing = derived from the name. */
+  emoji?: string | null
   model: ModelId
   effort: EffortLevel
   instructions: string
@@ -529,6 +531,7 @@ export interface RoutineInfo {
   agentName: string
   shape: MascotShape | null
   color: string
+  emoji: string | null
   avatarVersion: number | null
   routine: Routine
   nextRun: number | null

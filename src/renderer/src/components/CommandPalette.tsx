@@ -40,7 +40,7 @@ export function CommandPalette() {
           'memberIds' in c ? (
             <GroupAvatar members={c.memberIds.map((id) => byId[id]).filter((a): a is NonNullable<typeof a> => !!a)} size={22} backdrop="var(--elev)" />
           ) : (
-            <Avatar seed={c.name} shape={c.shape} color={c.color} picture={agentPicture(c.id, c.avatarVersion)} size={22} />
+            <Avatar seed={c.name} shape={c.shape} color={c.color} emoji={c.emoji} picture={agentPicture(c.id, c.avatarVersion)} size={22} />
           ),
         run: () => useStore.getState().select(c.id)
       }))

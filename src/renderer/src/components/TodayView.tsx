@@ -65,7 +65,7 @@ export function TodayView() {
     const a = byId[agentId]
     return (
       <button type="button" onClick={() => useStore.getState().select(agentId)} className="flex items-center gap-2 text-[13px] font-semibold hover:underline">
-        <Avatar seed={a?.name ?? '?'} shape={a?.shape} color={a?.color} picture={a ? agentPicture(a.id, a.avatarVersion) : null} size={22} />
+        <Avatar seed={a?.name ?? '?'} shape={a?.shape} color={a?.color} emoji={a?.emoji} picture={a ? agentPicture(a.id, a.avatarVersion) : null} size={22} />
         {a?.name ?? 'Agent'}
       </button>
     )

@@ -40,7 +40,7 @@ export function SetupScreen({ env }: { env: EnvStatus }) {
         <div className="w-full max-w-[520px]">
           <div className="mb-6 text-center">
             <div className="mb-3 flex justify-center">
-              <Avatar seed="NateBot" shape="blob" color="#6A5CFF" size={64} />
+              <Avatar seed="NateBot" shape="square" color="#5B6B8C" emoji="🐺" size={64} />
             </div>
             <h1 className="text-[22px] font-bold">Let's get NateBot running</h1>
             <p className="mt-2 text-[13px] text-muted">

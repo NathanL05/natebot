@@ -36,12 +36,12 @@ Everything is listed with short steps in the app's **Guide** (sidebar menu, or *
 
 <table>
   <tr>
-    <td width="33%"><img src="docs/images/today.png" alt="Today: the morning brief, today's calendar and tasks, and a people-first inbox, with the sidebar menu open"></td>
+    <td width="33%"><img src="docs/images/today.png" alt="Today: what your agents wrote since you were last here, the morning brief, and today's calendar"></td>
     <td width="33%"><img src="docs/images/group-chat.png" alt="A group chat where a Travel Planner, Budget Buddy and Planner plan a weekend in Lisbon"></td>
     <td width="33%"><img src="docs/images/guide.png" alt="The Guide: every feature in categories, with numbered steps for the one selected"></td>
   </tr>
   <tr>
-    <td align="center"><b>Today</b>: your day, inbox and approvals</td>
+    <td align="center"><b>Today</b>: what's new, your day and approvals</td>
     <td align="center"><b>Group chats</b>: agents work it out together</td>
     <td align="center"><b>Guide</b>: steps for every feature</td>
   </tr>

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { EFFORTS, MAX_EMAIL_TRIGGERS, MAX_QUICK_PROMPTS, MAX_READ_FOLDERS, MAX_ROUTINES, MAX_WATCH_RUNS_PER_DAY, MAX_WEB_WATCHES, MODELS, WATCH_INTERVALS, type EmailTrigger, type WebWatch, type AgentDraft, type EffortLevel, type McpServerInfo, type ModelId, type Routine } from '@shared/types'
 import { toolLabel } from '@shared/tools'
 import { splitToolRules } from '@shared/toolRules'
-import { MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededShape } from '@shared/mascot'
+import { cleanEmoji, EMOJI_CHOICES, MASCOT_COLORS, MASCOT_SHAPES, mascotDataUrl, seededColor, seededEmoji, seededShape } from '@shared/mascot'
 import { api } from '../lib/store'
 import { Avatar } from './Avatar'
 import { ChevronIcon, PlusIcon, TrashIcon } from './icons'
@@ -66,7 +66,7 @@ export function AgentForm({
     <div className="space-y-5">
       {/* Identity */}
       <div className="flex items-start gap-4">
-        {avatar ?? <Avatar seed={draft.name} shape={draft.shape} color={draft.color} size={64} />}
+        {avatar ?? <Avatar seed={draft.name} shape={draft.shape} color={draft.color} emoji={draft.emoji} size={64} />}
         <div className="flex-1 space-y-3">
           <Field label="Name">
             <input
@@ -77,6 +77,7 @@ export function AgentForm({
               autoFocus
             />
           </Field>
+          <EmojiPicker draft={draft} onPick={(emoji) => set('emoji', emoji)} />
           <ShapePicker draft={draft} onPick={(shape) => set('shape', shape)} />
           <div className="flex items-center gap-1.5">
             {MASCOT_COLORS.map((c) => (
@@ -251,11 +252,48 @@ export function AgentForm({
   )
 }
 
+/** "Auto" (derived from the name), a few suggestions, and a box for any other emoji. */
+function EmojiPicker({ draft, onPick }: { draft: AgentDraft; onPick: (emoji: string | null) => void }) {
+  const current = draft.emoji ?? null
+  const auto = seededEmoji(draft.name)
+  const tile = (active: boolean): string =>
+    `flex h-8 w-8 items-center justify-center rounded-lg text-[18px] leading-none transition ${active ? 'bg-selected ring-1 ring-accent' : 'hover:bg-hover'}`
+  const custom = current && !EMOJI_CHOICES.includes(current) ? current : ''
+  return (
+    <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label="Avatar emoji">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={current === null}
+        onClick={() => onPick(null)}
+        className={`${tile(current === null)} w-auto px-2 text-[11px] font-medium text-muted`}
+        title={`Auto: picked from the name (currently ${auto})`}
+      >
+        Auto
+      </button>
+      {EMOJI_CHOICES.map((e) => (
+        <button key={e} type="button" role="radio" aria-checked={current === e} onClick={() => onPick(e)} className={tile(current === e)}>
+          {e}
+        </button>
+      ))}
+      <input
+        className={`h-8 w-12 rounded-lg border bg-transparent text-center text-[18px] outline-none focus:border-accent ${custom ? 'border-accent' : 'border-line'}`}
+        value={custom}
+        // The newest character typed replaces the old one, so there's no need to delete it first.
+        onChange={(e) => onPick(cleanEmoji([...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(e.target.value)].at(-1)?.segment))}
+        placeholder="…"
+        aria-label="Any other emoji (⌃⌘Space opens the emoji picker)"
+        title="Any other emoji (⌃⌘Space opens the emoji picker)"
+      />
+    </div>
+  )
+}
+
 /** "Auto" (derived from the name) plus one preview per mascot shape. */
 function ShapePicker({ draft, onPick }: { draft: AgentDraft; onPick: (shape: AgentDraft['shape']) => void }) {
   const previews = useMemo(
-    () => MASCOT_SHAPES.map((shape) => ({ shape, src: mascotDataUrl(draft.name, { shape, color: draft.color }) })),
-    [draft.name, draft.color]
+    () => MASCOT_SHAPES.map((shape) => ({ shape, src: mascotDataUrl(draft.name, { shape, color: draft.color, emoji: draft.emoji }) })),
+    [draft.name, draft.color, draft.emoji]
   )
   const auto = seededShape(draft.name)
   const tile = (active: boolean): string =>

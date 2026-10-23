@@ -1,54 +1,40 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- NateBot app icon: a chat-bubble bot head with an antenna on a black tile,
-       in brushed white-to-silver metal (Cursor-style). The eyes are cut-outs,
-       so the tile shows through. macOS grid: 824px tile on a 1024 canvas. -->
+  <!-- NateBot app icon: a geometric wolf head in steel blues with gold eyes, on a midnight-navy
+       tile. Each facet is drawn on the left and mirrored. macOS grid: 824px tile on a 1024 canvas.
+       The menu-bar icon (trayTemplate.svg) is the same head as a silhouette. -->
   <defs>
     <linearGradient id="tile" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#26262A"/>
-      <stop offset="0.45" stop-color="#0D0D0F"/>
-      <stop offset="1" stop-color="#000000"/>
+      <stop offset="0" stop-color="#20304F"/>
+      <stop offset="1" stop-color="#0B1222"/>
     </linearGradient>
     <linearGradient id="edge" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.18"/>
-      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.04"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.07"/>
     </linearGradient>
-    <linearGradient id="metal" x1="0" y1="210" x2="0" y2="800" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="0.38" stop-color="#ECEEF2"/>
-      <stop offset="0.72" stop-color="#BCC1CA"/>
-      <stop offset="1" stop-color="#868C98"/>
-    </linearGradient>
-    <linearGradient id="sheen" x1="262" y1="318" x2="620" y2="700" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.7"/>
-      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="drop" x="-20%" y="-20%" width="140%" height="150%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="16"/>
-      <feOffset dy="14"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.7"/></feComponentTransfer>
+    <filter id="drop" x="-30%" y="-30%" width="160%" height="170%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="18"/>
+      <feOffset dy="16"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
       <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <mask id="face">
-      <rect width="1024" height="1024" fill="#fff"/>
-      <rect x="400" y="440" width="68" height="124" rx="34" fill="#000"/>
-      <rect x="556" y="440" width="68" height="124" rx="34" fill="#000"/>
-    </mask>
   </defs>
 
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
   <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#edge)" stroke-width="3"/>
 
-  <g filter="url(#drop)">
-    <g mask="url(#face)" fill="url(#metal)">
-      <!-- antenna -->
-      <circle cx="512" cy="248" r="38"/>
-      <rect x="496" y="260" width="32" height="80" rx="16"/>
-      <!-- head: rounded bubble with a tail at the bottom left -->
-      <rect x="262" y="318" width="500" height="390" rx="150"/>
-      <path d="M318 640 L292 790 L452 690 Z" stroke="url(#metal)" stroke-width="28" stroke-linejoin="round"/>
-    </g>
-    <!-- top-left sheen on the head -->
-    <rect x="262" y="318" width="500" height="390" rx="150" fill="url(#sheen)" mask="url(#face)"/>
+  <g filter="url(#drop)" stroke-linejoin="round">
+    <!-- ear --><path d="M300 180 L262 440 L430 330 Z" fill="#5B6B8C"/><path d="M724 180 L762 440 L594 330 Z" fill="#5B6B8C"/>
+    <!-- inner ear --><path d="M308 250 L290 410 L395 338 Z" fill="#29314D"/><path d="M716 250 L734 410 L629 338 Z" fill="#29314D"/>
+    <!-- brow --><path d="M430 330 L512 296 L512 540 L388 480 Z" fill="#8C9BB8"/><path d="M594 330 L512 296 L512 540 L636 480 Z" fill="#8C9BB8"/>
+    <!-- cheek --><path d="M262 440 L430 330 L388 480 Z" fill="#6E7EA0"/><path d="M762 440 L594 330 L636 480 Z" fill="#6E7EA0"/>
+    <!-- ruff --><path d="M262 440 L388 480 L338 650 L230 575 Z" fill="#B4C0D6"/><path d="M762 440 L636 480 L686 650 L794 575 Z" fill="#B4C0D6"/>
+    <!-- jaw --><path d="M338 650 L388 480 L452 610 Z" fill="#7E8DAE"/><path d="M686 650 L636 480 L572 610 Z" fill="#7E8DAE"/>
+    <!-- muzzle --><path d="M452 610 L512 560 L512 800 L446 735 Z" fill="#EEF1F7"/><path d="M572 610 L512 560 L512 800 L578 735 Z" fill="#EEF1F7"/>
+    <!-- chin --><path d="M338 650 L452 610 L446 735 Z" fill="#CBD3E4"/><path d="M686 650 L572 610 L578 735 Z" fill="#CBD3E4"/>
+    <!-- nose --><path d="M476 700 L512 688 L512 742 L492 738 Z" fill="#151926"/><path d="M548 700 L512 688 L512 742 L532 738 Z" fill="#151926"/>
+    <!-- eyes -->
+    <path d="M386 490 L410 469 L454 482 L430 500 Z" fill="#FFD54A"/><path d="M638 490 L614 469 L570 482 L594 500 Z" fill="#FFD54A"/>
+    <ellipse cx="422" cy="486" rx="7" ry="13" fill="#0B0B12"/><ellipse cx="602" cy="486" rx="7" ry="13" fill="#0B0B12"/>
   </g>
 </svg>
