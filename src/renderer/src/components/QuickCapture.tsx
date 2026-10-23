@@ -117,7 +117,7 @@ export function QuickCapture() {
       <div className="w-full rounded-[22px] border border-line-strong bg-bg/95 p-3 shadow-2xl backdrop-blur-xl">
         <div className="flex items-end gap-2.5">
           {target && (
-            <Avatar seed={target.name} shape={target.shape} color={target.color} picture={agentPicture(target.id, target.avatarVersion)} size={34} />
+            <Avatar seed={target.name} shape={target.shape} color={target.color} emoji={target.emoji} picture={agentPicture(target.id, target.avatarVersion)} size={34} />
           )}
           <textarea
             ref={box}
@@ -150,7 +150,7 @@ export function QuickCapture() {
                 a.id === target?.id ? 'bg-selected text-fg' : 'text-muted hover:bg-hover hover:text-fg'
               }`}
             >
-              <Avatar seed={a.name} shape={a.shape} color={a.color} picture={agentPicture(a.id, a.avatarVersion)} size={16} />
+              <Avatar seed={a.name} shape={a.shape} color={a.color} emoji={a.emoji} picture={agentPicture(a.id, a.avatarVersion)} size={16} />
               {a.name}
             </button>
           ))}

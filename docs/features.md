@@ -346,12 +346,15 @@ only sees what reaches Gmail, so turn on job alerts on each company's careers si
 
 ## Avatars
 
-Each agent gets a mascot (a coloured shape with a small face) generated from its name, so it always looks
-the same. You can pick a different shape and colour in the agent's settings.
+Each agent's avatar is an emoji on a shape in a pale tint of its colour. All three follow from its name unless you
+pick them (📬 for an Email Agent, 😴 for a Sleep Specialist, 🗓️ for a Planner…), so an agent always looks the same.
+In the agent's settings, pick an emoji from the suggestions or type any other into the box (⌃⌘Space opens the emoji
+picker), and pick a shape and colour. **Auto** goes back to the one from the name. The emoji is saved as `emoji:` in
+the agent's YAML file.
 
 To use a photo instead, click any avatar (in the chat header, in agent settings, or your own at the bottom of the
 sidebar) and choose **Choose picture…**. PNG, JPG and GIF work; the image is cropped to a square and resized to
-256px, and a GIF keeps its first frame. **Reset to default** goes back to the mascot (or your initials).
+256px, and a GIF keeps its first frame. **Reset to default** goes back to the emoji avatar (or your initials).
 
 ## Skills marketplace
 

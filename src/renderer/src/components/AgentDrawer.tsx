@@ -87,6 +87,7 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
                   seed={draft.name}
                   shape={draft.shape}
                   color={draft.color}
+                  emoji={draft.emoji}
                   picture={agentPicture(agent.id, agent.avatarVersion)}
                   size={64}
                 />

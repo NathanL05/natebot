@@ -317,6 +317,7 @@ export function ChatList() {
             seed={chat.name}
             shape={chat.shape}
             color={chat.color}
+            emoji={chat.emoji}
             picture={agentPicture(chat.id, chat.avatarVersion)}
             size={44}
             running={chat.status === 'running'}
@@ -446,7 +447,7 @@ function MessageResults({ query, byId, rooms }: { query: string; byId: Record<st
             {room && !h.speakerId ? (
               <GroupAvatar members={room.memberIds.map((id) => byId[id]).filter((a): a is AgentSummary => !!a)} size={28} backdrop="var(--sidebar)" />
             ) : (
-              <Avatar seed={agent?.name ?? chatName} shape={agent?.shape} color={agent?.color} picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null} size={28} />
+              <Avatar seed={agent?.name ?? chatName} shape={agent?.shape} color={agent?.color} emoji={agent?.emoji} picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null} size={28} />
             )}
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline gap-2">
