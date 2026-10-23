@@ -1,7 +1,7 @@
 // The safety promises: tools marked require_approval are never available in a
 // normal run, and an approved action can only run its one tool, from one of
 // the agent's own MCP servers. claude itself is never started here.
-import { writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -436,8 +436,9 @@ describe('saving usage', () => {
 })
 
 describe('read-only folders', () => {
-  it('adds the folder and denies writes inside it', async () => {
-    const dir = tmpdir()
+  it('adds the folder and its map, and denies writes inside it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'natebot-plan-'))
+    writeFileSync(join(dir, 'README.md'), '# My plan\nHong Kong by 2029.\n')
     const { run } = setup({ ...helper, read_folders: [dir, '/does/not/exist'] })
     h.events.push(...reply('Read it.'))
     await run('What does my plan say?')
@@ -447,6 +448,8 @@ describe('read-only folders', () => {
     const prompt = s?.args[s.args.indexOf('--append-system-prompt') + 1] ?? ''
     expect(prompt).toContain(`folder ${dir}`)
     expect(prompt).not.toContain('/does/not/exist')
+    expect(prompt).toContain(`## Map of ${dir}`)
+    expect(prompt).toContain('Hong Kong by 2029.')
   })
 })
 
