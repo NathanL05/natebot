@@ -1520,7 +1520,7 @@ export class Backend implements NateBotApi {
           shape: a.shape,
           avatarVersion: avatarVersion(`agent:${a.id}`),
           color: a.color,
-          emoji: a.emoji ?? null,
+          animal: a.animal ?? null,
           routine,
           nextRun: routine.enabled ? this.scheduler.nextRun(a.id, routine.id) : null,
           lastRun: last?.endedAt ? { at: last.endedAt, ok: last.ok === true, summary: last.summary ?? '' } : null

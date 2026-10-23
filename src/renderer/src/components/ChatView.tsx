@@ -73,7 +73,7 @@ export function ChatView() {
     <div className="relative flex min-w-0 flex-1 flex-col">
       <header className="drag flex h-[52px] shrink-0 items-center gap-3 px-5">
         <AvatarEditor target={`agent:${agent.id}`} hasPicture={!!agent.avatarVersion} label={`Change ${agent.name}'s picture`}>
-          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} emoji={agent.emoji} picture={agentPicture(agent.id, agent.avatarVersion)} size={30} running={agent.status === 'running'} />
+          <Avatar seed={agent.name} color={agent.color} animal={agent.animal} picture={agentPicture(agent.id, agent.avatarVersion)} size={30} running={agent.status === 'running'} />
         </AvatarEditor>
         <div className="min-w-0 flex-1">
           <div className="truncate text-[14px] leading-tight font-semibold">{agent.name}</div>
@@ -110,7 +110,7 @@ export function ChatView() {
         <div className="flex-1" />
       ) : messages.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-          <Avatar seed={agent.name} shape={agent.shape} color={agent.color} emoji={agent.emoji} picture={agentPicture(agent.id, agent.avatarVersion)} size={72} />
+          <Avatar seed={agent.name} color={agent.color} animal={agent.animal} picture={agentPicture(agent.id, agent.avatarVersion)} size={72} />
           <div className="text-[17px] font-semibold">{agent.name}</div>
           <div className="max-w-[360px] text-[13px] text-muted">
             {agent.instructions.split('\n')[0] || 'Say hi to get started.'}

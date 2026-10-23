@@ -128,7 +128,7 @@ export function RoomModal() {
                     on ? 'border-accent/60 bg-selected' : 'border-transparent hover:bg-hover'
                   }`}
                 >
-                  <Avatar seed={a.name} shape={a.shape} color={a.color} emoji={a.emoji} picture={agentPicture(a.id, a.avatarVersion)} size={32} />
+                  <Avatar seed={a.name} color={a.color} animal={a.animal} picture={agentPicture(a.id, a.avatarVersion)} size={32} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[14px] font-medium">{a.name}</div>
                     <div className="truncate text-[12px] text-muted">{a.instructions.split('\n')[0] || 'General assistant'}</div>
