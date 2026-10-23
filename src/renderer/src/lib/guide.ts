@@ -717,7 +717,8 @@ export const GUIDE: GuideCategory[] = [
           'Under **Folders it can read**, click **Add folder…**.',
           'Pick the folder, then click **Save**.'
         ],
-        keywords: 'files folder access read only'
+        tip: 'NateBot hands the agent a map of the folder (each note, when it was edited, what it’s about), so it opens only the files it needs. The map costs no Claude usage to build.',
+        keywords: 'files folder access read only map digest atlas'
       },
       {
         id: 'mcp',

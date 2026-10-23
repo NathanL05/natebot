@@ -18,6 +18,7 @@ import { spawnClaude, type ClaudeProcess } from './claude/process'
 import { extractActions, extractCommitments, extractHandoffs, extractJobs, extractReminders, hideActionsBlock, quietMarker, stripBlocks, StreamState, type RunTokens } from './claude/stream'
 import { resolveHandoffs, rosterFor } from './handoff'
 import { memoryBlock } from './memory'
+import { folderMap } from './folder-map'
 import { resolveReminders } from './reminders'
 import { looksLikeUsageLimit, type UsageTracker } from './usage'
 
@@ -139,9 +140,22 @@ export function readableFolders(agent: AgentConfig): string[] {
 function folderNotes(agent: AgentConfig): string[] {
   return readableFolders(agent).map(
     (f) =>
-      `You can read, but never change, the user's folder ${f} (Read, Glob, Grep). Start with its README.md if there is one and read only the files the task needs. ` +
+      `You can read, but never change, the user's folder ${f} (Read, Glob, Grep). Its map is at the end of these instructions, with its README.md and CLAUDE.md in full: ` +
+      "don't list the folder or re-read those two, and open only the files the task needs. " +
       "Its CLAUDE.md, if any, describes how the user works in that folder's own sessions; you keep NateBot's house style."
   )
+}
+
+/** Maps of the folders the agent can read, for the end of its system prompt (empty when it has none). */
+function folderMaps(agent: AgentConfig): string {
+  const maps = readableFolders(agent).map((f) => {
+    try {
+      return folderMap(f)
+    } catch {
+      return ''
+    }
+  })
+  return maps.filter(Boolean).map((m) => `\n\n${m}`).join('')
 }
 
 export function ensureWorkspace(agentId: string): string {
@@ -281,7 +295,8 @@ export class Engine extends EventEmitter {
     mcpServers: string[],
     sessionArgs: string[],
     // One-on-one chats can hand tasks to the other agents (group chats pass their own prompt).
-    prompt = systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], { roster: rosterFor(agent, this.deps.store.list()) }, this.deps.user?.() ?? null)
+    prompt = systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], { roster: rosterFor(agent, this.deps.store.list()) }, this.deps.user?.() ?? null) +
+      folderMaps(agent)
   ): string[] {
     const allowed = [...new Set([...agent.allowed_tools, ...mcpServers.map((s) => `mcp__${s}`)])]
     const folders = readableFolders(agent)
@@ -560,7 +575,7 @@ export class Engine extends EventEmitter {
     const mcp = writeRunConfig(agent, skip)
     const state = new StreamState()
     const sessionArgs = t.sessionId ? ['--resume', t.sessionId] : ['--session-id', randomUUID()]
-    const prompt = `${systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], null, this.deps.user?.() ?? null)}\n\n${t.roomPrompt}`
+    const prompt = `${systemPrompt(agent, [...agentNotes(agent), ...folderNotes(agent)], null, this.deps.user?.() ?? null)}${folderMaps(agent)}\n\n${t.roomPrompt}`
     // Recorded against the agent, so its usage stats include group chats.
     const runId = randomUUID()
     this.deps.db.startRun(runId, agent.id, 'room')

@@ -54,8 +54,13 @@ irreversible actions without approval.
 
 - **Folders it can read:** in an agent's settings, **Add folder…** gives it read-only access to a folder on your Mac,
   for example a career-plans folder. NateBot passes it with `--add-dir` and denies Edit/Write inside it, so the agent can
-  read and search it but never change it. The agent is told to start with the folder's README and read only what it
-  needs. A newly created Job Hunter or Morning Brief gets the folders your other agents already read.
+  read and search it but never change it. With every message, NateBot gives the agent a **map** of the folder, built
+  from the files themselves (no Claude run): its README.md and CLAUDE.md in full, then each note (Markdown, text,
+  YAML, CSV) with its size, when it was last edited and its title and first line, most recently edited first. Copies,
+  test fixtures, packages and dot folders are left out, and the map is kept under about 18,000 characters. So the agent
+  doesn't spend its first turns listing the folder and opening files to see what's in them: it opens only what the
+  question needs. The map changes only when the files do, so it stays cached between messages. A newly created Job
+  Hunter or Morning Brief gets the folders your other agents already read.
 - **Folders:** group agents and group chats in the sidebar. Create one with the folder button at the top, then
   drag chats onto it or right-click a chat → **Move to**. Click a folder's name to collapse it, **+** to create an
   agent inside it, and **…** to rename or delete it (its chats move to *No folder*).
