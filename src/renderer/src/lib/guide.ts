@@ -95,15 +95,15 @@ export const GUIDE: GuideCategory[] = [
       },
       {
         id: 'avatars',
-        title: 'Change a picture or emoji',
-        summary: 'Give an agent (or yourself) a photo, or pick its emoji, shape and colour.',
+        title: 'Change a picture or animal',
+        summary: 'Give an agent (or yourself) a photo, or pick its animal and colour.',
         steps: [
           'Click any avatar: in the chat header, in agent settings, or yours at the bottom of the sidebar.',
           'Choose **Choose picture…** and pick a PNG, JPG or GIF.',
-          'Or pick an emoji, shape and colour in the agent’s settings (⌃⌘Space for any emoji).',
-          '**Reset to default** brings back the emoji avatar or your initials.'
+          'Or pick one of 19 animals and a colour in the agent’s settings.',
+          '**Reset to default** brings back the animal or your initials.'
         ],
-        keywords: 'photo image avatar shape colour color emoji mascot icon'
+        keywords: 'photo image avatar animal colour color mascot icon'
       },
       {
         id: 'import-agent',

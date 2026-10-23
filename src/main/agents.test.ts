@@ -13,7 +13,7 @@ describe('agent YAML normalisation', () => {
         name: 'my-agent',
         shape: null,
         color: '#5E8BFF',
-        emoji: null,
+        animal: null,
         model: 'sonnet',
         effort: DEFAULT_EFFORT,
         instructions: '',
@@ -31,11 +31,10 @@ describe('agent YAML normalisation', () => {
     }
   })
 
-  it('keeps one emoji for the avatar, and drops anything that could break its SVG', () => {
-    expect(normalize({ emoji: ' 📬 ' }, 'p').emoji).toBe('📬')
-    expect(normalize({ emoji: '🧑‍💻 extra' }, 'p').emoji).toBe('🧑‍💻')
-    expect(normalize({ emoji: '<svg>' }, 'p').emoji).toBeNull()
-    expect(normalize({ emoji: 7 }, 'p').emoji).toBeNull()
+  it('keeps a known avatar animal and drops anything else', () => {
+    expect(normalize({ animal: 'fox' }, 'p').animal).toBe('fox')
+    expect(normalize({ animal: 'dragon' }, 'p').animal).toBeNull()
+    expect(normalize({ animal: 7 }, 'p').animal).toBeNull()
   })
 
   it('keeps only MCP tool names as Always allow rules, once each', () => {

@@ -1,6 +1,6 @@
 // Types shared by the main process, preload and renderer.
 import type { AccentId } from './accents'
-import type { MascotShape } from './mascot'
+import type { Animal, MascotShape } from './mascot'
 
 export type { AccentId, MascotShape }
 
@@ -74,11 +74,11 @@ export const MAX_READ_FOLDERS = 5
 export interface AgentConfig {
   id: string
   name: string
-  /** Avatar shape; null = derived from the name. */
+  /** Avatar shape from before animals: still kept in the file, no longer drawn. */
   shape: MascotShape | null
   color: string
-  /** Avatar emoji; null or missing = derived from the name. */
-  emoji?: string | null
+  /** Avatar animal; null or missing = derived from the name. */
+  animal?: Animal | null
   model: ModelId
   effort: EffortLevel
   instructions: string
@@ -531,7 +531,7 @@ export interface RoutineInfo {
   agentName: string
   shape: MascotShape | null
   color: string
-  emoji: string | null
+  animal: Animal | null
   avatarVersion: number | null
   routine: Routine
   nextRun: number | null

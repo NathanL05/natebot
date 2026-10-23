@@ -47,7 +47,7 @@ The icon's source is `build/icon.svg` (the menu-bar icon is `build/trayTemplate.
 every size from them. To use your own art, run `npm run icons -- path/to/art.png` with any 1024×1024 PNG or SVG.
 It regenerates `build/icon.icns` and the PNGs, and rebuilds the dev app.
 
-The current icon is a geometric wolf head in steel blues with gold eyes on a midnight-navy tile, and the menu-bar
+The current icon is a geometric wolf head in steel blues on a midnight-navy tile, and the menu-bar
 icon is the same head as a silhouette. The UI's accent colour is separate:
 pick one of 18 in **Settings → Appearance → Accent colour** (defined in `src/shared/accents.ts`).
 

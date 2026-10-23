@@ -36,7 +36,7 @@ export function VisitCard() {
     const room = rooms.find((r) => r.id === chatId)
     if (room) return <GroupAvatar members={room.memberIds.map((id) => byId[id]).filter((a): a is AgentSummary => !!a)} size={28} backdrop="var(--elev)" />
     const a = byId[chatId]
-    return <Avatar seed={a?.name ?? '?'} shape={a?.shape} color={a?.color} emoji={a?.emoji} picture={a ? agentPicture(a.id, a.avatarVersion) : null} size={28} />
+    return <Avatar seed={a?.name ?? '?'} color={a?.color} animal={a?.animal} picture={a ? agentPicture(a.id, a.avatarVersion) : null} size={28} />
   }
   const name = (chatId: string): string => rooms.find((r) => r.id === chatId)?.name ?? byId[chatId]?.name ?? 'Chat'
 

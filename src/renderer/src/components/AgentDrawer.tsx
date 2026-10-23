@@ -85,9 +85,9 @@ export function AgentDrawer({ agent }: { agent: AgentSummary }) {
               <AvatarEditor target={`agent:${agent.id}`} hasPicture={!!agent.avatarVersion} label="Upload a picture">
                 <Avatar
                   seed={draft.name}
-                  shape={draft.shape}
+                 
                   color={draft.color}
-                  emoji={draft.emoji}
+                  animal={draft.animal}
                   picture={agentPicture(agent.id, agent.avatarVersion)}
                   size={64}
                 />

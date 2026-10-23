@@ -91,7 +91,7 @@ export function RoutinesView() {
             {routines?.map((r) => (
               <div key={`${r.agentId}#${r.routine.id}`} className="rounded-2xl bg-elev/60 px-4 py-3.5">
                 <div className="flex items-center gap-4">
-                  <Avatar seed={r.agentName} shape={r.shape} color={r.color} emoji={r.emoji} picture={agentPicture(r.agentId, r.avatarVersion)} size={40} />
+                  <Avatar seed={r.agentName} color={r.color} animal={r.animal} picture={agentPicture(r.agentId, r.avatarVersion)} size={40} />
                   <div className="min-w-0 flex-1">
                     <button
                       type="button"
@@ -156,9 +156,9 @@ export function RoutinesView() {
                   <div key={r.id} className="flex items-center gap-4 rounded-2xl bg-elev/60 px-4 py-3">
                     <Avatar
                       seed={agent?.name ?? '?'}
-                      shape={agent?.shape}
+                     
                       color={agent?.color}
-                      emoji={agent?.emoji}
+                      animal={agent?.animal}
                       picture={agent ? agentPicture(agent.id, agent.avatarVersion) : null}
                       size={32}
                     />

@@ -346,15 +346,15 @@ only sees what reaches Gmail, so turn on job alerts on each company's careers si
 
 ## Avatars
 
-Each agent's avatar is an emoji on a shape in a pale tint of its colour. All three follow from its name unless you
-pick them (📬 for an Email Agent, 😴 for a Sleep Specialist, 🗓️ for a Planner…), so an agent always looks the same.
-In the agent's settings, pick an emoji from the suggestions or type any other into the box (⌃⌘Space opens the emoji
-picker), and pick a shape and colour. **Auto** goes back to the one from the name. The emoji is saved as `emoji:` in
-the agent's YAML file.
+Each agent's avatar is a small faceted animal head in its colour, in the same folded-paper style as the wolf app icon.
+There are 19 animals (wolf, fox, cat, bear, panda, koala, owl, rabbit, lion, tiger, deer, penguin, frog, monkey,
+raccoon, mouse, pig, elephant and dog). Unless you pick one, the animal follows from the agent's name (an animal named
+in it wins, so "Night Owl" is an owl), so an agent always looks the same. In the agent's settings, pick an animal and a
+colour; **Auto** goes back to the one from the name. The animal is saved as `animal:` in the agent's YAML file.
 
 To use a photo instead, click any avatar (in the chat header, in agent settings, or your own at the bottom of the
 sidebar) and choose **Choose picture…**. PNG, JPG and GIF work; the image is cropped to a square and resized to
-256px, and a GIF keeps its first frame. **Reset to default** goes back to the emoji avatar (or your initials).
+256px, and a GIF keeps its first frame. **Reset to default** goes back to the animal (or your initials).
 
 ## Skills marketplace
 

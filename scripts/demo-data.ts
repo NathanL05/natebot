@@ -66,6 +66,7 @@ const agents: AgentConfig[] = [
     id: 'email-agent',
     name: 'Email Agent',
     shape: 'hexagon',
+    animal: 'owl',
     color: '#F5A524',
     model: 'sonnet',
     effort: 'medium',
@@ -77,15 +78,16 @@ const agents: AgentConfig[] = [
     id: 'morning-brief',
     name: 'Morning Brief',
     shape: 'circle',
+    animal: 'lion',
     color: '#FFB224',
     instructions: 'Each morning, a short brief of my day.',
     routines: [{ id: 'main', enabled: true, cron: '30 7 * * *', prompt: 'Write my morning brief. {{today}}' }]
   }),
-  agent({ id: 'planner', name: 'Planner', shape: 'pill', color: '#5E8BFF', model: 'sonnet', instructions: 'You plan my day and week.', quick_prompts: ['Plan my day', 'Plan my week'] }),
-  agent({ id: 'travel-planner', name: 'Travel Planner', shape: 'cloud', color: '#2EC4B6', instructions: 'You plan trips on a student budget.' }),
-  agent({ id: 'budget-buddy', name: 'Budget Buddy', shape: 'square', color: '#22C55E', instructions: 'You keep my spending on track.' }),
-  agent({ id: 'study-buddy', name: 'Study Buddy', shape: 'triangle', color: '#FF6B6B', instructions: 'You quiz me and make flashcards.' }),
-  agent({ id: 'straight-talk', name: 'Straight Talk', shape: 'blob', color: '#9B82FF', model: 'sonnet', instructions: 'Brutally honest mentor. Verdict first.' })
+  agent({ id: 'planner', name: 'Planner', shape: 'pill', animal: 'fox', color: '#5E8BFF', model: 'sonnet', instructions: 'You plan my day and week.', quick_prompts: ['Plan my day', 'Plan my week'] }),
+  agent({ id: 'travel-planner', name: 'Travel Planner', shape: 'cloud', animal: 'penguin', color: '#2EC4B6', instructions: 'You plan trips on a student budget.' }),
+  agent({ id: 'budget-buddy', name: 'Budget Buddy', shape: 'square', animal: 'pig', color: '#22C55E', instructions: 'You keep my spending on track.' }),
+  agent({ id: 'study-buddy', name: 'Study Buddy', shape: 'triangle', animal: 'rabbit', color: '#FF6B6B', instructions: 'You quiz me and make flashcards.' }),
+  agent({ id: 'straight-talk', name: 'Straight Talk', shape: 'blob', animal: 'wolf', color: '#9B82FF', model: 'sonnet', instructions: 'Brutally honest mentor. Verdict first.' })
 ]
 for (const a of agents) writeFileSync(join(home, 'agents', `${a.id}.yaml`), serialize(a))
 
