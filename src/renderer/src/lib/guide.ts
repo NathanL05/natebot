@@ -546,10 +546,26 @@ export const GUIDE: GuideCategory[] = [
         id: 'today',
         title: 'Today',
         summary: 'Everything that needs you: approvals, what’s coming up, and what routines found.',
-        steps: ['Open the sidebar menu and click **Today**, or press `⇧⌘T`.', 'Work through **Needs your OK** first.'],
-        tip: 'Opening Today uses no Claude usage.',
+        steps: [
+          'NateBot opens on **Today**. Later, open the sidebar menu and click **Today**, or press `⇧⌘T`.',
+          'Work through **Needs your OK** first.'
+        ],
+        tip: 'Opening Today uses no Claude usage. To open on your latest chat instead, turn off **Settings → General → Open on Today**.',
         go: 'today',
-        keywords: 'dashboard home overview'
+        keywords: 'dashboard home overview start launch'
+      },
+      {
+        id: 'since-last-visit',
+        title: 'See what happened while you were away',
+        summary: 'Today starts with what your agents wrote since you were last here, and what’s waiting for you.',
+        steps: [
+          'Open NateBot, or come back to it after an hour or more away.',
+          'At the top of **Today**, click a chat under **Since you were last here** to open it at that message.',
+          'Click **Got it** to hide the list until you’re next away.'
+        ],
+        tip: 'It also says when NateBot was closed, since routines and reminders don’t run then. It uses no Claude usage.',
+        go: 'today',
+        keywords: 'missed away catch up welcome back new unread'
       },
       {
         id: 'your-day',

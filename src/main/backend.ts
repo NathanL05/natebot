@@ -36,7 +36,8 @@ import type {
   WebWatch,
   UsageBreakdown,
   UsageInfo,
-  UsageWindow
+  UsageWindow,
+  VisitSummary
 } from '@shared/types'
 import { isRoomId, OLDER_PAGE, replyExcerpt, replyNote } from '@shared/types'
 import { describeCron } from '@shared/schedule'
@@ -67,7 +68,7 @@ import { digest, inQuietHours } from './quiet'
 import { approvalButtons, parsePhoneDecision, parsePhoneMessage, PhoneInbox } from './phone'
 import { appleConnected, connectApple, refreshAppleEntry, saveNote } from './apple'
 import { afterMiss, dueAction, nextRepeat, ReminderClock } from './reminders'
-import { commitmentsBlock, mergeCommitments, nudgeAt } from './commitments'
+import { commitmentsBlock, dayStart, mergeCommitments, nudgeAt } from './commitments'
 import { deadlineReminders, JOB_HUNTER, JOB_HUNTER_ID, jobKey, parseJob } from './jobs'
 import { Rooms } from './rooms'
 import { EmailWatcher, triggerPrompt, type EmailHit } from './triggers'
@@ -77,6 +78,7 @@ import { draftFromShare, shareFile } from './agent-share'
 import { dueDay, dueRun, missedRun, routineChanges, Scheduler, syncedCheckpoint, type Checkpoint } from './scheduler'
 import { SettingsStore } from './settings'
 import { UsageTracker } from './usage'
+import { returnVisit, startupVisit, summarizeVisit, type Visit } from './visit'
 
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
 /** After a wake, give the network a moment before catching up on routines. */
@@ -151,6 +153,10 @@ export class Backend implements NateBotApi {
   onCaptureShortcut: (accelerator: string | null) => boolean = () => true
   onHideCapture: () => void = () => undefined
   private captureOk = true
+  /** What Today's "since you were last here" covers; null once dismissed or when you weren't away. */
+  private visit: Visit | null = null
+  /** When the window last lost focus (kept across restarts). */
+  private lastSeen: number | null = null
 
   constructor() {
     if (makePrivate(ROOT)) log(`startup: made ${ROOT} readable by you only`)
@@ -162,6 +168,10 @@ export class Backend implements NateBotApi {
     if (cleaned) log(`startup: removed ${cleaned} leftover temp file(s)`)
     this.db = new Db(DB_FILE)
     this.db.repairInterrupted()
+    this.lastSeen = this.db.metaNumber('last_seen')
+    this.visit = startupVisit(this.lastSeen, this.db.metaNumber('closed_at'), this.db.lastUserMessageAt(), Date.now())
+    // A crash writes no closed_at, so a stale one must not count for the next start.
+    this.db.setMetaNumber('closed_at', null)
 
     this.engine = new Engine({
       store: this.store,
@@ -296,6 +306,8 @@ export class Backend implements NateBotApi {
   }
 
   shutdown(): void {
+    if (this.focused()) this.windowAway()
+    this.db.setMetaNumber('closed_at', Date.now())
     // Their buttons stop working once NateBot quits, so don't leave them on screen.
     for (const n of this.approvalNotices.values()) n.close()
     this.approvalNotices.clear()
@@ -373,6 +385,37 @@ export class Backend implements NateBotApi {
       this.roomsTimer = undefined
       emit('rooms', this.rooms.summaries())
     }, 30)
+  }
+
+  /** The main window lost focus or was hidden. */
+  windowAway(): void {
+    this.lastSeen = Date.now()
+    this.db.setMetaNumber('last_seen', this.lastSeen)
+  }
+
+  /** The main window got focus: after an hour or more away, Today's card covers what arrived meanwhile. */
+  windowBack(): void {
+    const next = returnVisit(this.visit, this.lastSeen, Date.now())
+    if (!next) return
+    this.visit = next
+    emit('visit', this.visitSummary())
+  }
+
+  private visitSummary(): VisitSummary | null {
+    const v = this.visit
+    if (!v) return null
+    const chats = new Set([...this.store.list().map((a) => a.id), ...this.rooms.summaries().map((r) => r.id)])
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return summarizeVisit(
+      v,
+      this.db.messagesBetween(v.from, v.to ?? Date.now()).filter((m) => chats.has(m.agentId)),
+      {
+        approvals: this.summaries().reduce((n, a) => n + a.pending, 0),
+        radar: this.settings.get().jobRadar ? this.db.listRadarHits(v.from).filter((h) => h.status === 'new').length : 0,
+        due: this.db.listCommitments().filter((c) => c.status === 'open' && dayStart(c.due) <= today.getTime()).length
+      }
+    )
   }
 
   private focused(): boolean {
@@ -1035,6 +1078,15 @@ export class Backend implements NateBotApi {
       if (room) this.emitRooms()
       else this.emitAgents()
     }
+  }
+
+  async sinceLastVisit(): Promise<VisitSummary | null> {
+    return this.visitSummary()
+  }
+
+  async dismissVisit(): Promise<void> {
+    this.visit = null
+    emit('visit', null)
   }
 
   async pendingMessages(): Promise<ChatMessage[]> {

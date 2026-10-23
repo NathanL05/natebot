@@ -187,7 +187,9 @@ export const useStore = create<State>((set, get) => {
         userAvatarVersion: boot.userAvatarVersion
       })
       const first = sortAgents(boot.agents)[0]
-      if (first) get().select(first.id)
+      // On Today, the latest chat is only remembered, not opened, so its unread stays unread.
+      if (boot.settings.openOnToday) set({ view: 'today', selectedId: first?.id ?? null })
+      else if (first) get().select(first.id)
     },
 
     select(chatId) {

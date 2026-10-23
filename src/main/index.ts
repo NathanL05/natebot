@@ -78,6 +78,9 @@ function createWindow(): BrowserWindow {
     }
   })
   trackBounds(win)
+  // For Today's "since you were last here".
+  win.on('focus', () => backend.windowBack())
+  win.on('blur', () => backend.windowAway())
 
   win.once('ready-to-show', () => {
     if (!startHidden) win.show()
