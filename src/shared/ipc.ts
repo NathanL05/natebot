@@ -27,7 +27,8 @@ import type {
   RoutineInfo,
   RoutineRun,
   UsageBreakdown,
-  UsageInfo
+  UsageInfo,
+  VisitSummary
 } from './types'
 
 export interface NateBotApi {
@@ -43,6 +44,10 @@ export interface NateBotApi {
   markRead(chatId: string): Promise<void>
   /** Deletes a chat's messages (pinned ones stay) and starts a fresh conversation. Refused while it's working. */
   clearMessages(chatId: string): Promise<void>
+  /** What arrived while you were away (Today's top card), or null when there's nothing to show. */
+  sinceLastVisit(): Promise<VisitSummary | null>
+  /** Hides that card until you're next away. */
+  dismissVisit(): Promise<void>
   /** Agent messages with actions or handoffs waiting for the user (for the Today screen). */
   pendingMessages(): Promise<ChatMessage[]>
   /** Today's events and tasks from connected calendars and task lists (no Claude run). */
@@ -175,6 +180,8 @@ export const API_METHODS = [
   'stop',
   'markRead',
   'clearMessages',
+  'sinceLastVisit',
+  'dismissVisit',
   'searchMessages',
   'todayAgenda',
   'inbox',
@@ -267,6 +274,8 @@ export interface NateBotEvents {
   navigate: 'settings' | 'routines' | 'today' | 'jobs' | 'guide' | 'newAgent' | 'newRoom'
   /** The quick-capture box was opened, optionally pre-filled from a natebot:// link. */
   captureShown: { at: number; text?: string; agent?: string }
+  /** You came back after being away (or dismissed the card): Today's "since you were last here". */
+  visit: VisitSummary | null
 }
 
 export const EVENT_NAMES = [
@@ -280,7 +289,8 @@ export const EVENT_NAMES = [
   'gmailProgress',
   'focusAgent',
   'navigate',
-  'captureShown'
+  'captureShown',
+  'visit'
 ] as const satisfies readonly (keyof NateBotEvents)[]
 
 export type Unsubscribe = () => void

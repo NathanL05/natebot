@@ -451,6 +451,9 @@ export function SettingsView() {
             </Row>
             <PhoneRow topic={settings.pushTopic} details={settings.pushDetails} inbox={settings.phoneInbox} onChange={(p) => void patch(p)} />
             <QuickCaptureRow value={settings.quickCapture} onChange={(quickCapture) => void patch({ quickCapture })} />
+            <Row label="Open on Today" hint="Start on Today, with what happened while you were away at the top. Off: open your latest chat.">
+              <Toggle label="Open on Today" checked={settings.openOnToday} onChange={(v) => void patch({ openOnToday: v })} />
+            </Row>
             <Row label="Launch at login" hint="Keeps routines running after a restart. NateBot starts hidden in the menu bar.">
               <Toggle label="Launch at login" checked={settings.launchAtLogin} onChange={(v) => void patch({ launchAtLogin: v })} />
             </Row>

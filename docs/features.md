@@ -102,7 +102,14 @@ and you're back in the app you were using. The reply arrives as a
 
 ## Today
 
-**Today** (in the sidebar menu, ⇧⌘T, or the menu-bar menu) gathers what needs you across every agent:
+**Today** (in the sidebar menu, ⇧⌘T, or the menu-bar menu) is where NateBot opens (turn off **Settings → General →
+Open on Today** to open on your latest chat instead). At the top, **Since you were last here** lists the chats your
+agents wrote in while you were away (since NateBot was last open, or after an hour or more with the window in the
+background), each with its latest message: click one to open the chat there, or **Got it** to hide the list. It also
+counts what's waiting below (approvals, commitments due, new radar roles), and says how long NateBot was closed, since
+routines and reminders don't run then.
+
+Today gathers what needs you across every agent:
 proposed actions and handoffs waiting for your OK (with **Approve all** when there are several, after a confirmation
 listing each one), reminders and routines due in the next day, and what routines found in the last day. At the top, **Your day** lists today's Google Calendar events and the tasks due from Google Tasks and Apple Reminders,
 once those are connected. NateBot reads them directly, so this uses no Claude usage. **Commitments** lists what you told

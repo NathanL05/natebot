@@ -58,7 +58,8 @@ export function sanitize(raw: Partial<AppSettings>, fallback: AppSettings): AppS
       : fallback.radarCompanies,
     radarSkip: Array.isArray(raw.radarSkip)
       ? [...new Set(raw.radarSkip.filter((w): w is string => typeof w === 'string').map((w) => w.replace(/\s+/g, ' ').trim().slice(0, 40)).filter(Boolean))].slice(0, 30)
-      : fallback.radarSkip
+      : fallback.radarSkip,
+    openOnToday: typeof raw.openOnToday === 'boolean' ? raw.openOnToday : fallback.openOnToday
   }
 }
 
@@ -87,7 +88,8 @@ export class SettingsStore {
       confirmQuit: true,
       jobRadar: false,
       radarCompanies: [],
-      radarSkip: []
+      radarSkip: [],
+      openOnToday: true
     }
     let raw: Partial<AppSettings> = {}
     try {

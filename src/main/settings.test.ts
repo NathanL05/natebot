@@ -24,7 +24,8 @@ const defaults: AppSettings = {
   confirmQuit: true,
   jobRadar: false,
   radarCompanies: [],
-  radarSkip: []
+  radarSkip: [],
+  openOnToday: true
 }
 
 describe('settings sanitising', () => {

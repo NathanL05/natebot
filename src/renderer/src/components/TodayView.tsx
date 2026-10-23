@@ -10,6 +10,7 @@ import { Avatar } from './Avatar'
 import { HandoffCard } from './HandoffCard'
 import { InboxCard } from './InboxCard'
 import { RadarCard } from './RadarCard'
+import { VisitCard } from './VisitCard'
 import { Markdown } from './Markdown'
 import { CheckIcon, XIcon } from './icons'
 import { Button, ConfirmDialog, IconButton } from './ui'
@@ -82,6 +83,7 @@ export function TodayView() {
             {new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
 
+          <VisitCard />
           <BriefCard />
           {agenda && <YourDay agenda={agenda} onRefresh={() => void api.todayAgenda(true).then(setAgenda)} />}
           <InboxCard />

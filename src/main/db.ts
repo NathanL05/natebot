@@ -270,6 +270,11 @@ export class Db {
         collapsed INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at);
     `)
     // Added after the first release: which sidebar folder a chat is in.
     const cols = this.db.prepare('PRAGMA table_info(agent_state)').all() as { name: string }[]
@@ -298,6 +303,20 @@ export class Db {
   /** The underlying database, for backups. */
   get raw(): DatabaseSync {
     return this.db
+  }
+
+  // ---- small app state (meta) ----
+
+  /** A stored number, e.g. when the window was last looked at; null if never set. */
+  metaNumber(key: string): number | null {
+    const row = this.db.prepare('SELECT value FROM meta WHERE key = ?').get(key) as { value: string } | undefined
+    const n = row ? Number(row.value) : NaN
+    return Number.isFinite(n) ? n : null
+  }
+
+  setMetaNumber(key: string, value: number | null): void {
+    if (value === null) this.db.prepare('DELETE FROM meta WHERE key = ?').run(key)
+    else this.db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value))
   }
 
   // ---- messages ----
@@ -386,6 +405,23 @@ export class Db {
       .prepare(`SELECT * FROM messages WHERE agent_id = ? AND data LIKE '%"status":"executing"%'`)
       .all(chatId) as unknown as MessageRow[]
     return rows.map(toMessage).some((m) => m.actions?.some((a) => a.status === 'executing'))
+  }
+
+  /** Agent and NateBot messages written after `from` and up to `to`, newest first (for "since you were last here"). */
+  messagesBetween(from: number, to: number, limit = 300): ChatMessage[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM messages WHERE created_at > ? AND created_at <= ? AND role IN ('agent', 'system') AND text != ''
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`
+      )
+      .all(from, to, limit) as unknown as MessageRow[]
+    return rows.map(toMessage)
+  }
+
+  /** When you last sent a message anywhere, or null. */
+  lastUserMessageAt(): number | null {
+    const row = this.db.prepare(`SELECT MAX(created_at) AS at FROM messages WHERE role = 'user'`).get() as { at: number | null }
+    return row.at ?? null
   }
 
   /** Agent messages with a proposed action or handoff still waiting for the user, newest first. */

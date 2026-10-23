@@ -441,6 +441,8 @@ export interface AppSettings {
   radarCompanies: string[]
   /** Roles whose title has one of these words are left out ("Senior", "VP"). */
   radarSkip: string[]
+  /** Open on Today, with what happened while you were away (otherwise on the latest chat). */
+  openOnToday: boolean
 }
 
 export const VOICE_RATES = [0.9, 1, 1.15, 1.3]
@@ -531,6 +533,24 @@ export interface RoutineInfo {
   routine: Routine
   nextRun: number | null
   lastRun: { at: number; ok: boolean; summary: string } | null
+}
+
+/** What arrived while you were away, for the card at the top of Today (built without Claude). */
+export interface VisitSummary {
+  /** When you were last here. */
+  since: number
+  /** When NateBot was quit, if it was closed from then until it started again (nothing ran meanwhile). */
+  closedAt: number | null
+  /** When NateBot started again after being closed. */
+  startedAt: number | null
+  /** Chats with new messages, most recent first: how many arrived and the latest one. */
+  chats: { chatId: string; count: number; messageId: string; text: string; at: number }[]
+  /** Proposed actions and handoffs waiting for your OK. */
+  approvals: number
+  /** New roles the job radar found. */
+  radar: number
+  /** Open commitments due today or overdue. */
+  due: number
 }
 
 export interface Bootstrap {

@@ -29,6 +29,16 @@ export function separatorTime(ts: number): string {
   return `${new Date(ts).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} ${time}`
 }
 
+/** How long something lasted: "45 minutes", "3 hours", "2 days". */
+export function duration(ms: number): string {
+  const mins = Math.max(1, Math.round(ms / 60_000))
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'}`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`
+  const days = Math.round(hours / 24)
+  return `${days} day${days === 1 ? '' : 's'}`
+}
+
 export function relativeFuture(ts: number): string {
   const diff = ts - Date.now()
   if (diff <= 0) return 'now'
